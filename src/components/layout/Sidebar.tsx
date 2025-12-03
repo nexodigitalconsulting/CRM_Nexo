@@ -3,7 +3,6 @@ import {
   LayoutDashboard,
   Users,
   Building2,
-  FileText,
   Receipt,
   Briefcase,
   Settings,
@@ -13,10 +12,15 @@ import {
   TrendingUp,
   Megaphone,
   Workflow,
+  LogOut,
+  Wallet,
   CreditCard,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useState } from "react";
+import { useAuth } from "@/hooks/useAuth";
+import { Button } from "@/components/ui/button";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 
 interface NavItem {
   label: string;
@@ -58,6 +62,7 @@ const bottomNav: NavItem[] = [
 
 export function Sidebar() {
   const location = useLocation();
+  const { user, signOut, isAdmin } = useAuth();
   const [expandedItems, setExpandedItems] = useState<string[]>(["Comercial", "Facturación"]);
 
   const toggleExpand = (label: string) => {
@@ -72,6 +77,10 @@ export function Sidebar() {
     if (href) return location.pathname === href;
     if (children) return children.some((child) => location.pathname === child.href);
     return false;
+  };
+
+  const getInitials = (email: string) => {
+    return email.substring(0, 2).toUpperCase();
   };
 
   return (
@@ -163,6 +172,33 @@ export function Sidebar() {
               </li>
             ))}
           </ul>
+        </div>
+
+        {/* User Section */}
+        <div className="border-t border-sidebar-border p-4">
+          <div className="flex items-center gap-3">
+            <Avatar className="h-9 w-9">
+              <AvatarFallback className="bg-primary/10 text-primary text-sm">
+                {user?.email ? getInitials(user.email) : 'U'}
+              </AvatarFallback>
+            </Avatar>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium text-sidebar-foreground truncate">
+                {user?.email}
+              </p>
+              <p className="text-xs text-muted-foreground">
+                {isAdmin ? 'Administrador' : 'Usuario'}
+              </p>
+            </div>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={signOut}
+              className="h-8 w-8 text-muted-foreground hover:text-foreground"
+            >
+              <LogOut className="h-4 w-4" />
+            </Button>
+          </div>
         </div>
       </div>
     </aside>

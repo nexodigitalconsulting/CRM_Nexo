@@ -3,6 +3,8 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { AuthProvider } from "@/hooks/useAuth";
+import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { MainLayout } from "@/components/layout/MainLayout";
 import Dashboard from "./pages/Dashboard";
 import Contacts from "./pages/Contacts";
@@ -11,7 +13,13 @@ import Services from "./pages/Services";
 import Quotes from "./pages/Quotes";
 import Contracts from "./pages/Contracts";
 import Invoices from "./pages/Invoices";
+import Campaigns from "./pages/Campaigns";
+import Expenses from "./pages/Expenses";
+import Remittances from "./pages/Remittances";
+import Flows from "./pages/Flows";
+import Calendar from "./pages/Calendar";
 import Settings from "./pages/Settings";
+import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -22,19 +30,36 @@ const App = () => (
       <Toaster />
       <Sonner />
       <BrowserRouter>
-        <MainLayout>
+        <AuthProvider>
           <Routes>
-            <Route path="/" element={<Dashboard />} />
-            <Route path="/contacts" element={<Contacts />} />
-            <Route path="/clients" element={<Clients />} />
-            <Route path="/services" element={<Services />} />
-            <Route path="/quotes" element={<Quotes />} />
-            <Route path="/contracts" element={<Contracts />} />
-            <Route path="/invoices" element={<Invoices />} />
-            <Route path="/settings" element={<Settings />} />
-            <Route path="*" element={<NotFound />} />
+            <Route path="/auth" element={<Auth />} />
+            <Route
+              path="/*"
+              element={
+                <ProtectedRoute>
+                  <MainLayout>
+                    <Routes>
+                      <Route path="/" element={<Dashboard />} />
+                      <Route path="/campaigns" element={<Campaigns />} />
+                      <Route path="/contacts" element={<Contacts />} />
+                      <Route path="/clients" element={<Clients />} />
+                      <Route path="/services" element={<Services />} />
+                      <Route path="/quotes" element={<Quotes />} />
+                      <Route path="/contracts" element={<Contracts />} />
+                      <Route path="/invoices" element={<Invoices />} />
+                      <Route path="/remittances" element={<Remittances />} />
+                      <Route path="/expenses" element={<Expenses />} />
+                      <Route path="/flows" element={<Flows />} />
+                      <Route path="/calendar" element={<Calendar />} />
+                      <Route path="/settings" element={<Settings />} />
+                      <Route path="*" element={<NotFound />} />
+                    </Routes>
+                  </MainLayout>
+                </ProtectedRoute>
+              }
+            />
           </Routes>
-        </MainLayout>
+        </AuthProvider>
       </BrowserRouter>
     </TooltipProvider>
   </QueryClientProvider>
