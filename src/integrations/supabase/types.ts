@@ -14,6 +14,326 @@ export type Database = {
   }
   public: {
     Tables: {
+      campaigns: {
+        Row: {
+          budget: number | null
+          campaign_number: number
+          created_at: string | null
+          created_by: string | null
+          description: string | null
+          end_date: string | null
+          id: string
+          name: string
+          source: string | null
+          start_date: string | null
+          status: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          budget?: number | null
+          campaign_number?: number
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          end_date?: string | null
+          id?: string
+          name: string
+          source?: string | null
+          start_date?: string | null
+          status?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          budget?: number | null
+          campaign_number?: number
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          end_date?: string | null
+          id?: string
+          name?: string
+          source?: string | null
+          start_date?: string | null
+          status?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      clients: {
+        Row: {
+          address: string | null
+          cif: string | null
+          city: string | null
+          client_number: number
+          contact_id: string | null
+          country: string | null
+          created_at: string | null
+          created_by: string | null
+          email: string | null
+          iban: string | null
+          id: string
+          name: string
+          notes: string | null
+          phone: string | null
+          postal_code: string | null
+          province: string | null
+          segment: Database["public"]["Enums"]["client_segment"] | null
+          source: string | null
+          status: Database["public"]["Enums"]["client_status"] | null
+          updated_at: string | null
+        }
+        Insert: {
+          address?: string | null
+          cif?: string | null
+          city?: string | null
+          client_number?: number
+          contact_id?: string | null
+          country?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          email?: string | null
+          iban?: string | null
+          id?: string
+          name: string
+          notes?: string | null
+          phone?: string | null
+          postal_code?: string | null
+          province?: string | null
+          segment?: Database["public"]["Enums"]["client_segment"] | null
+          source?: string | null
+          status?: Database["public"]["Enums"]["client_status"] | null
+          updated_at?: string | null
+        }
+        Update: {
+          address?: string | null
+          cif?: string | null
+          city?: string | null
+          client_number?: number
+          contact_id?: string | null
+          country?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          email?: string | null
+          iban?: string | null
+          id?: string
+          name?: string
+          notes?: string | null
+          phone?: string | null
+          postal_code?: string | null
+          province?: string | null
+          segment?: Database["public"]["Enums"]["client_segment"] | null
+          source?: string | null
+          status?: Database["public"]["Enums"]["client_status"] | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "clients_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      contacts: {
+        Row: {
+          contact_number: number
+          created_at: string | null
+          created_by: string | null
+          email: string | null
+          id: string
+          meeting_date: string | null
+          name: string
+          notes: string | null
+          phone: string | null
+          presentation_url: string | null
+          quote_url: string | null
+          source: string | null
+          status: Database["public"]["Enums"]["contact_status"] | null
+          updated_at: string | null
+        }
+        Insert: {
+          contact_number?: number
+          created_at?: string | null
+          created_by?: string | null
+          email?: string | null
+          id?: string
+          meeting_date?: string | null
+          name: string
+          notes?: string | null
+          phone?: string | null
+          presentation_url?: string | null
+          quote_url?: string | null
+          source?: string | null
+          status?: Database["public"]["Enums"]["contact_status"] | null
+          updated_at?: string | null
+        }
+        Update: {
+          contact_number?: number
+          created_at?: string | null
+          created_by?: string | null
+          email?: string | null
+          id?: string
+          meeting_date?: string | null
+          name?: string
+          notes?: string | null
+          phone?: string | null
+          presentation_url?: string | null
+          quote_url?: string | null
+          source?: string | null
+          status?: Database["public"]["Enums"]["contact_status"] | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      contract_services: {
+        Row: {
+          contract_id: string
+          created_at: string | null
+          discount_amount: number | null
+          discount_percent: number | null
+          id: string
+          is_active: boolean | null
+          iva_amount: number | null
+          iva_percent: number | null
+          quantity: number | null
+          service_id: string
+          subtotal: number
+          total: number
+          unit_price: number
+          updated_at: string | null
+        }
+        Insert: {
+          contract_id: string
+          created_at?: string | null
+          discount_amount?: number | null
+          discount_percent?: number | null
+          id?: string
+          is_active?: boolean | null
+          iva_amount?: number | null
+          iva_percent?: number | null
+          quantity?: number | null
+          service_id: string
+          subtotal: number
+          total: number
+          unit_price: number
+          updated_at?: string | null
+        }
+        Update: {
+          contract_id?: string
+          created_at?: string | null
+          discount_amount?: number | null
+          discount_percent?: number | null
+          id?: string
+          is_active?: boolean | null
+          iva_amount?: number | null
+          iva_percent?: number | null
+          quantity?: number | null
+          service_id?: string
+          subtotal?: number
+          total?: number
+          unit_price?: number
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "contract_services_contract_id_fkey"
+            columns: ["contract_id"]
+            isOneToOne: false
+            referencedRelation: "contracts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contract_services_service_id_fkey"
+            columns: ["service_id"]
+            isOneToOne: false
+            referencedRelation: "services"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      contracts: {
+        Row: {
+          billing_period: Database["public"]["Enums"]["billing_period"] | null
+          client_id: string
+          contract_number: number
+          created_at: string | null
+          created_by: string | null
+          document_url: string | null
+          end_date: string | null
+          id: string
+          iva_total: number | null
+          name: string | null
+          next_billing_date: string | null
+          notes: string | null
+          payment_status: Database["public"]["Enums"]["payment_status"] | null
+          quote_id: string | null
+          start_date: string
+          status: Database["public"]["Enums"]["contract_status"] | null
+          subtotal: number | null
+          total: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          billing_period?: Database["public"]["Enums"]["billing_period"] | null
+          client_id: string
+          contract_number?: number
+          created_at?: string | null
+          created_by?: string | null
+          document_url?: string | null
+          end_date?: string | null
+          id?: string
+          iva_total?: number | null
+          name?: string | null
+          next_billing_date?: string | null
+          notes?: string | null
+          payment_status?: Database["public"]["Enums"]["payment_status"] | null
+          quote_id?: string | null
+          start_date: string
+          status?: Database["public"]["Enums"]["contract_status"] | null
+          subtotal?: number | null
+          total?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          billing_period?: Database["public"]["Enums"]["billing_period"] | null
+          client_id?: string
+          contract_number?: number
+          created_at?: string | null
+          created_by?: string | null
+          document_url?: string | null
+          end_date?: string | null
+          id?: string
+          iva_total?: number | null
+          name?: string | null
+          next_billing_date?: string | null
+          notes?: string | null
+          payment_status?: Database["public"]["Enums"]["payment_status"] | null
+          quote_id?: string | null
+          start_date?: string
+          status?: Database["public"]["Enums"]["contract_status"] | null
+          subtotal?: number | null
+          total?: number | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "contracts_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contracts_quote_id_fkey"
+            columns: ["quote_id"]
+            isOneToOne: false
+            referencedRelation: "quotes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       documents_rag: {
         Row: {
           content: string
@@ -35,11 +355,515 @@ export type Database = {
         }
         Relationships: []
       }
+      expenses: {
+        Row: {
+          concept: string | null
+          created_at: string | null
+          created_by: string | null
+          currency: string | null
+          document_url: string | null
+          due_date: string | null
+          expense_number: number
+          id: string
+          invoice_number: string | null
+          irpf_amount: number | null
+          irpf_percent: number | null
+          issue_date: string
+          iva_amount: number | null
+          iva_percent: number | null
+          notes: string | null
+          status: string | null
+          subtotal: number | null
+          supplier_cif: string | null
+          supplier_name: string
+          total: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          concept?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          currency?: string | null
+          document_url?: string | null
+          due_date?: string | null
+          expense_number?: number
+          id?: string
+          invoice_number?: string | null
+          irpf_amount?: number | null
+          irpf_percent?: number | null
+          issue_date: string
+          iva_amount?: number | null
+          iva_percent?: number | null
+          notes?: string | null
+          status?: string | null
+          subtotal?: number | null
+          supplier_cif?: string | null
+          supplier_name: string
+          total?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          concept?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          currency?: string | null
+          document_url?: string | null
+          due_date?: string | null
+          expense_number?: number
+          id?: string
+          invoice_number?: string | null
+          irpf_amount?: number | null
+          irpf_percent?: number | null
+          issue_date?: string
+          iva_amount?: number | null
+          iva_percent?: number | null
+          notes?: string | null
+          status?: string | null
+          subtotal?: number | null
+          supplier_cif?: string | null
+          supplier_name?: string
+          total?: number | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      invoice_services: {
+        Row: {
+          created_at: string | null
+          description: string | null
+          discount_amount: number | null
+          discount_percent: number | null
+          id: string
+          invoice_id: string
+          iva_amount: number | null
+          iva_percent: number | null
+          quantity: number | null
+          service_id: string
+          subtotal: number
+          total: number
+          unit_price: number
+        }
+        Insert: {
+          created_at?: string | null
+          description?: string | null
+          discount_amount?: number | null
+          discount_percent?: number | null
+          id?: string
+          invoice_id: string
+          iva_amount?: number | null
+          iva_percent?: number | null
+          quantity?: number | null
+          service_id: string
+          subtotal: number
+          total: number
+          unit_price: number
+        }
+        Update: {
+          created_at?: string | null
+          description?: string | null
+          discount_amount?: number | null
+          discount_percent?: number | null
+          id?: string
+          invoice_id?: string
+          iva_amount?: number | null
+          iva_percent?: number | null
+          quantity?: number | null
+          service_id?: string
+          subtotal?: number
+          total?: number
+          unit_price?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "invoice_services_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "invoices"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invoice_services_service_id_fkey"
+            columns: ["service_id"]
+            isOneToOne: false
+            referencedRelation: "services"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      invoices: {
+        Row: {
+          client_id: string
+          contract_id: string | null
+          created_at: string | null
+          created_by: string | null
+          document_url: string | null
+          due_date: string | null
+          id: string
+          invoice_number: number
+          issue_date: string
+          iva_amount: number | null
+          iva_percent: number | null
+          notes: string | null
+          remittance_id: string | null
+          status: Database["public"]["Enums"]["invoice_status"] | null
+          subtotal: number | null
+          total: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          client_id: string
+          contract_id?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          document_url?: string | null
+          due_date?: string | null
+          id?: string
+          invoice_number?: number
+          issue_date?: string
+          iva_amount?: number | null
+          iva_percent?: number | null
+          notes?: string | null
+          remittance_id?: string | null
+          status?: Database["public"]["Enums"]["invoice_status"] | null
+          subtotal?: number | null
+          total?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          client_id?: string
+          contract_id?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          document_url?: string | null
+          due_date?: string | null
+          id?: string
+          invoice_number?: number
+          issue_date?: string
+          iva_amount?: number | null
+          iva_percent?: number | null
+          notes?: string | null
+          remittance_id?: string | null
+          status?: Database["public"]["Enums"]["invoice_status"] | null
+          subtotal?: number | null
+          total?: number | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fk_invoice_remittance"
+            columns: ["remittance_id"]
+            isOneToOne: false
+            referencedRelation: "remittances"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invoices_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invoices_contract_id_fkey"
+            columns: ["contract_id"]
+            isOneToOne: false
+            referencedRelation: "contracts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      profiles: {
+        Row: {
+          avatar_url: string | null
+          created_at: string | null
+          email: string
+          full_name: string | null
+          id: string
+          is_active: boolean | null
+          language: string | null
+          phone: string | null
+          timezone: string | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          avatar_url?: string | null
+          created_at?: string | null
+          email: string
+          full_name?: string | null
+          id?: string
+          is_active?: boolean | null
+          language?: string | null
+          phone?: string | null
+          timezone?: string | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          avatar_url?: string | null
+          created_at?: string | null
+          email?: string
+          full_name?: string | null
+          id?: string
+          is_active?: boolean | null
+          language?: string | null
+          phone?: string | null
+          timezone?: string | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      quote_services: {
+        Row: {
+          created_at: string | null
+          discount_amount: number | null
+          discount_percent: number | null
+          id: string
+          iva_amount: number | null
+          iva_percent: number | null
+          quantity: number | null
+          quote_id: string
+          service_id: string
+          subtotal: number
+          total: number
+          unit_price: number
+        }
+        Insert: {
+          created_at?: string | null
+          discount_amount?: number | null
+          discount_percent?: number | null
+          id?: string
+          iva_amount?: number | null
+          iva_percent?: number | null
+          quantity?: number | null
+          quote_id: string
+          service_id: string
+          subtotal: number
+          total: number
+          unit_price: number
+        }
+        Update: {
+          created_at?: string | null
+          discount_amount?: number | null
+          discount_percent?: number | null
+          id?: string
+          iva_amount?: number | null
+          iva_percent?: number | null
+          quantity?: number | null
+          quote_id?: string
+          service_id?: string
+          subtotal?: number
+          total?: number
+          unit_price?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "quote_services_quote_id_fkey"
+            columns: ["quote_id"]
+            isOneToOne: false
+            referencedRelation: "quotes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "quote_services_service_id_fkey"
+            columns: ["service_id"]
+            isOneToOne: false
+            referencedRelation: "services"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      quotes: {
+        Row: {
+          client_id: string | null
+          contact_id: string | null
+          created_at: string | null
+          created_by: string | null
+          document_url: string | null
+          id: string
+          iva_total: number | null
+          name: string | null
+          notes: string | null
+          quote_number: number
+          status: Database["public"]["Enums"]["quote_status"] | null
+          subtotal: number | null
+          total: number | null
+          updated_at: string | null
+          valid_until: string | null
+        }
+        Insert: {
+          client_id?: string | null
+          contact_id?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          document_url?: string | null
+          id?: string
+          iva_total?: number | null
+          name?: string | null
+          notes?: string | null
+          quote_number?: number
+          status?: Database["public"]["Enums"]["quote_status"] | null
+          subtotal?: number | null
+          total?: number | null
+          updated_at?: string | null
+          valid_until?: string | null
+        }
+        Update: {
+          client_id?: string | null
+          contact_id?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          document_url?: string | null
+          id?: string
+          iva_total?: number | null
+          name?: string | null
+          notes?: string | null
+          quote_number?: number
+          status?: Database["public"]["Enums"]["quote_status"] | null
+          subtotal?: number | null
+          total?: number | null
+          updated_at?: string | null
+          valid_until?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "quotes_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "quotes_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      remittances: {
+        Row: {
+          code: string | null
+          created_at: string | null
+          created_by: string | null
+          id: string
+          invoice_count: number | null
+          issue_date: string
+          n19_file_url: string | null
+          notes: string | null
+          remittance_number: number
+          status: Database["public"]["Enums"]["remittance_status"] | null
+          total_amount: number | null
+          updated_at: string | null
+          xml_file_url: string | null
+        }
+        Insert: {
+          code?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          invoice_count?: number | null
+          issue_date?: string
+          n19_file_url?: string | null
+          notes?: string | null
+          remittance_number?: number
+          status?: Database["public"]["Enums"]["remittance_status"] | null
+          total_amount?: number | null
+          updated_at?: string | null
+          xml_file_url?: string | null
+        }
+        Update: {
+          code?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          invoice_count?: number | null
+          issue_date?: string
+          n19_file_url?: string | null
+          notes?: string | null
+          remittance_number?: number
+          status?: Database["public"]["Enums"]["remittance_status"] | null
+          total_amount?: number | null
+          updated_at?: string | null
+          xml_file_url?: string | null
+        }
+        Relationships: []
+      }
+      services: {
+        Row: {
+          category: string | null
+          created_at: string | null
+          description: string | null
+          id: string
+          iva_percent: number | null
+          name: string
+          price: number
+          service_number: number
+          status: Database["public"]["Enums"]["service_status"] | null
+          updated_at: string | null
+        }
+        Insert: {
+          category?: string | null
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          iva_percent?: number | null
+          name: string
+          price?: number
+          service_number?: number
+          status?: Database["public"]["Enums"]["service_status"] | null
+          updated_at?: string | null
+        }
+        Update: {
+          category?: string | null
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          iva_percent?: number | null
+          name?: string
+          price?: number
+          service_number?: number
+          status?: Database["public"]["Enums"]["service_status"] | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      user_roles: {
+        Row: {
+          created_at: string | null
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
+      has_any_role: { Args: { _user_id: string }; Returns: boolean }
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
       match_documents_rag: {
         Args: { filter?: Json; match_count?: number; query_embedding: string }
         Returns: {
@@ -51,7 +875,22 @@ export type Database = {
       }
     }
     Enums: {
-      [_ in never]: never
+      app_role: "admin" | "manager" | "user" | "readonly"
+      billing_period: "monthly" | "quarterly" | "annual" | "one_time" | "other"
+      client_segment: "corporate" | "pyme" | "entrepreneur" | "individual"
+      client_status: "active" | "inactive"
+      contact_status:
+        | "new"
+        | "contacted"
+        | "follow_up"
+        | "discarded"
+        | "converted"
+      contract_status: "active" | "expired" | "cancelled" | "pending_activation"
+      invoice_status: "draft" | "issued" | "paid" | "cancelled"
+      payment_status: "paid" | "pending" | "partial" | "claimed"
+      quote_status: "draft" | "sent" | "approved" | "rejected"
+      remittance_status: "pending" | "paid" | "partial" | "overdue"
+      service_status: "active" | "inactive" | "development"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -178,6 +1017,24 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      app_role: ["admin", "manager", "user", "readonly"],
+      billing_period: ["monthly", "quarterly", "annual", "one_time", "other"],
+      client_segment: ["corporate", "pyme", "entrepreneur", "individual"],
+      client_status: ["active", "inactive"],
+      contact_status: [
+        "new",
+        "contacted",
+        "follow_up",
+        "discarded",
+        "converted",
+      ],
+      contract_status: ["active", "expired", "cancelled", "pending_activation"],
+      invoice_status: ["draft", "issued", "paid", "cancelled"],
+      payment_status: ["paid", "pending", "partial", "claimed"],
+      quote_status: ["draft", "sent", "approved", "rejected"],
+      remittance_status: ["pending", "paid", "partial", "overdue"],
+      service_status: ["active", "inactive", "development"],
+    },
   },
 } as const
