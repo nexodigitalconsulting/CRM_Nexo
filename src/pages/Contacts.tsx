@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Header } from "@/components/layout/Header";
 import { DataTable } from "@/components/ui/data-table";
 import { StatusBadge } from "@/components/ui/status-badge";
@@ -10,141 +11,199 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Plus, Filter, Download, Mail, Phone } from "lucide-react";
-
-interface Contact {
-  id: string;
-  name: string;
-  email: string;
-  phone: string;
-  origin: string;
-  status: string;
-  captureDate: string;
-}
-
-const contacts: Contact[] = [
-  {
-    id: "CC-2024-0001",
-    name: "María García López",
-    email: "maria.garcia@email.com",
-    phone: "+34 612 345 678",
-    origin: "Formulario Web",
-    status: "Nuevo",
-    captureDate: "2024-12-01",
-  },
-  {
-    id: "CC-2024-0002",
-    name: "Carlos Martínez",
-    email: "carlos.m@empresa.es",
-    phone: "+34 623 456 789",
-    origin: "WhatsApp",
-    status: "Contactado",
-    captureDate: "2024-11-28",
-  },
-  {
-    id: "CC-2024-0003",
-    name: "Ana Rodríguez",
-    email: "ana.rodriguez@gmail.com",
-    phone: "+34 634 567 890",
-    origin: "Instagram",
-    status: "En seguimiento",
-    captureDate: "2024-11-25",
-  },
-  {
-    id: "CC-2024-0004",
-    name: "Pedro Sánchez Ruiz",
-    email: "pedro.sr@outlook.com",
-    phone: "+34 645 678 901",
-    origin: "Facebook",
-    status: "Convertido",
-    captureDate: "2024-11-20",
-  },
-  {
-    id: "CC-2024-0005",
-    name: "Laura Fernández",
-    email: "laura.f@empresa.com",
-    phone: "+34 656 789 012",
-    origin: "Webscraping",
-    status: "Descartado",
-    captureDate: "2024-11-15",
-  },
-];
+import { Plus, Filter, Download, Mail, Phone, Edit, Trash2, UserPlus, Loader2 } from "lucide-react";
+import { useContacts, useDeleteContact, useConvertToClient, Contact } from "@/hooks/useContacts";
+import { ContactFormDialog } from "@/components/contacts/ContactFormDialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 const statusMap: Record<string, "new" | "active" | "pending" | "success" | "inactive"> = {
-  Nuevo: "new",
-  Contactado: "pending",
-  "En seguimiento": "pending",
-  Convertido: "success",
-  Descartado: "inactive",
+  new: "new",
+  contacted: "pending",
+  follow_up: "pending",
+  converted: "success",
+  discarded: "inactive",
 };
 
-const columns = [
-  {
-    key: "id",
-    label: "ID",
-    render: (contact: Contact) => (
-      <span className="font-mono text-xs text-muted-foreground">{contact.id}</span>
-    ),
-  },
-  {
-    key: "name",
-    label: "Nombre",
-    render: (contact: Contact) => (
-      <span className="font-medium text-foreground">{contact.name}</span>
-    ),
-  },
-  {
-    key: "email",
-    label: "Email",
-    render: (contact: Contact) => (
-      <div className="flex items-center gap-2">
-        <Mail className="h-4 w-4 text-muted-foreground" />
-        <span className="text-sm">{contact.email}</span>
-      </div>
-    ),
-  },
-  {
-    key: "phone",
-    label: "Teléfono",
-    render: (contact: Contact) => (
-      <div className="flex items-center gap-2">
-        <Phone className="h-4 w-4 text-muted-foreground" />
-        <span className="text-sm">{contact.phone}</span>
-      </div>
-    ),
-  },
-  {
-    key: "origin",
-    label: "Origen",
-  },
-  {
-    key: "status",
-    label: "Estado",
-    render: (contact: Contact) => (
-      <StatusBadge variant={statusMap[contact.status]}>
-        {contact.status}
-      </StatusBadge>
-    ),
-  },
-  {
-    key: "captureDate",
-    label: "Fecha Captación",
-    render: (contact: Contact) => (
-      <span className="text-sm text-muted-foreground">
-        {new Date(contact.captureDate).toLocaleDateString("es-ES")}
-      </span>
-    ),
-  },
-];
+const statusLabels: Record<string, string> = {
+  new: "Nuevo",
+  contacted: "Contactado",
+  follow_up: "Seguimiento",
+  converted: "Convertido",
+  discarded: "Descartado",
+};
 
 export default function Contacts() {
+  const { data: contacts, isLoading, error } = useContacts();
+  const deleteContact = useDeleteContact();
+  const convertToClient = useConvertToClient();
+  
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [selectedContact, setSelectedContact] = useState<Contact | null>(null);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [contactToDelete, setContactToDelete] = useState<Contact | null>(null);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [sourceFilter, setSourceFilter] = useState("all");
+
+  const handleEdit = (contact: Contact) => {
+    setSelectedContact(contact);
+    setDialogOpen(true);
+  };
+
+  const handleDelete = (contact: Contact) => {
+    setContactToDelete(contact);
+    setDeleteDialogOpen(true);
+  };
+
+  const confirmDelete = async () => {
+    if (contactToDelete) {
+      await deleteContact.mutateAsync(contactToDelete.id);
+      setDeleteDialogOpen(false);
+      setContactToDelete(null);
+    }
+  };
+
+  const handleConvert = async (contact: Contact) => {
+    await convertToClient.mutateAsync(contact);
+  };
+
+  const filteredContacts = contacts?.filter((contact) => {
+    const matchesSearch = contact.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      contact.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      contact.phone?.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesStatus = statusFilter === "all" || contact.status === statusFilter;
+    const matchesSource = sourceFilter === "all" || contact.source === sourceFilter;
+    return matchesSearch && matchesStatus && matchesSource;
+  }) || [];
+
+  const columns = [
+    {
+      key: "contact_number",
+      label: "ID",
+      render: (contact: Contact) => (
+        <span className="font-mono text-xs text-muted-foreground">CC-{String(contact.contact_number).padStart(4, "0")}</span>
+      ),
+    },
+    {
+      key: "name",
+      label: "Nombre",
+      render: (contact: Contact) => (
+        <span className="font-medium text-foreground">{contact.name}</span>
+      ),
+    },
+    {
+      key: "email",
+      label: "Email",
+      render: (contact: Contact) => (
+        <div className="flex items-center gap-2">
+          <Mail className="h-4 w-4 text-muted-foreground" />
+          <span className="text-sm">{contact.email || "-"}</span>
+        </div>
+      ),
+    },
+    {
+      key: "phone",
+      label: "Teléfono",
+      render: (contact: Contact) => (
+        <div className="flex items-center gap-2">
+          <Phone className="h-4 w-4 text-muted-foreground" />
+          <span className="text-sm">{contact.phone || "-"}</span>
+        </div>
+      ),
+    },
+    {
+      key: "source",
+      label: "Origen",
+      render: (contact: Contact) => <span className="text-sm capitalize">{contact.source || "-"}</span>,
+    },
+    {
+      key: "status",
+      label: "Estado",
+      render: (contact: Contact) => (
+        <StatusBadge variant={statusMap[contact.status || "new"]}>
+          {statusLabels[contact.status || "new"]}
+        </StatusBadge>
+      ),
+    },
+    {
+      key: "created_at",
+      label: "Fecha Captación",
+      render: (contact: Contact) => (
+        <span className="text-sm text-muted-foreground">
+          {contact.created_at ? new Date(contact.created_at).toLocaleDateString("es-ES") : "-"}
+        </span>
+      ),
+    },
+    {
+      key: "actions",
+      label: "",
+      render: (contact: Contact) => (
+        <TooltipProvider>
+          <div className="flex gap-1">
+            {contact.status !== "converted" && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button 
+                    variant="ghost" 
+                    size="icon" 
+                    className="h-8 w-8 text-success" 
+                    onClick={() => handleConvert(contact)}
+                    disabled={convertToClient.isPending}
+                  >
+                    <UserPlus className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Convertir a cliente</TooltipContent>
+              </Tooltip>
+            )}
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleEdit(contact)}>
+                  <Edit className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Editar</TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => handleDelete(contact)}>
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Eliminar</TooltipContent>
+            </Tooltip>
+          </div>
+        </TooltipProvider>
+      ),
+    },
+  ];
+
+  if (error) {
+    return <div className="p-6 text-destructive">Error al cargar contactos: {error.message}</div>;
+  }
+
   return (
     <div className="animate-fade-in">
       <Header
         title="Contactos"
         subtitle="Gestiona tus leads y contactos"
         actions={
-          <Button className="gap-2">
+          <Button className="gap-2" onClick={() => { setSelectedContact(null); setDialogOpen(true); }}>
             <Plus className="h-4 w-4" />
             Nuevo Contacto
           </Button>
@@ -152,35 +211,71 @@ export default function Contacts() {
       />
 
       <div className="p-6 space-y-6">
+        {/* Stats */}
+        <div className="grid grid-cols-1 sm:grid-cols-5 gap-4">
+          <div className="bg-card rounded-lg border border-border p-4">
+            <p className="text-sm text-muted-foreground">Total</p>
+            <p className="text-2xl font-semibold mt-1">{contacts?.length || 0}</p>
+          </div>
+          <div className="bg-card rounded-lg border border-border p-4">
+            <p className="text-sm text-muted-foreground">Nuevos</p>
+            <p className="text-2xl font-semibold mt-1 text-primary">
+              {contacts?.filter((c) => c.status === "new").length || 0}
+            </p>
+          </div>
+          <div className="bg-card rounded-lg border border-border p-4">
+            <p className="text-sm text-muted-foreground">Seguimiento</p>
+            <p className="text-2xl font-semibold mt-1 text-warning">
+              {contacts?.filter((c) => c.status === "follow_up").length || 0}
+            </p>
+          </div>
+          <div className="bg-card rounded-lg border border-border p-4">
+            <p className="text-sm text-muted-foreground">Convertidos</p>
+            <p className="text-2xl font-semibold mt-1 text-success">
+              {contacts?.filter((c) => c.status === "converted").length || 0}
+            </p>
+          </div>
+          <div className="bg-card rounded-lg border border-border p-4">
+            <p className="text-sm text-muted-foreground">Tasa Conversión</p>
+            <p className="text-2xl font-semibold mt-1">
+              {contacts?.length ? Math.round((contacts.filter((c) => c.status === "converted").length / contacts.length) * 100) : 0}%
+            </p>
+          </div>
+        </div>
+
         {/* Filters */}
         <div className="flex flex-col sm:flex-row gap-4">
           <Input
             placeholder="Buscar contactos..."
             className="sm:w-80"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
           />
-          <Select>
+          <Select value={statusFilter} onValueChange={setStatusFilter}>
             <SelectTrigger className="sm:w-48">
               <SelectValue placeholder="Estado" />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Todos</SelectItem>
-              <SelectItem value="nuevo">Nuevo</SelectItem>
-              <SelectItem value="contactado">Contactado</SelectItem>
-              <SelectItem value="seguimiento">En seguimiento</SelectItem>
-              <SelectItem value="convertido">Convertido</SelectItem>
-              <SelectItem value="descartado">Descartado</SelectItem>
+              <SelectItem value="new">Nuevo</SelectItem>
+              <SelectItem value="contacted">Contactado</SelectItem>
+              <SelectItem value="follow_up">Seguimiento</SelectItem>
+              <SelectItem value="converted">Convertido</SelectItem>
+              <SelectItem value="discarded">Descartado</SelectItem>
             </SelectContent>
           </Select>
-          <Select>
+          <Select value={sourceFilter} onValueChange={setSourceFilter}>
             <SelectTrigger className="sm:w-48">
               <SelectValue placeholder="Origen" />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Todos</SelectItem>
-              <SelectItem value="web">Formulario Web</SelectItem>
-              <SelectItem value="whatsapp">WhatsApp</SelectItem>
-              <SelectItem value="instagram">Instagram</SelectItem>
-              <SelectItem value="facebook">Facebook</SelectItem>
+              <SelectItem value="web">Web</SelectItem>
+              <SelectItem value="linkedin">LinkedIn</SelectItem>
+              <SelectItem value="referido">Referido</SelectItem>
+              <SelectItem value="email">Email</SelectItem>
+              <SelectItem value="telefono">Teléfono</SelectItem>
+              <SelectItem value="evento">Evento</SelectItem>
             </SelectContent>
           </Select>
           <div className="flex gap-2 ml-auto">
@@ -194,8 +289,37 @@ export default function Contacts() {
         </div>
 
         {/* Data Table */}
-        <DataTable columns={columns} data={contacts} />
+        {isLoading ? (
+          <div className="flex items-center justify-center py-12">
+            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+          </div>
+        ) : (
+          <DataTable columns={columns} data={filteredContacts} />
+        )}
       </div>
+
+      <ContactFormDialog 
+        open={dialogOpen} 
+        onOpenChange={setDialogOpen} 
+        contact={selectedContact} 
+      />
+
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Eliminar contacto?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta acción no se puede deshacer. Se eliminará permanentemente el contacto "{contactToDelete?.name}".
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              Eliminar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
