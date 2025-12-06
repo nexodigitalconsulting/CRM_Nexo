@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Header } from "@/components/layout/Header";
 import { DataTable } from "@/components/ui/data-table";
 import { StatusBadge } from "@/components/ui/status-badge";
@@ -10,97 +11,48 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Plus, Filter, Download, FileText, Calendar } from "lucide-react";
-
-interface Contract {
-  id: string;
-  name: string;
-  client: string;
-  startDate: string;
-  endDate: string;
-  billing: string;
-  status: string;
-  paymentStatus: string;
-}
-
-const contracts: Contract[] = [
-  {
-    id: "CN-2024-0018",
-    name: "Marketing Digital Anual",
-    client: "Tech Solutions SL",
-    startDate: "2024-01-01",
-    endDate: "2024-12-31",
-    billing: "Mensual",
-    status: "Vigente",
-    paymentStatus: "Pagado",
-  },
-  {
-    id: "CN-2024-0017",
-    name: "Gestión RRSS Premium",
-    client: "Digital Labs SA",
-    startDate: "2024-03-01",
-    endDate: "2025-02-28",
-    billing: "Mensual",
-    status: "Vigente",
-    paymentStatus: "Pagado",
-  },
-  {
-    id: "CN-2024-0016",
-    name: "SEO + SEM Trimestral",
-    client: "Innovación Global",
-    startDate: "2024-09-01",
-    endDate: "2024-11-30",
-    billing: "Trimestral",
-    status: "Vencido",
-    paymentStatus: "Pendiente de Pago",
-  },
-  {
-    id: "CN-2024-0015",
-    name: "Desarrollo Web Corporativa",
-    client: "Acme Corporation",
-    startDate: "2024-10-15",
-    endDate: "2025-01-15",
-    billing: "Puntual",
-    status: "Vigente",
-    paymentStatus: "Pago Parcial",
-  },
-  {
-    id: "CN-2024-0014",
-    name: "Consultoría Digital",
-    client: "María López Consulting",
-    startDate: "2024-06-01",
-    endDate: "2024-08-31",
-    billing: "Mensual",
-    status: "Cancelado",
-    paymentStatus: "Pagado",
-  },
-];
+import { Plus, Filter, Download, FileText, Calendar, Edit, Trash2 } from "lucide-react";
+import { useContracts, useDeleteContract, ContractWithDetails } from "@/hooks/useContracts";
+import { ContractFormDialog } from "@/components/contracts/ContractFormDialog";
+import { Skeleton } from "@/components/ui/skeleton";
+import { format } from "date-fns";
+import { es } from "date-fns/locale";
 
 const statusMap: Record<string, "active" | "pending" | "inactive" | "danger"> = {
-  Vigente: "active",
-  "Pendiente de Activación": "pending",
-  Vencido: "danger",
-  Cancelado: "inactive",
+  active: "active",
+  pending_activation: "pending",
+  expired: "danger",
+  cancelled: "inactive",
 };
 
 const paymentStatusMap: Record<string, "active" | "pending" | "danger"> = {
-  Pagado: "active",
-  "Pendiente de Pago": "danger",
-  "Pago Parcial": "pending",
-  Reclamado: "danger",
+  paid: "active",
+  pending: "pending",
+  partial: "pending",
+  claimed: "danger",
 };
 
-const columns = [
-  {
-    key: "id",
-    label: "ID Contrato",
-    render: (contract: Contract) => (
-      <div className="flex items-center gap-2">
-        <FileText className="h-4 w-4 text-muted-foreground" />
-        <span className="font-mono text-xs text-muted-foreground">{contract.id}</span>
-      </div>
-    ),
-  },
+const statusLabels: Record<string, string> = {
+  active: "Vigente",
+  pending_activation: "Pendiente",
+  expired: "Vencido",
+  cancelled: "Cancelado",
+};
+
+const paymentLabels: Record<string, string> = {
+  paid: "Pagado",
+  pending: "Pendiente",
+  partial: "Pago Parcial",
+  claimed: "Reclamado",
+};
+
+const billingLabels: Record<string, string> = {
+  monthly: "Mensual",
+  quarterly: "Trimestral",
+  annual: "Anual",
+  one_time: "Puntual",
+  other: "Otro",
+};
   {
     key: "name",
     label: "Contrato",
