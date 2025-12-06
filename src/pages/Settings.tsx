@@ -17,10 +17,10 @@ import {
   Users,
   Shield,
   Bell,
-  Globe,
-  Palette,
+  FileText,
   Save,
 } from "lucide-react";
+import { TemplateManager } from "@/components/settings/TemplateManager";
 
 export default function Settings() {
   return (
@@ -50,7 +50,10 @@ export default function Settings() {
               <Bell className="h-4 w-4" />
               Notificaciones
             </TabsTrigger>
-          </TabsList>
+            <TabsTrigger value="templates" className="gap-2">
+              <FileText className="h-4 w-4" />
+              Plantillas
+            </TabsTrigger>
 
           <TabsContent value="company" className="space-y-6">
             <div className="bg-card rounded-xl border border-border p-6">
@@ -388,8 +391,14 @@ export default function Settings() {
               </div>
             </div>
           </TabsContent>
+
+          <TabsContent value="templates" className="space-y-6">
+            <TemplateManager />
+          </TabsContent>
         </Tabs>
       </div>
     </div>
+  );
+}
   );
 }
