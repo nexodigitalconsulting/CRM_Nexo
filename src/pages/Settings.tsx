@@ -54,6 +54,7 @@ export default function Settings() {
               <FileText className="h-4 w-4" />
               Plantillas
             </TabsTrigger>
+          </TabsList>
 
           <TabsContent value="company" className="space-y-6">
             <div className="bg-card rounded-xl border border-border p-6">
@@ -398,7 +399,5 @@ export default function Settings() {
         </Tabs>
       </div>
     </div>
-  );
-}
   );
 }
