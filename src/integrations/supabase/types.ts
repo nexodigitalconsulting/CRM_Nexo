@@ -16,46 +16,64 @@ export type Database = {
     Tables: {
       campaigns: {
         Row: {
-          budget: number | null
+          address: string | null
+          business_name: string | null
           campaign_number: number
+          capture_date: string | null
+          category: string | null
+          city: string | null
           created_at: string | null
           created_by: string | null
-          description: string | null
-          end_date: string | null
+          email: string | null
           id: string
           name: string
-          source: string | null
-          start_date: string | null
+          phone: string | null
+          place_id: string | null
+          postal_code: string | null
+          province: string | null
           status: string | null
           updated_at: string | null
+          website: string | null
         }
         Insert: {
-          budget?: number | null
+          address?: string | null
+          business_name?: string | null
           campaign_number?: number
+          capture_date?: string | null
+          category?: string | null
+          city?: string | null
           created_at?: string | null
           created_by?: string | null
-          description?: string | null
-          end_date?: string | null
+          email?: string | null
           id?: string
           name: string
-          source?: string | null
-          start_date?: string | null
+          phone?: string | null
+          place_id?: string | null
+          postal_code?: string | null
+          province?: string | null
           status?: string | null
           updated_at?: string | null
+          website?: string | null
         }
         Update: {
-          budget?: number | null
+          address?: string | null
+          business_name?: string | null
           campaign_number?: number
+          capture_date?: string | null
+          category?: string | null
+          city?: string | null
           created_at?: string | null
           created_by?: string | null
-          description?: string | null
-          end_date?: string | null
+          email?: string | null
           id?: string
           name?: string
-          source?: string | null
-          start_date?: string | null
+          phone?: string | null
+          place_id?: string | null
+          postal_code?: string | null
+          province?: string | null
           status?: string | null
           updated_at?: string | null
+          website?: string | null
         }
         Relationships: []
       }
@@ -391,6 +409,45 @@ export type Database = {
           embedding?: string | null
           id?: number
           metadata?: Json | null
+        }
+        Relationships: []
+      }
+      entity_configurations: {
+        Row: {
+          created_at: string | null
+          created_by: string | null
+          display_name: string
+          entity_name: string
+          fields: Json
+          icon: string | null
+          id: string
+          is_active: boolean | null
+          is_system: boolean | null
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          created_by?: string | null
+          display_name: string
+          entity_name: string
+          fields?: Json
+          icon?: string | null
+          id?: string
+          is_active?: boolean | null
+          is_system?: boolean | null
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          created_by?: string | null
+          display_name?: string
+          entity_name?: string
+          fields?: Json
+          icon?: string | null
+          id?: string
+          is_active?: boolean | null
+          is_system?: boolean | null
+          updated_at?: string | null
         }
         Relationships: []
       }
