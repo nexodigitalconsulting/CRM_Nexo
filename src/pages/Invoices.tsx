@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Header } from "@/components/layout/Header";
 import { DataTable } from "@/components/ui/data-table";
 import { StatusBadge } from "@/components/ui/status-badge";
@@ -10,175 +11,221 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Plus, Filter, Download, FileText, Eye } from "lucide-react";
+import { Plus, Filter, Download, FileText, Edit, Trash2, Printer } from "lucide-react";
+import { useInvoices, useDeleteInvoice, useInvoice, InvoiceWithDetails } from "@/hooks/useInvoices";
+import { InvoiceFormDialog } from "@/components/invoices/InvoiceFormDialog";
+import { Skeleton } from "@/components/ui/skeleton";
+import { format } from "date-fns";
+import { es } from "date-fns/locale";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { useDefaultTemplate } from "@/hooks/useTemplates";
+import { printDocument, formatInvoiceData } from "@/lib/pdfGenerator";
+import { toast } from "sonner";
 
-interface Invoice {
-  id: string;
-  client: string;
-  clientCif: string;
-  issueDate: string;
-  dueDate: string;
-  baseAmount: number;
-  iva: number;
-  total: number;
-  status: string;
-}
-
-const invoices: Invoice[] = [
-  {
-    id: "FF-2024-0156",
-    client: "Tech Solutions SL",
-    clientCif: "B12345678",
-    issueDate: "2024-12-01",
-    dueDate: "2024-12-31",
-    baseAmount: 2500,
-    iva: 525,
-    total: 3025,
-    status: "Emitida",
-  },
-  {
-    id: "FF-2024-0155",
-    client: "Digital Labs SA",
-    clientCif: "A87654321",
-    issueDate: "2024-11-28",
-    dueDate: "2024-12-28",
-    baseAmount: 1800,
-    iva: 378,
-    total: 2178,
-    status: "Cobrado",
-  },
-  {
-    id: "FF-2024-0154",
-    client: "Innovación Global",
-    clientCif: "B11223344",
-    issueDate: "2024-11-25",
-    dueDate: "2024-12-25",
-    baseAmount: 950,
-    iva: 199.5,
-    total: 1149.5,
-    status: "Emitida",
-  },
-  {
-    id: "FF-2024-0153",
-    client: "Acme Corporation",
-    clientCif: "B99887766",
-    issueDate: "2024-11-20",
-    dueDate: "2024-12-20",
-    baseAmount: 4200,
-    iva: 882,
-    total: 5082,
-    status: "Borrador",
-  },
-  {
-    id: "FF-2024-0152",
-    client: "María López Consulting",
-    clientCif: "44556677X",
-    issueDate: "2024-11-15",
-    dueDate: "2024-12-15",
-    baseAmount: 750,
-    iva: 157.5,
-    total: 907.5,
-    status: "Cancelada",
-  },
-];
-
-const statusMap: Record<string, "new" | "active" | "pending" | "inactive" | "danger"> = {
-  Borrador: "inactive",
-  Emitida: "pending",
-  Cobrado: "active",
-  Cancelada: "danger",
+const statusMap: Record<string, "active" | "pending" | "inactive" | "danger"> = {
+  draft: "inactive",
+  issued: "pending",
+  paid: "active",
+  cancelled: "danger",
 };
 
-const formatCurrency = (amount: number) => {
+const statusLabels: Record<string, string> = {
+  draft: "Borrador",
+  issued: "Emitida",
+  paid: "Cobrada",
+  cancelled: "Cancelada",
+};
+
+const formatCurrency = (amount: number | null) => {
   return new Intl.NumberFormat("es-ES", {
     style: "currency",
     currency: "EUR",
-  }).format(amount);
+  }).format(amount || 0);
 };
 
-const columns = [
-  {
-    key: "id",
-    label: "Nº Factura",
-    render: (invoice: Invoice) => (
-      <div className="flex items-center gap-2">
-        <FileText className="h-4 w-4 text-muted-foreground" />
-        <span className="font-mono font-medium text-foreground">{invoice.id}</span>
-      </div>
-    ),
-  },
-  {
-    key: "client",
-    label: "Cliente",
-    render: (invoice: Invoice) => (
-      <div>
-        <p className="font-medium text-foreground">{invoice.client}</p>
-        <p className="text-xs text-muted-foreground">{invoice.clientCif}</p>
-      </div>
-    ),
-  },
-  {
-    key: "issueDate",
-    label: "Fecha Emisión",
-    render: (invoice: Invoice) => (
-      <span className="text-sm">
-        {new Date(invoice.issueDate).toLocaleDateString("es-ES")}
-      </span>
-    ),
-  },
-  {
-    key: "dueDate",
-    label: "Vencimiento",
-    render: (invoice: Invoice) => (
-      <span className="text-sm">
-        {new Date(invoice.dueDate).toLocaleDateString("es-ES")}
-      </span>
-    ),
-  },
-  {
-    key: "baseAmount",
-    label: "Base Imponible",
-    render: (invoice: Invoice) => (
-      <span className="text-sm">{formatCurrency(invoice.baseAmount)}</span>
-    ),
-  },
-  {
-    key: "total",
-    label: "Total",
-    render: (invoice: Invoice) => (
-      <span className="font-semibold text-foreground">
-        {formatCurrency(invoice.total)}
-      </span>
-    ),
-  },
-  {
-    key: "status",
-    label: "Estado",
-    render: (invoice: Invoice) => (
-      <StatusBadge variant={statusMap[invoice.status]}>
-        {invoice.status}
-      </StatusBadge>
-    ),
-  },
-  {
-    key: "actions",
-    label: "",
-    render: () => (
-      <Button variant="ghost" size="icon">
-        <Eye className="h-4 w-4" />
-      </Button>
-    ),
-  },
-];
-
 export default function Invoices() {
+  const { data: invoices = [], isLoading } = useInvoices();
+  const deleteInvoice = useDeleteInvoice();
+  const { data: invoiceTemplate } = useDefaultTemplate("invoice");
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [editingInvoice, setEditingInvoice] = useState<InvoiceWithDetails | null>(null);
+  const [invoiceForPrint, setInvoiceForPrint] = useState<string | null>(null);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [invoiceToDelete, setInvoiceToDelete] = useState<InvoiceWithDetails | null>(null);
+  const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [searchTerm, setSearchTerm] = useState("");
+
+  // Fetch full invoice for printing
+  const { data: fullInvoice } = useInvoice(invoiceForPrint || undefined);
+
+  const filteredInvoices = invoices.filter((invoice) => {
+    const matchesStatus = statusFilter === "all" || invoice.status === statusFilter;
+    const matchesSearch = 
+      invoice.client?.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      String(invoice.invoice_number).includes(searchTerm);
+    return matchesStatus && matchesSearch;
+  });
+
+  const handleEdit = (invoice: InvoiceWithDetails) => {
+    setEditingInvoice(invoice);
+    setDialogOpen(true);
+  };
+
+  const handleDelete = (invoice: InvoiceWithDetails) => {
+    setInvoiceToDelete(invoice);
+    setDeleteDialogOpen(true);
+  };
+
+  const confirmDelete = () => {
+    if (invoiceToDelete) {
+      deleteInvoice.mutate(invoiceToDelete.id);
+      setDeleteDialogOpen(false);
+      setInvoiceToDelete(null);
+    }
+  };
+
+  const handlePrint = async (invoiceId: string) => {
+    setInvoiceForPrint(invoiceId);
+  };
+
+  // Effect to print when full invoice is loaded
+  if (fullInvoice && invoiceForPrint && invoiceTemplate) {
+    const data = formatInvoiceData(fullInvoice as unknown as Record<string, unknown>);
+    printDocument({
+      template: invoiceTemplate.content,
+      data,
+      filename: `factura-${fullInvoice.invoice_number}.html`,
+    });
+    setInvoiceForPrint(null);
+  }
+
+  const handleDialogClose = () => {
+    setDialogOpen(false);
+    setEditingInvoice(null);
+  };
+
+  const columns = [
+    {
+      key: "invoice_number",
+      label: "Nº Factura",
+      render: (invoice: InvoiceWithDetails) => (
+        <div className="flex items-center gap-2">
+          <FileText className="h-4 w-4 text-muted-foreground" />
+          <span className="font-mono font-medium text-foreground">
+            FF-{String(invoice.invoice_number).padStart(4, "0")}
+          </span>
+        </div>
+      ),
+    },
+    {
+      key: "client",
+      label: "Cliente",
+      render: (invoice: InvoiceWithDetails) => (
+        <div>
+          <p className="font-medium text-foreground">{invoice.client?.name}</p>
+          <p className="text-xs text-muted-foreground">{invoice.client?.cif}</p>
+        </div>
+      ),
+    },
+    {
+      key: "issue_date",
+      label: "Fecha Emisión",
+      render: (invoice: InvoiceWithDetails) => (
+        <span className="text-sm">
+          {format(new Date(invoice.issue_date), "dd MMM yyyy", { locale: es })}
+        </span>
+      ),
+    },
+    {
+      key: "due_date",
+      label: "Vencimiento",
+      render: (invoice: InvoiceWithDetails) => (
+        <span className="text-sm">
+          {invoice.due_date
+            ? format(new Date(invoice.due_date), "dd MMM yyyy", { locale: es })
+            : "-"}
+        </span>
+      ),
+    },
+    {
+      key: "subtotal",
+      label: "Base Imponible",
+      render: (invoice: InvoiceWithDetails) => (
+        <span className="text-sm">{formatCurrency(invoice.subtotal)}</span>
+      ),
+    },
+    {
+      key: "total",
+      label: "Total",
+      render: (invoice: InvoiceWithDetails) => (
+        <span className="font-semibold text-foreground">
+          {formatCurrency(invoice.total)}
+        </span>
+      ),
+    },
+    {
+      key: "status",
+      label: "Estado",
+      render: (invoice: InvoiceWithDetails) => (
+        <StatusBadge variant={statusMap[invoice.status]}>
+          {statusLabels[invoice.status]}
+        </StatusBadge>
+      ),
+    },
+    {
+      key: "actions",
+      label: "Acciones",
+      render: (invoice: InvoiceWithDetails) => (
+        <div className="flex items-center gap-1">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => {
+              if (!invoiceTemplate) {
+                toast.error("No hay plantilla de factura configurada");
+                return;
+              }
+              handlePrint(invoice.id);
+            }}
+            title="Imprimir"
+          >
+            <Printer className="h-4 w-4" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => handleEdit(invoice)}
+          >
+            <Edit className="h-4 w-4" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => handleDelete(invoice)}
+          >
+            <Trash2 className="h-4 w-4 text-destructive" />
+          </Button>
+        </div>
+      ),
+    },
+  ];
+
   const totalEmitidas = invoices
-    .filter((i) => i.status === "Emitida")
-    .reduce((sum, i) => sum + i.total, 0);
+    .filter((i) => i.status === "issued")
+    .reduce((sum, i) => sum + (i.total || 0), 0);
 
   const totalCobrado = invoices
-    .filter((i) => i.status === "Cobrado")
-    .reduce((sum, i) => sum + i.total, 0);
+    .filter((i) => i.status === "paid")
+    .reduce((sum, i) => sum + (i.total || 0), 0);
 
   return (
     <div className="animate-fade-in">
@@ -186,7 +233,7 @@ export default function Invoices() {
         title="Facturas"
         subtitle="Gestión de facturación"
         actions={
-          <Button className="gap-2">
+          <Button className="gap-2" onClick={() => setDialogOpen(true)}>
             <Plus className="h-4 w-4" />
             Nueva Factura
           </Button>
@@ -198,25 +245,33 @@ export default function Invoices() {
         <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
           <div className="bg-card rounded-lg border border-border p-4">
             <p className="text-sm text-muted-foreground">Total Facturas</p>
-            <p className="text-2xl font-semibold mt-1">{invoices.length}</p>
+            <p className="text-2xl font-semibold mt-1">
+              {isLoading ? <Skeleton className="h-8 w-12" /> : invoices.length}
+            </p>
           </div>
           <div className="bg-card rounded-lg border border-border p-4">
             <p className="text-sm text-muted-foreground">Pendientes de Cobro</p>
             <p className="text-2xl font-semibold mt-1 text-warning">
-              {formatCurrency(totalEmitidas)}
+              {isLoading ? <Skeleton className="h-8 w-12" /> : formatCurrency(totalEmitidas)}
             </p>
           </div>
           <div className="bg-card rounded-lg border border-border p-4">
             <p className="text-sm text-muted-foreground">Cobrado este mes</p>
             <p className="text-2xl font-semibold mt-1 text-success">
-              {formatCurrency(totalCobrado)}
+              {isLoading ? <Skeleton className="h-8 w-12" /> : formatCurrency(totalCobrado)}
             </p>
           </div>
           <div className="bg-card rounded-lg border border-border p-4">
             <p className="text-sm text-muted-foreground">Media por factura</p>
             <p className="text-2xl font-semibold mt-1">
-              {formatCurrency(
-                invoices.reduce((sum, i) => sum + i.total, 0) / invoices.length
+              {isLoading ? (
+                <Skeleton className="h-8 w-12" />
+              ) : invoices.length > 0 ? (
+                formatCurrency(
+                  invoices.reduce((sum, i) => sum + (i.total || 0), 0) / invoices.length
+                )
+              ) : (
+                formatCurrency(0)
               )}
             </p>
           </div>
@@ -224,28 +279,22 @@ export default function Invoices() {
 
         {/* Filters */}
         <div className="flex flex-col sm:flex-row gap-4">
-          <Input placeholder="Buscar facturas..." className="sm:w-80" />
-          <Select>
+          <Input 
+            placeholder="Buscar facturas..." 
+            className="sm:w-80" 
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
+          <Select value={statusFilter} onValueChange={setStatusFilter}>
             <SelectTrigger className="sm:w-48">
               <SelectValue placeholder="Estado" />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Todos</SelectItem>
-              <SelectItem value="borrador">Borrador</SelectItem>
-              <SelectItem value="emitida">Emitida</SelectItem>
-              <SelectItem value="cobrado">Cobrado</SelectItem>
-              <SelectItem value="cancelada">Cancelada</SelectItem>
-            </SelectContent>
-          </Select>
-          <Select>
-            <SelectTrigger className="sm:w-48">
-              <SelectValue placeholder="Período" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todo</SelectItem>
-              <SelectItem value="month">Este mes</SelectItem>
-              <SelectItem value="quarter">Este trimestre</SelectItem>
-              <SelectItem value="year">Este año</SelectItem>
+              <SelectItem value="draft">Borrador</SelectItem>
+              <SelectItem value="issued">Emitida</SelectItem>
+              <SelectItem value="paid">Cobrada</SelectItem>
+              <SelectItem value="cancelled">Cancelada</SelectItem>
             </SelectContent>
           </Select>
           <div className="flex gap-2 ml-auto">
@@ -259,8 +308,40 @@ export default function Invoices() {
         </div>
 
         {/* Data Table */}
-        <DataTable columns={columns} data={invoices} />
+        {isLoading ? (
+          <div className="space-y-4">
+            {[...Array(5)].map((_, i) => (
+              <Skeleton key={i} className="h-16 w-full" />
+            ))}
+          </div>
+        ) : (
+          <DataTable columns={columns} data={filteredInvoices} />
+        )}
       </div>
+
+      <InvoiceFormDialog
+        open={dialogOpen}
+        onOpenChange={handleDialogClose}
+        invoice={editingInvoice}
+      />
+
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Eliminar factura?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta acción no se puede deshacer. Se eliminará permanentemente la factura
+              FF-{String(invoiceToDelete?.invoice_number).padStart(4, "0")}.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDelete} className="bg-destructive text-destructive-foreground">
+              Eliminar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

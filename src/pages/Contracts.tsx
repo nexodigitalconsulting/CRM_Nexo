@@ -11,8 +11,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Plus, Filter, Download, Calendar, Edit, Trash2, FileText } from "lucide-react";
-import { useContracts, useDeleteContract, ContractWithDetails } from "@/hooks/useContracts";
+import { Plus, Filter, Download, Calendar, Edit, Trash2, FileText, Printer } from "lucide-react";
+import { useContracts, useDeleteContract, useContract, ContractWithDetails } from "@/hooks/useContracts";
+import { useDefaultTemplate } from "@/hooks/useTemplates";
+import { printDocument, formatContractData } from "@/lib/pdfGenerator";
+import { toast } from "sonner";
 import { ContractFormDialog } from "@/components/contracts/ContractFormDialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { format } from "date-fns";
@@ -67,13 +70,36 @@ const billingLabels: Record<string, string> = {
 export default function Contracts() {
   const { data: contracts = [], isLoading } = useContracts();
   const deleteContract = useDeleteContract();
+  const { data: contractTemplate } = useDefaultTemplate("contract");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingContract, setEditingContract] = useState<ContractWithDetails | null>(null);
+  const [contractForPrint, setContractForPrint] = useState<string | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [contractToDelete, setContractToDelete] = useState<ContractWithDetails | null>(null);
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [billingFilter, setBillingFilter] = useState<string>("all");
   const [searchTerm, setSearchTerm] = useState("");
+
+  const { data: fullContract } = useContract(contractForPrint || undefined);
+
+  // Print when contract is loaded
+  if (fullContract && contractForPrint && contractTemplate) {
+    const data = formatContractData(fullContract as unknown as Record<string, unknown>);
+    printDocument({
+      template: contractTemplate.content,
+      data,
+      filename: `contrato-${fullContract.contract_number}.html`,
+    });
+    setContractForPrint(null);
+  }
+
+  const handlePrint = (contractId: string) => {
+    if (!contractTemplate) {
+      toast.error("No hay plantilla de contrato configurada");
+      return;
+    }
+    setContractForPrint(contractId);
+  };
 
   const filteredContracts = contracts.filter((contract) => {
     const matchesStatus = statusFilter === "all" || contract.status === statusFilter;
@@ -178,7 +204,15 @@ export default function Contracts() {
       key: "actions",
       label: "Acciones",
       render: (contract: ContractWithDetails) => (
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => handlePrint(contract.id)}
+            title="Imprimir"
+          >
+            <Printer className="h-4 w-4" />
+          </Button>
           <Button
             variant="ghost"
             size="icon"
