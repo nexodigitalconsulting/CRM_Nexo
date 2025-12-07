@@ -19,9 +19,10 @@ import {
   Bell,
   FileText,
   Save,
+  Settings2,
 } from "lucide-react";
 import { TemplateManager } from "@/components/settings/TemplateManager";
-
+import { EntityConfigManager } from "@/components/settings/EntityConfigManager";
 export default function Settings() {
   return (
     <div className="animate-fade-in">
@@ -53,6 +54,10 @@ export default function Settings() {
             <TabsTrigger value="templates" className="gap-2">
               <FileText className="h-4 w-4" />
               Plantillas
+            </TabsTrigger>
+            <TabsTrigger value="entities" className="gap-2">
+              <Settings2 className="h-4 w-4" />
+              Entidades
             </TabsTrigger>
           </TabsList>
 
@@ -395,6 +400,10 @@ export default function Settings() {
 
           <TabsContent value="templates" className="space-y-6">
             <TemplateManager />
+          </TabsContent>
+
+          <TabsContent value="entities" className="space-y-6">
+            <EntityConfigManager />
           </TabsContent>
         </Tabs>
       </div>
