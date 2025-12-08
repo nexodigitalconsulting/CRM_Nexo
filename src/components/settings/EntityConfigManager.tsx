@@ -47,6 +47,8 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 
+import { Wallet, ShoppingCart, Package, Briefcase, FolderOpen, Tag } from "lucide-react";
+
 const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
   Building2,
   Users,
@@ -54,6 +56,12 @@ const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
   FileText,
   Receipt,
   Calendar,
+  Wallet,
+  ShoppingCart,
+  Package,
+  Briefcase,
+  FolderOpen,
+  Tag,
 };
 
 const fieldTypes = [
@@ -63,9 +71,28 @@ const fieldTypes = [
   { value: "phone", label: "Teléfono" },
   { value: "url", label: "URL" },
   { value: "number", label: "Número" },
+  { value: "currency", label: "Moneda" },
+  { value: "percent", label: "Porcentaje" },
   { value: "date", label: "Fecha" },
+  { value: "datetime", label: "Fecha/Hora" },
   { value: "select", label: "Selector" },
   { value: "checkbox", label: "Checkbox" },
+  { value: "formula", label: "Fórmula" },
+];
+
+const iconOptions = [
+  { value: "Building2", label: "Edificio" },
+  { value: "Users", label: "Usuarios" },
+  { value: "Megaphone", label: "Megáfono" },
+  { value: "FileText", label: "Documento" },
+  { value: "Receipt", label: "Factura" },
+  { value: "Calendar", label: "Calendario" },
+  { value: "Wallet", label: "Cartera" },
+  { value: "ShoppingCart", label: "Carrito" },
+  { value: "Package", label: "Paquete" },
+  { value: "Briefcase", label: "Maletín" },
+  { value: "FolderOpen", label: "Carpeta" },
+  { value: "Tag", label: "Etiqueta" },
 ];
 
 export function EntityConfigManager() {
