@@ -26,6 +26,7 @@ import { QuoteFormDialog } from "@/components/quotes/QuoteFormDialog";
 import { ExportDropdown } from "@/components/common/ExportDropdown";
 import { entityExportConfigs } from "@/lib/exportUtils";
 import { useDefaultTemplate } from "@/hooks/useTemplates";
+import { useCompanySettings } from "@/hooks/useCompanySettings";
 import { printDocument, formatQuoteData } from "@/lib/pdfGenerator";
 import { toast } from "sonner";
 
@@ -58,6 +59,7 @@ export default function Quotes() {
   const deleteQuote = useDeleteQuote();
   const updateStatus = useUpdateQuoteStatus();
   const { data: quoteTemplate } = useDefaultTemplate("quote");
+  const { data: companySettings } = useCompanySettings();
   
   const [dialogOpen, setDialogOpen] = useState(false);
   const [selectedQuote, setSelectedQuote] = useState<QuoteWithDetails | null>(null);
@@ -71,11 +73,15 @@ export default function Quotes() {
 
   // Effect to print when full quote is loaded
   if (fullQuote && quoteForPrint && quoteTemplate) {
-    const data = formatQuoteData(fullQuote as unknown as Record<string, unknown>);
+    const data = formatQuoteData(
+      fullQuote as unknown as Record<string, unknown>,
+      companySettings as unknown as Record<string, unknown>
+    );
     printDocument({
       template: quoteTemplate.content,
       data,
       filename: `presupuesto-${fullQuote.quote_number}.html`,
+      logoUrl: companySettings?.logo_url || undefined,
     });
     setQuoteForPrint(null);
   }
