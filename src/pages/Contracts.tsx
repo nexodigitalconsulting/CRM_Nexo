@@ -11,7 +11,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Plus, Filter, Download, Calendar, Edit, Trash2, FileText, Printer } from "lucide-react";
+import { Plus, Filter, Calendar, Edit, Trash2, FileText, Printer } from "lucide-react";
+import { ExportDropdown } from "@/components/common/ExportDropdown";
+import { entityExportConfigs } from "@/lib/exportUtils";
 import { useContracts, useDeleteContract, useContract, ContractWithDetails } from "@/hooks/useContracts";
 import { useDefaultTemplate } from "@/hooks/useTemplates";
 import { printDocument, formatContractData } from "@/lib/pdfGenerator";
@@ -320,9 +322,11 @@ export default function Contracts() {
             <Button variant="outline" size="icon">
               <Filter className="h-4 w-4" />
             </Button>
-            <Button variant="outline" size="icon">
-              <Download className="h-4 w-4" />
-            </Button>
+            <ExportDropdown
+              data={filteredContracts}
+              columns={entityExportConfigs.contracts.columns as any}
+              filename={entityExportConfigs.contracts.filename}
+            />
           </div>
         </div>
 
