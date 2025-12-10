@@ -226,13 +226,13 @@ export function QuoteFormDialog({ open, onOpenChange, quote }: QuoteFormDialogPr
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>Cliente</Label>
-              <Select value={clientId} onValueChange={(v) => { setClientId(v); setContactId(""); }}>
+              <Select value={clientId || "none"} onValueChange={(v) => { setClientId(v === "none" ? "" : v); setContactId(""); }}>
                 <SelectTrigger>
                   <SelectValue placeholder="Seleccionar cliente" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Sin cliente</SelectItem>
-                  {clients?.map((client) => (
+                  <SelectItem value="none">Sin cliente</SelectItem>
+                  {clients?.filter(c => c.id).map((client) => (
                     <SelectItem key={client.id} value={client.id}>
                       {client.name} {client.cif && `(${client.cif})`}
                     </SelectItem>
@@ -242,13 +242,13 @@ export function QuoteFormDialog({ open, onOpenChange, quote }: QuoteFormDialogPr
             </div>
             <div className="space-y-2">
               <Label>O Contacto (Lead)</Label>
-              <Select value={contactId} onValueChange={(v) => { setContactId(v); setClientId(""); }}>
+              <Select value={contactId || "none"} onValueChange={(v) => { setContactId(v === "none" ? "" : v); setClientId(""); }}>
                 <SelectTrigger>
                   <SelectValue placeholder="Seleccionar contacto" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Sin contacto</SelectItem>
-                  {contacts?.filter(c => c.status !== "converted").map((contact) => (
+                  <SelectItem value="none">Sin contacto</SelectItem>
+                  {contacts?.filter(c => c.status !== "converted" && c.id).map((contact) => (
                     <SelectItem key={contact.id} value={contact.id}>
                       {contact.name} {contact.email && `(${contact.email})`}
                     </SelectItem>
