@@ -14,6 +14,143 @@ export type Database = {
   }
   public: {
     Tables: {
+      calendar_categories: {
+        Row: {
+          color: string
+          created_at: string | null
+          id: string
+          importance: Database["public"]["Enums"]["event_importance"] | null
+          is_default: boolean | null
+          name: string
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          color?: string
+          created_at?: string | null
+          id?: string
+          importance?: Database["public"]["Enums"]["event_importance"] | null
+          is_default?: boolean | null
+          name: string
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          color?: string
+          created_at?: string | null
+          id?: string
+          importance?: Database["public"]["Enums"]["event_importance"] | null
+          is_default?: boolean | null
+          name?: string
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      calendar_events: {
+        Row: {
+          all_day: boolean | null
+          category_id: string | null
+          client_id: string | null
+          contact_id: string | null
+          contract_id: string | null
+          created_at: string | null
+          description: string | null
+          end_datetime: string
+          google_calendar_id: string | null
+          google_event_id: string | null
+          id: string
+          importance: Database["public"]["Enums"]["event_importance"] | null
+          is_synced_to_google: boolean | null
+          location: string | null
+          notes: string | null
+          recurrence_rule: string | null
+          reminder_minutes: number | null
+          start_datetime: string
+          status: string | null
+          title: string
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          all_day?: boolean | null
+          category_id?: string | null
+          client_id?: string | null
+          contact_id?: string | null
+          contract_id?: string | null
+          created_at?: string | null
+          description?: string | null
+          end_datetime: string
+          google_calendar_id?: string | null
+          google_event_id?: string | null
+          id?: string
+          importance?: Database["public"]["Enums"]["event_importance"] | null
+          is_synced_to_google?: boolean | null
+          location?: string | null
+          notes?: string | null
+          recurrence_rule?: string | null
+          reminder_minutes?: number | null
+          start_datetime: string
+          status?: string | null
+          title: string
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          all_day?: boolean | null
+          category_id?: string | null
+          client_id?: string | null
+          contact_id?: string | null
+          contract_id?: string | null
+          created_at?: string | null
+          description?: string | null
+          end_datetime?: string
+          google_calendar_id?: string | null
+          google_event_id?: string | null
+          id?: string
+          importance?: Database["public"]["Enums"]["event_importance"] | null
+          is_synced_to_google?: boolean | null
+          location?: string | null
+          notes?: string | null
+          recurrence_rule?: string | null
+          reminder_minutes?: number | null
+          start_datetime?: string
+          status?: string | null
+          title?: string
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "calendar_events_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "calendar_categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "calendar_events_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "calendar_events_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "calendar_events_contract_id_fkey"
+            columns: ["contract_id"]
+            isOneToOne: false
+            referencedRelation: "contracts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       campaigns: {
         Row: {
           address: string | null
@@ -153,6 +290,72 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      company_settings: {
+        Row: {
+          address: string | null
+          cif: string | null
+          city: string | null
+          country: string | null
+          created_at: string | null
+          currency: string | null
+          date_format: string | null
+          email: string | null
+          iban: string | null
+          id: string
+          language: string | null
+          logo_url: string | null
+          name: string
+          phone: string | null
+          postal_code: string | null
+          province: string | null
+          timezone: string | null
+          updated_at: string | null
+          website: string | null
+        }
+        Insert: {
+          address?: string | null
+          cif?: string | null
+          city?: string | null
+          country?: string | null
+          created_at?: string | null
+          currency?: string | null
+          date_format?: string | null
+          email?: string | null
+          iban?: string | null
+          id?: string
+          language?: string | null
+          logo_url?: string | null
+          name: string
+          phone?: string | null
+          postal_code?: string | null
+          province?: string | null
+          timezone?: string | null
+          updated_at?: string | null
+          website?: string | null
+        }
+        Update: {
+          address?: string | null
+          cif?: string | null
+          city?: string | null
+          country?: string | null
+          created_at?: string | null
+          currency?: string | null
+          date_format?: string | null
+          email?: string | null
+          iban?: string | null
+          id?: string
+          language?: string | null
+          logo_url?: string | null
+          name?: string
+          phone?: string | null
+          postal_code?: string | null
+          province?: string | null
+          timezone?: string | null
+          updated_at?: string | null
+          website?: string | null
+        }
+        Relationships: []
       }
       contacts: {
         Row: {
@@ -520,6 +723,48 @@ export type Database = {
           supplier_name?: string
           total?: number | null
           updated_at?: string | null
+        }
+        Relationships: []
+      }
+      google_calendar_config: {
+        Row: {
+          access_token: string | null
+          calendar_id: string | null
+          created_at: string | null
+          id: string
+          last_sync_at: string | null
+          refresh_token: string | null
+          sync_direction: string | null
+          sync_enabled: boolean | null
+          token_expiry: string | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          access_token?: string | null
+          calendar_id?: string | null
+          created_at?: string | null
+          id?: string
+          last_sync_at?: string | null
+          refresh_token?: string | null
+          sync_direction?: string | null
+          sync_enabled?: boolean | null
+          token_expiry?: string | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          access_token?: string | null
+          calendar_id?: string | null
+          created_at?: string | null
+          id?: string
+          last_sync_at?: string | null
+          refresh_token?: string | null
+          sync_direction?: string | null
+          sync_enabled?: boolean | null
+          token_expiry?: string | null
+          updated_at?: string | null
+          user_id?: string
         }
         Relationships: []
       }
@@ -926,6 +1171,39 @@ export type Database = {
         }
         Relationships: []
       }
+      user_availability: {
+        Row: {
+          created_at: string | null
+          day_of_week: number
+          end_time: string
+          id: string
+          is_available: boolean | null
+          start_time: string
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          day_of_week: number
+          end_time: string
+          id?: string
+          is_available?: boolean | null
+          start_time: string
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          day_of_week?: number
+          end_time?: string
+          id?: string
+          is_available?: boolean | null
+          start_time?: string
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           created_at: string | null
@@ -982,6 +1260,7 @@ export type Database = {
         | "discarded"
         | "converted"
       contract_status: "active" | "expired" | "cancelled" | "pending_activation"
+      event_importance: "high" | "medium" | "low"
       invoice_status: "draft" | "issued" | "paid" | "cancelled"
       payment_status: "paid" | "pending" | "partial" | "claimed"
       quote_status: "draft" | "sent" | "approved" | "rejected"
@@ -1126,6 +1405,7 @@ export const Constants = {
         "converted",
       ],
       contract_status: ["active", "expired", "cancelled", "pending_activation"],
+      event_importance: ["high", "medium", "low"],
       invoice_status: ["draft", "issued", "paid", "cancelled"],
       payment_status: ["paid", "pending", "partial", "claimed"],
       quote_status: ["draft", "sent", "approved", "rejected"],

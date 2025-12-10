@@ -23,6 +23,8 @@ import {
 } from "lucide-react";
 import { TemplateManager } from "@/components/settings/TemplateManager";
 import { EntityConfigManager } from "@/components/settings/EntityConfigManager";
+import { CompanySettings } from "@/components/settings/CompanySettings";
+
 export default function Settings() {
   return (
     <div className="animate-fade-in">
@@ -62,114 +64,7 @@ export default function Settings() {
           </TabsList>
 
           <TabsContent value="company" className="space-y-6">
-            <div className="bg-card rounded-xl border border-border p-6">
-              <h3 className="text-lg font-semibold mb-6">
-                Información de la Empresa
-              </h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="space-y-2">
-                  <Label htmlFor="companyName">Nombre de la Empresa</Label>
-                  <Input id="companyName" placeholder="Tu Empresa SL" />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="cif">CIF/NIF</Label>
-                  <Input id="cif" placeholder="B12345678" />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="email">Email</Label>
-                  <Input
-                    id="email"
-                    type="email"
-                    placeholder="info@tuempresa.com"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="phone">Teléfono</Label>
-                  <Input id="phone" placeholder="+34 912 345 678" />
-                </div>
-                <div className="space-y-2 md:col-span-2">
-                  <Label htmlFor="address">Dirección</Label>
-                  <Input id="address" placeholder="Calle Ejemplo, 123" />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="city">Ciudad</Label>
-                  <Input id="city" placeholder="Madrid" />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="postalCode">Código Postal</Label>
-                  <Input id="postalCode" placeholder="28001" />
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-card rounded-xl border border-border p-6">
-              <h3 className="text-lg font-semibold mb-6">
-                Configuración Regional
-              </h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="space-y-2">
-                  <Label>Idioma</Label>
-                  <Select defaultValue="es">
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="es">Español</SelectItem>
-                      <SelectItem value="en">English</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label>Zona Horaria</Label>
-                  <Select defaultValue="europe-madrid">
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="europe-madrid">
-                        Europe/Madrid (UTC+1)
-                      </SelectItem>
-                      <SelectItem value="europe-london">
-                        Europe/London (UTC+0)
-                      </SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label>Moneda</Label>
-                  <Select defaultValue="eur">
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="eur">Euro (€)</SelectItem>
-                      <SelectItem value="usd">US Dollar ($)</SelectItem>
-                      <SelectItem value="gbp">British Pound (£)</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label>Formato de Fecha</Label>
-                  <Select defaultValue="dd-mm-yyyy">
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="dd-mm-yyyy">DD/MM/YYYY</SelectItem>
-                      <SelectItem value="mm-dd-yyyy">MM/DD/YYYY</SelectItem>
-                      <SelectItem value="yyyy-mm-dd">YYYY-MM-DD</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-            </div>
-
-            <div className="flex justify-end">
-              <Button className="gap-2">
-                <Save className="h-4 w-4" />
-                Guardar Cambios
-              </Button>
-            </div>
+            <CompanySettings />
           </TabsContent>
 
           <TabsContent value="database" className="space-y-6">

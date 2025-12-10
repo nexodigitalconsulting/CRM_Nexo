@@ -11,9 +11,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Plus, Filter, Download, Building2, Mail, Edit, Trash2, Loader2 } from "lucide-react";
+import { Plus, Filter, Download, Building2, Mail, Edit, Trash2, Loader2, Eye } from "lucide-react";
 import { useClients, useDeleteClient, Client } from "@/hooks/useClients";
 import { ClientFormDialog } from "@/components/clients/ClientFormDialog";
+import { ClientDetailDialog } from "@/components/clients/ClientDetailDialog";
+import { ExportDropdown } from "@/components/common/ExportDropdown";
+import { entityExportConfigs } from "@/lib/exportUtils";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -50,11 +53,18 @@ export default function Clients() {
   
   const [dialogOpen, setDialogOpen] = useState(false);
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
+  const [detailDialogOpen, setDetailDialogOpen] = useState(false);
+  const [viewingClient, setViewingClient] = useState<Client | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [clientToDelete, setClientToDelete] = useState<Client | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [segmentFilter, setSegmentFilter] = useState("all");
+
+  const handleView = (client: Client) => {
+    setViewingClient(client);
+    setDetailDialogOpen(true);
+  };
 
   const handleEdit = (client: Client) => {
     setSelectedClient(client);
@@ -147,6 +157,9 @@ export default function Clients() {
       label: "",
       render: (client: Client) => (
         <div className="flex gap-1">
+          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleView(client)}>
+            <Eye className="h-4 w-4" />
+          </Button>
           <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleEdit(client)}>
             <Edit className="h-4 w-4" />
           </Button>
@@ -233,12 +246,11 @@ export default function Clients() {
             </SelectContent>
           </Select>
           <div className="flex gap-2 ml-auto">
-            <Button variant="outline" size="icon">
-              <Filter className="h-4 w-4" />
-            </Button>
-            <Button variant="outline" size="icon">
-              <Download className="h-4 w-4" />
-            </Button>
+            <ExportDropdown
+              data={filteredClients}
+              columns={entityExportConfigs.clients.columns}
+              filename={entityExportConfigs.clients.filename}
+            />
           </div>
         </div>
 
