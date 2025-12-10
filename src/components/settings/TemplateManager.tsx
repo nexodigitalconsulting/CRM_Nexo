@@ -29,6 +29,12 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   useTemplates,
@@ -49,6 +55,13 @@ import {
   Code,
   Copy,
   Check,
+  Building2,
+  User,
+  Receipt,
+  FileSpreadsheet,
+  Calendar,
+  Hash,
+  DollarSign,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -58,25 +71,105 @@ const entityTypeLabels: Record<string, string> = {
   quote: "Presupuesto",
 };
 
-const availableVariables: Record<string, string[]> = {
-  contract: [
-    "contract_number", "company_name", "company_cif", "company_address",
-    "client_name", "client_cif", "client_address", "contract_name",
-    "services", "subtotal", "iva_percent", "iva_amount", "total",
-    "billing_period", "start_date", "end_date", "notes"
-  ],
-  invoice: [
-    "invoice_number", "company_name", "company_cif", "company_address",
-    "client_name", "client_cif", "client_address", "services",
-    "subtotal", "iva_percent", "iva_amount", "total",
-    "issue_date", "due_date", "payment_method", "notes"
-  ],
-  quote: [
-    "quote_number", "company_name", "company_cif", "company_address",
-    "client_name", "client_address", "quote_name", "services",
-    "subtotal", "iva_percent", "iva_amount", "total",
-    "valid_until", "notes"
-  ],
+// Variables organizadas por entidad con nombre CRM y variable DB
+const variablesByEntity: Record<string, Record<string, { label: string; dbVar: string; icon: React.ElementType }[]>> = {
+  contract: {
+    "Datos de Empresa": [
+      { label: "Nombre Empresa", dbVar: "company_name", icon: Building2 },
+      { label: "CIF Empresa", dbVar: "company_cif", icon: Hash },
+      { label: "Dirección Empresa", dbVar: "company_address", icon: Building2 },
+    ],
+    "Datos del Cliente": [
+      { label: "Nombre Cliente", dbVar: "client_name", icon: User },
+      { label: "CIF Cliente", dbVar: "client_cif", icon: Hash },
+      { label: "Dirección Cliente", dbVar: "client_address", icon: Building2 },
+    ],
+    "Datos del Contrato": [
+      { label: "Nº Contrato", dbVar: "contract_number", icon: Hash },
+      { label: "Nombre Contrato", dbVar: "contract_name", icon: FileText },
+      { label: "Fecha Inicio", dbVar: "start_date", icon: Calendar },
+      { label: "Fecha Fin", dbVar: "end_date", icon: Calendar },
+      { label: "Periodicidad", dbVar: "billing_period", icon: Calendar },
+    ],
+    "Importes": [
+      { label: "Subtotal", dbVar: "subtotal", icon: DollarSign },
+      { label: "% IVA", dbVar: "iva_percent", icon: DollarSign },
+      { label: "Importe IVA", dbVar: "iva_amount", icon: DollarSign },
+      { label: "Total", dbVar: "total", icon: DollarSign },
+    ],
+    "Servicios (Lista)": [
+      { label: "Nombre Servicio", dbVar: "service_name", icon: FileSpreadsheet },
+      { label: "Precio Servicio", dbVar: "service_price", icon: DollarSign },
+    ],
+    "Otros": [
+      { label: "Notas", dbVar: "notes", icon: FileText },
+    ],
+  },
+  invoice: {
+    "Datos de Empresa": [
+      { label: "Nombre Empresa", dbVar: "company_name", icon: Building2 },
+      { label: "CIF Empresa", dbVar: "company_cif", icon: Hash },
+      { label: "Dirección Empresa", dbVar: "company_address", icon: Building2 },
+    ],
+    "Datos del Cliente": [
+      { label: "Nombre Cliente", dbVar: "client_name", icon: User },
+      { label: "CIF Cliente", dbVar: "client_cif", icon: Hash },
+      { label: "Dirección Cliente", dbVar: "client_address", icon: Building2 },
+    ],
+    "Datos de Factura": [
+      { label: "Nº Factura", dbVar: "invoice_number", icon: Hash },
+      { label: "Fecha Emisión", dbVar: "issue_date", icon: Calendar },
+      { label: "Fecha Vencimiento", dbVar: "due_date", icon: Calendar },
+      { label: "Método de Pago", dbVar: "payment_method", icon: Receipt },
+    ],
+    "Importes": [
+      { label: "Subtotal", dbVar: "subtotal", icon: DollarSign },
+      { label: "% IVA", dbVar: "iva_percent", icon: DollarSign },
+      { label: "Importe IVA", dbVar: "iva_amount", icon: DollarSign },
+      { label: "Total", dbVar: "total", icon: DollarSign },
+    ],
+    "Servicios (Lista)": [
+      { label: "Nombre Servicio", dbVar: "service_name", icon: FileSpreadsheet },
+      { label: "Cantidad", dbVar: "quantity", icon: Hash },
+      { label: "Precio Unitario", dbVar: "unit_price", icon: DollarSign },
+      { label: "Total Línea", dbVar: "line_total", icon: DollarSign },
+    ],
+    "Otros": [
+      { label: "Notas", dbVar: "notes", icon: FileText },
+    ],
+  },
+  quote: {
+    "Datos de Empresa": [
+      { label: "Nombre Empresa", dbVar: "company_name", icon: Building2 },
+      { label: "CIF Empresa", dbVar: "company_cif", icon: Hash },
+      { label: "Dirección Empresa", dbVar: "company_address", icon: Building2 },
+    ],
+    "Datos del Cliente": [
+      { label: "Nombre Cliente", dbVar: "client_name", icon: User },
+      { label: "Dirección Cliente", dbVar: "client_address", icon: Building2 },
+    ],
+    "Datos del Presupuesto": [
+      { label: "Nº Presupuesto", dbVar: "quote_number", icon: Hash },
+      { label: "Nombre Presupuesto", dbVar: "quote_name", icon: FileText },
+      { label: "Válido hasta", dbVar: "valid_until", icon: Calendar },
+    ],
+    "Importes": [
+      { label: "Subtotal", dbVar: "subtotal", icon: DollarSign },
+      { label: "% IVA", dbVar: "iva_percent", icon: DollarSign },
+      { label: "Importe IVA", dbVar: "iva_amount", icon: DollarSign },
+      { label: "Total", dbVar: "total", icon: DollarSign },
+    ],
+    "Servicios (Lista)": [
+      { label: "Nombre Servicio", dbVar: "service_name", icon: FileSpreadsheet },
+      { label: "Cantidad", dbVar: "quantity", icon: Hash },
+      { label: "Precio Unitario", dbVar: "unit_price", icon: DollarSign },
+      { label: "Descuento", dbVar: "discount", icon: DollarSign },
+      { label: "Total Línea", dbVar: "line_total", icon: DollarSign },
+    ],
+    "Otros": [
+      { label: "Notas", dbVar: "notes", icon: FileText },
+    ],
+  },
 };
 
 const sampleData: Record<string, Record<string, any>> = {
@@ -188,7 +281,6 @@ export function TemplateManager() {
       return;
     }
 
-    // Extract variables from content
     const variableRegex = /{{(\w+)}}/g;
     const matches = formData.content.matchAll(variableRegex);
     const variables = [...new Set([...matches].map(m => m[1]))];
@@ -230,7 +322,15 @@ export function TemplateManager() {
   const handleCopyVariable = (variable: string) => {
     navigator.clipboard.writeText(`{{${variable}}}`);
     setCopiedVar(variable);
+    toast.success(`Variable {{${variable}}} copiada`);
     setTimeout(() => setCopiedVar(null), 2000);
+  };
+
+  const insertVariable = (variable: string) => {
+    setFormData(prev => ({
+      ...prev,
+      content: prev.content + `{{${variable}}}`
+    }));
   };
 
   const getPreviewHtml = () => {
@@ -267,11 +367,11 @@ export function TemplateManager() {
             Contratos
           </TabsTrigger>
           <TabsTrigger value="invoice" className="gap-2">
-            <FileText className="h-4 w-4" />
+            <Receipt className="h-4 w-4" />
             Facturas
           </TabsTrigger>
           <TabsTrigger value="quote" className="gap-2">
-            <FileText className="h-4 w-4" />
+            <FileSpreadsheet className="h-4 w-4" />
             Presupuestos
           </TabsTrigger>
         </TabsList>
@@ -363,14 +463,14 @@ export function TemplateManager() {
 
       {/* Editor Dialog */}
       <Dialog open={isEditorOpen} onOpenChange={setIsEditorOpen}>
-        <DialogContent className="max-w-5xl max-h-[90vh] overflow-hidden flex flex-col">
+        <DialogContent className="max-w-6xl max-h-[90vh] flex flex-col">
           <DialogHeader>
             <DialogTitle>
               {editingTemplate ? "Editar Plantilla" : `Nueva Plantilla de ${entityTypeLabels[selectedType]}`}
             </DialogTitle>
           </DialogHeader>
 
-          <div className="flex-1 overflow-hidden flex gap-4">
+          <div className="flex-1 overflow-hidden flex gap-4 min-h-0">
             {/* Editor */}
             <div className="flex-1 flex flex-col overflow-hidden">
               <div className="mb-4">
@@ -384,7 +484,7 @@ export function TemplateManager() {
                 />
               </div>
 
-              <Tabs value={editorTab} onValueChange={(v) => setEditorTab(v as any)} className="flex-1 flex flex-col">
+              <Tabs value={editorTab} onValueChange={(v) => setEditorTab(v as any)} className="flex-1 flex flex-col min-h-0">
                 <TabsList className="w-fit">
                   <TabsTrigger value="edit" className="gap-2">
                     <Code className="h-4 w-4" />
@@ -396,7 +496,7 @@ export function TemplateManager() {
                   </TabsTrigger>
                 </TabsList>
 
-                <TabsContent value="edit" className="flex-1 mt-2">
+                <TabsContent value="edit" className="flex-1 mt-2 min-h-0">
                   <Textarea
                     value={formData.content}
                     onChange={(e) => setFormData({ ...formData, content: e.target.value })}
@@ -405,50 +505,77 @@ export function TemplateManager() {
                   />
                 </TabsContent>
 
-                <TabsContent value="preview" className="flex-1 mt-2 overflow-hidden">
-                  <div className="h-full border rounded-lg overflow-auto bg-white">
+                <TabsContent value="preview" className="flex-1 mt-2 overflow-hidden min-h-0">
+                  <ScrollArea className="h-full border rounded-lg bg-white">
                     <div
                       className="p-4"
                       dangerouslySetInnerHTML={{ __html: getEditorPreviewHtml() }}
                     />
-                  </div>
+                  </ScrollArea>
                 </TabsContent>
               </Tabs>
             </div>
 
-            {/* Variables Panel */}
-            <div className="w-64 flex flex-col">
-              <Label className="mb-2">Variables Disponibles</Label>
-              <ScrollArea className="flex-1 border rounded-lg p-2">
-                <div className="space-y-1">
-                  {availableVariables[selectedType]?.map((variable) => (
-                    <button
-                      key={variable}
-                      onClick={() => handleCopyVariable(variable)}
-                      className="w-full text-left px-2 py-1.5 text-sm rounded hover:bg-muted flex items-center justify-between group"
-                    >
-                      <code className="text-xs bg-muted px-1.5 py-0.5 rounded">
-                        {`{{${variable}}}`}
-                      </code>
-                      {copiedVar === variable ? (
-                        <Check className="h-3 w-3 text-green-500" />
-                      ) : (
-                        <Copy className="h-3 w-3 opacity-0 group-hover:opacity-50" />
-                      )}
-                    </button>
+            {/* Variables Panel - Mejorado */}
+            <div className="w-80 flex flex-col border-l pl-4">
+              <Label className="mb-2 text-base font-semibold">Variables por Entidad</Label>
+              <p className="text-xs text-muted-foreground mb-3">
+                Haz clic en una variable para copiarla o doble clic para insertarla
+              </p>
+              <ScrollArea className="flex-1">
+                <Accordion type="multiple" defaultValue={Object.keys(variablesByEntity[selectedType])} className="w-full">
+                  {Object.entries(variablesByEntity[selectedType]).map(([category, variables]) => (
+                    <AccordionItem key={category} value={category}>
+                      <AccordionTrigger className="text-sm font-medium py-2">
+                        {category}
+                      </AccordionTrigger>
+                      <AccordionContent>
+                        <div className="space-y-1">
+                          {variables.map((variable) => {
+                            const Icon = variable.icon;
+                            return (
+                              <button
+                                key={variable.dbVar}
+                                onClick={() => handleCopyVariable(variable.dbVar)}
+                                onDoubleClick={() => insertVariable(variable.dbVar)}
+                                className="w-full text-left px-2 py-2 text-sm rounded hover:bg-muted flex items-center justify-between group border border-transparent hover:border-border"
+                              >
+                                <div className="flex items-center gap-2">
+                                  <Icon className="h-3.5 w-3.5 text-muted-foreground" />
+                                  <div>
+                                    <p className="text-xs font-medium">{variable.label}</p>
+                                    <code className="text-[10px] text-muted-foreground bg-muted px-1 rounded">
+                                      {`{{${variable.dbVar}}}`}
+                                    </code>
+                                  </div>
+                                </div>
+                                {copiedVar === variable.dbVar ? (
+                                  <Check className="h-3 w-3 text-green-500" />
+                                ) : (
+                                  <Copy className="h-3 w-3 opacity-0 group-hover:opacity-50" />
+                                )}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </AccordionContent>
+                    </AccordionItem>
                   ))}
-                </div>
+                </Accordion>
+
                 <div className="mt-4 pt-4 border-t">
-                  <p className="text-xs text-muted-foreground mb-2">Para listas (servicios):</p>
-                  <code className="text-xs bg-muted px-2 py-1 rounded block">
-                    {`{{#services}}...{{/services}}`}
-                  </code>
+                  <p className="text-xs font-medium mb-2">Sintaxis para listas (servicios):</p>
+                  <div className="bg-muted p-2 rounded text-xs font-mono space-y-1">
+                    <p className="text-primary">{`{{#services}}`}</p>
+                    <p className="pl-2 text-muted-foreground">{`{{service_name}} - {{service_price}}`}</p>
+                    <p className="text-primary">{`{{/services}}`}</p>
+                  </div>
                 </div>
               </ScrollArea>
             </div>
           </div>
 
-          <DialogFooter>
+          <DialogFooter className="flex-shrink-0">
             <Button variant="outline" onClick={() => setIsEditorOpen(false)}>
               Cancelar
             </Button>
@@ -482,7 +609,7 @@ export function TemplateManager() {
           <AlertDialogHeader>
             <AlertDialogTitle>¿Eliminar plantilla?</AlertDialogTitle>
             <AlertDialogDescription>
-              Esta acción no se puede deshacer. La plantilla "{deleteTemplate?.name}" será eliminada permanentemente.
+              Esta acción no se puede deshacer. Se eliminará permanentemente la plantilla "{deleteTemplate?.name}".
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
