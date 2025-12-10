@@ -11,7 +11,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Plus, Filter, Download, FileText, Edit, Trash2, Printer } from "lucide-react";
+import { Plus, Filter, FileText, Edit, Trash2, Printer } from "lucide-react";
+import { ExportDropdown } from "@/components/common/ExportDropdown";
+import { entityExportConfigs } from "@/lib/exportUtils";
 import { useInvoices, useDeleteInvoice, useInvoice, InvoiceWithDetails } from "@/hooks/useInvoices";
 import { InvoiceFormDialog } from "@/components/invoices/InvoiceFormDialog";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -301,9 +303,11 @@ export default function Invoices() {
             <Button variant="outline" size="icon">
               <Filter className="h-4 w-4" />
             </Button>
-            <Button variant="outline" size="icon">
-              <Download className="h-4 w-4" />
-            </Button>
+            <ExportDropdown
+              data={filteredInvoices}
+              columns={entityExportConfigs.invoices.columns as any}
+              filename={entityExportConfigs.invoices.filename}
+            />
           </div>
         </div>
 

@@ -4,7 +4,9 @@ import { DataTable } from "@/components/ui/data-table";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Plus, Filter, Download, Receipt, Eye, Pencil, Trash2 } from "lucide-react";
+import { Plus, Filter, Receipt, Eye, Pencil, Trash2 } from "lucide-react";
+import { ExportDropdown } from "@/components/common/ExportDropdown";
+import { entityExportConfigs } from "@/lib/exportUtils";
 import { useExpenses, useDeleteExpense, useExpenseStats, type Expense } from "@/hooks/useExpenses";
 import { ExpenseFormDialog } from "@/components/expenses/ExpenseFormDialog";
 import {
@@ -218,9 +220,11 @@ export default function Expenses() {
             <Button variant="outline" size="icon">
               <Filter className="h-4 w-4" />
             </Button>
-            <Button variant="outline" size="icon">
-              <Download className="h-4 w-4" />
-            </Button>
+            <ExportDropdown
+              data={filteredExpenses}
+              columns={entityExportConfigs.expenses.columns as any}
+              filename={entityExportConfigs.expenses.filename}
+            />
           </div>
         </div>
 

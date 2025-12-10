@@ -3,7 +3,7 @@ import { Header } from "@/components/layout/Header";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Plus, Filter, MoreVertical, FileText, Send, Check, X, Loader2, ArrowRight } from "lucide-react";
+import { Plus, Filter, MoreVertical, FileText, Send, Check, X, Loader2, ArrowRight, Printer } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -21,8 +21,13 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { useQuotes, useDeleteQuote, useUpdateQuoteStatus, QuoteWithDetails } from "@/hooks/useQuotes";
+import { useQuotes, useQuote, useDeleteQuote, useUpdateQuoteStatus, QuoteWithDetails } from "@/hooks/useQuotes";
 import { QuoteFormDialog } from "@/components/quotes/QuoteFormDialog";
+import { ExportDropdown } from "@/components/common/ExportDropdown";
+import { entityExportConfigs } from "@/lib/exportUtils";
+import { useDefaultTemplate } from "@/hooks/useTemplates";
+import { printDocument, formatQuoteData } from "@/lib/pdfGenerator";
+import { toast } from "sonner";
 
 const statusMap: Record<string, "inactive" | "new" | "active" | "danger"> = {
   draft: "inactive",
@@ -52,12 +57,28 @@ export default function Quotes() {
   const { data: quotes, isLoading, error } = useQuotes();
   const deleteQuote = useDeleteQuote();
   const updateStatus = useUpdateQuoteStatus();
+  const { data: quoteTemplate } = useDefaultTemplate("quote");
   
   const [dialogOpen, setDialogOpen] = useState(false);
   const [selectedQuote, setSelectedQuote] = useState<QuoteWithDetails | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [quoteToDelete, setQuoteToDelete] = useState<QuoteWithDetails | null>(null);
+  const [quoteForPrint, setQuoteForPrint] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
+
+  // Fetch full quote for printing
+  const { data: fullQuote } = useQuote(quoteForPrint || undefined);
+
+  // Effect to print when full quote is loaded
+  if (fullQuote && quoteForPrint && quoteTemplate) {
+    const data = formatQuoteData(fullQuote as unknown as Record<string, unknown>);
+    printDocument({
+      template: quoteTemplate.content,
+      data,
+      filename: `presupuesto-${fullQuote.quote_number}.html`,
+    });
+    setQuoteForPrint(null);
+  }
 
   const handleEdit = (quote: QuoteWithDetails) => {
     setSelectedQuote(quote);
@@ -67,6 +88,14 @@ export default function Quotes() {
   const handleDelete = (quote: QuoteWithDetails) => {
     setQuoteToDelete(quote);
     setDeleteDialogOpen(true);
+  };
+
+  const handlePrint = (quoteId: string) => {
+    if (!quoteTemplate) {
+      toast.error("No hay plantilla de presupuesto configurada. Ve a Configuración > Plantillas.");
+      return;
+    }
+    setQuoteForPrint(quoteId);
   };
 
   const confirmDelete = async () => {
@@ -152,10 +181,17 @@ export default function Quotes() {
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
-          <Button variant="outline" className="gap-2">
-            <Filter className="h-4 w-4" />
-            Filtros
-          </Button>
+          <div className="flex gap-2 ml-auto">
+            <Button variant="outline" className="gap-2">
+              <Filter className="h-4 w-4" />
+              Filtros
+            </Button>
+            <ExportDropdown
+              data={filteredQuotes}
+              columns={entityExportConfigs.quotes.columns as any}
+              filename={entityExportConfigs.quotes.filename}
+            />
+          </div>
         </div>
 
         {/* Kanban View */}
@@ -209,6 +245,9 @@ export default function Quotes() {
                               </DropdownMenuTrigger>
                               <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
                                 <DropdownMenuItem onClick={() => handleEdit(quote)}>Editar</DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => handlePrint(quote.id)}>
+                                  <Printer className="h-4 w-4 mr-2" /> Imprimir
+                                </DropdownMenuItem>
                                 <DropdownMenuItem onClick={() => {
                                   setSelectedQuote({ ...quote, id: "" } as QuoteWithDetails);
                                   setDialogOpen(true);

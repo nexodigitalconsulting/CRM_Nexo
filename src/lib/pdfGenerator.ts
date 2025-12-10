@@ -4,13 +4,21 @@ interface PDFGeneratorOptions {
   template: string;
   data: Record<string, unknown>;
   filename?: string;
+  logoUrl?: string;
 }
 
 // Convert HTML to printable format
 export function generatePrintableHTML(options: PDFGeneratorOptions): string {
-  const { template, data } = options;
+  const { template, data, logoUrl } = options;
   
-  const renderedContent = renderTemplate(template, data);
+  // Add logo to data if available
+  const dataWithLogo = {
+    ...data,
+    company_logo: logoUrl ? `<img src="${logoUrl}" alt="Logo" style="max-height: 80px; max-width: 200px;" />` : "",
+    company_logo_url: logoUrl || "",
+  };
+  
+  const renderedContent = renderTemplate(template, dataWithLogo);
   
   const htmlDocument = `
 <!DOCTYPE html>
@@ -52,6 +60,11 @@ export function generatePrintableHTML(options: PDFGeneratorOptions): string {
     .company-info h1 {
       font-size: 24px;
       color: #1a1a1a;
+    }
+    
+    .company-logo img {
+      max-height: 80px;
+      max-width: 200px;
     }
     
     .document-info {
@@ -238,12 +251,12 @@ export function downloadDocument(options: PDFGeneratorOptions): void {
 }
 
 // Format contract data for template
-export function formatContractData(contract: Record<string, unknown>): Record<string, unknown> {
+export function formatContractData(contract: Record<string, unknown>, companySettings?: Record<string, unknown>): Record<string, unknown> {
   const client = contract.client as Record<string, unknown> | undefined;
   const services = contract.services as Array<Record<string, unknown>> | undefined;
   
   return {
-    contract_number: contract.contract_number,
+    contract_number: `CN-${String(contract.contract_number).padStart(4, "0")}`,
     contract_name: contract.name || `Contrato #${contract.contract_number}`,
     start_date: formatDate(contract.start_date as string),
     end_date: contract.end_date ? formatDate(contract.end_date as string) : "Indefinido",
@@ -262,6 +275,15 @@ export function formatContractData(contract: Record<string, unknown>): Record<st
     client_postal_code: client?.postal_code || "",
     client_email: client?.email || "",
     client_phone: client?.phone || "",
+    
+    // Company data
+    company_name: companySettings?.name || "",
+    company_cif: companySettings?.cif || "",
+    company_address: companySettings?.address || "",
+    company_city: companySettings?.city || "",
+    company_email: companySettings?.email || "",
+    company_phone: companySettings?.phone || "",
+    company_iban: companySettings?.iban || "",
     
     // Services
     services: services?.map((s) => {
@@ -284,12 +306,12 @@ export function formatContractData(contract: Record<string, unknown>): Record<st
 }
 
 // Format invoice data for template
-export function formatInvoiceData(invoice: Record<string, unknown>): Record<string, unknown> {
+export function formatInvoiceData(invoice: Record<string, unknown>, companySettings?: Record<string, unknown>): Record<string, unknown> {
   const client = invoice.client as Record<string, unknown> | undefined;
   const services = invoice.services as Array<Record<string, unknown>> | undefined;
   
   return {
-    invoice_number: invoice.invoice_number,
+    invoice_number: `FF-${String(invoice.invoice_number).padStart(4, "0")}`,
     issue_date: formatDate(invoice.issue_date as string),
     due_date: invoice.due_date ? formatDate(invoice.due_date as string) : "",
     subtotal: formatCurrency(invoice.subtotal as number),
@@ -303,6 +325,15 @@ export function formatInvoiceData(invoice: Record<string, unknown>): Record<stri
     client_cif: client?.cif || "",
     client_email: client?.email || "",
     client_iban: client?.iban || "",
+    client_address: client?.address || "",
+    
+    // Company data
+    company_name: companySettings?.name || "",
+    company_cif: companySettings?.cif || "",
+    company_address: companySettings?.address || "",
+    company_email: companySettings?.email || "",
+    company_phone: companySettings?.phone || "",
+    company_iban: companySettings?.iban || "",
     
     // Services
     services: services?.map((s) => {
@@ -312,6 +343,58 @@ export function formatInvoiceData(invoice: Record<string, unknown>): Record<stri
         quantity: s.quantity,
         unit_price: formatCurrency(s.unit_price as number),
         discount_percent: s.discount_percent,
+        subtotal: formatCurrency(s.subtotal as number),
+        iva_percent: s.iva_percent,
+        iva_amount: formatCurrency(s.iva_amount as number),
+        total: formatCurrency(s.total as number),
+      };
+    }) || [],
+    
+    // Meta
+    current_date: formatDate(new Date().toISOString()),
+  };
+}
+
+// Format quote data for template
+export function formatQuoteData(quote: Record<string, unknown>, companySettings?: Record<string, unknown>): Record<string, unknown> {
+  const client = quote.client as Record<string, unknown> | undefined;
+  const contact = quote.contact as Record<string, unknown> | undefined;
+  const services = quote.services as Array<Record<string, unknown>> | undefined;
+  
+  return {
+    quote_number: `PP-${String(quote.quote_number).padStart(4, "0")}`,
+    quote_name: quote.name || `Presupuesto #${quote.quote_number}`,
+    valid_until: quote.valid_until ? formatDate(quote.valid_until as string) : "",
+    subtotal: formatCurrency(quote.subtotal as number),
+    iva_total: formatCurrency(quote.iva_total as number),
+    total: formatCurrency(quote.total as number),
+    notes: quote.notes || "",
+    status: getQuoteStatusLabel(quote.status as string),
+    
+    // Client/Contact data
+    client_name: client?.name || contact?.name || "",
+    client_cif: client?.cif || "",
+    client_email: client?.email || contact?.email || "",
+    client_phone: client?.phone || contact?.phone || "",
+    client_address: client?.address || "",
+    
+    // Company data
+    company_name: companySettings?.name || "",
+    company_cif: companySettings?.cif || "",
+    company_address: companySettings?.address || "",
+    company_email: companySettings?.email || "",
+    company_phone: companySettings?.phone || "",
+    company_iban: companySettings?.iban || "",
+    
+    // Services
+    services: services?.map((s) => {
+      const service = s.service as Record<string, unknown> | undefined;
+      return {
+        name: service?.name || "",
+        quantity: s.quantity,
+        unit_price: formatCurrency(s.unit_price as number),
+        discount_percent: s.discount_percent,
+        discount_amount: formatCurrency(s.discount_amount as number),
         subtotal: formatCurrency(s.subtotal as number),
         iva_percent: s.iva_percent,
         iva_amount: formatCurrency(s.iva_amount as number),
@@ -360,6 +443,16 @@ function getInvoiceStatusLabel(status: string): string {
     issued: "Emitida",
     paid: "Pagada",
     cancelled: "Cancelada",
+  };
+  return labels[status] || status;
+}
+
+function getQuoteStatusLabel(status: string): string {
+  const labels: Record<string, string> = {
+    draft: "Borrador",
+    sent: "Enviado",
+    approved: "Aprobado",
+    rejected: "Rechazado",
   };
   return labels[status] || status;
 }

@@ -11,7 +11,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Plus, Filter, Download, Mail, Phone, Edit, Trash2, UserPlus, Loader2 } from "lucide-react";
+import { Plus, Filter, Mail, Phone, Edit, Trash2, UserPlus, Loader2 } from "lucide-react";
+import { ExportDropdown } from "@/components/common/ExportDropdown";
+import { entityExportConfigs } from "@/lib/exportUtils";
 import { useContacts, useDeleteContact, useConvertToClient, Contact } from "@/hooks/useContacts";
 import { ContactFormDialog } from "@/components/contacts/ContactFormDialog";
 import {
@@ -282,9 +284,11 @@ export default function Contacts() {
             <Button variant="outline" size="icon">
               <Filter className="h-4 w-4" />
             </Button>
-            <Button variant="outline" size="icon">
-              <Download className="h-4 w-4" />
-            </Button>
+            <ExportDropdown
+              data={filteredContacts}
+              columns={entityExportConfigs.contacts.columns as any}
+              filename={entityExportConfigs.contacts.filename}
+            />
           </div>
         </div>
 
