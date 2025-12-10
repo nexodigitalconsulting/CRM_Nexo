@@ -1,11 +1,12 @@
 import { Header } from "@/components/layout/Header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, FileText, RefreshCw, AlertTriangle, Plus, Settings } from "lucide-react";
+import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, FileText, AlertTriangle, Plus, Settings, ExternalLink, Loader2 } from "lucide-react";
 import { useState, useMemo } from "react";
 import { useContracts } from "@/hooks/useContracts";
 import { useInvoices } from "@/hooks/useInvoices";
 import { useCalendarEvents, useCreateCalendarEvent, useDeleteCalendarEvent, CalendarEvent as DBCalendarEvent } from "@/hooks/useCalendarEvents";
+import { useGoogleCalendar, GoogleCalendarEvent } from "@/hooks/useGoogleCalendar";
 import { format, addDays, isSameMonth, isSameDay, startOfMonth, endOfMonth, eachDayOfInterval, getDay, isWithinInterval, addMonths } from "date-fns";
 import { es } from "date-fns/locale";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -18,10 +19,11 @@ interface CalendarDisplayEvent {
   id: string;
   title: string;
   date: Date;
-  type: "contract_start" | "contract_end" | "billing" | "invoice_due" | "renewal" | "custom";
+  type: "contract_start" | "contract_end" | "billing" | "invoice_due" | "renewal" | "custom" | "google";
   color: string;
   details?: string;
   dbEvent?: DBCalendarEvent;
+  googleEvent?: GoogleCalendarEvent;
 }
 
 const eventTypeConfig = {
@@ -49,6 +51,10 @@ const eventTypeConfig = {
     label: "Evento", 
     color: "bg-secondary/20 text-secondary-foreground border-secondary/30",
   },
+  google: { 
+    label: "Google Calendar", 
+    color: "bg-blue-500/20 text-blue-600 border-blue-500/30",
+  },
 };
 
 export default function Calendar() {
@@ -62,6 +68,16 @@ export default function Calendar() {
   const { data: invoices = [], isLoading: invoicesLoading } = useInvoices();
   const { data: customEvents = [], isLoading: eventsLoading } = useCalendarEvents();
   const deleteEvent = useDeleteCalendarEvent();
+  
+  // Google Calendar integration
+  const { 
+    events: googleEvents, 
+    isConnected: googleConnected, 
+    isConnecting: googleConnecting,
+    isLoading: googleLoading,
+    connectGoogleCalendar,
+    disconnectGoogleCalendar,
+  } = useGoogleCalendar();
   
   const isLoading = contractsLoading || invoicesLoading || eventsLoading;
 
@@ -147,9 +163,22 @@ export default function Calendar() {
         dbEvent: event,
       });
     });
+
+    // Google Calendar events
+    googleEvents.forEach((event) => {
+      allEvents.push({
+        id: `google-${event.id}`,
+        title: event.title,
+        date: new Date(event.start),
+        type: "google",
+        color: eventTypeConfig.google.color,
+        details: event.location || event.description,
+        googleEvent: event,
+      });
+    });
     
     return allEvents;
-  }, [contracts, invoices, customEvents]);
+  }, [contracts, invoices, customEvents, googleEvents]);
 
   const monthStart = startOfMonth(currentDate);
   const monthEnd = endOfMonth(currentDate);
@@ -299,6 +328,57 @@ export default function Calendar() {
 
               {/* Sidebar */}
               <div className="space-y-6">
+                {/* Google Calendar Connection */}
+                <Card className="border-blue-500/30">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-lg flex items-center gap-2">
+                      <svg className="h-5 w-5" viewBox="0 0 24 24">
+                        <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                        <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                        <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+                        <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+                      </svg>
+                      Google Calendar
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    {googleConnected ? (
+                      <div className="space-y-3">
+                        <div className="flex items-center gap-2 text-sm text-green-600">
+                          <div className="w-2 h-2 rounded-full bg-green-500" />
+                          Conectado
+                        </div>
+                        {googleEvents.length > 0 && (
+                          <p className="text-xs text-muted-foreground">
+                            {googleEvents.length} eventos sincronizados
+                          </p>
+                        )}
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          className="w-full"
+                          onClick={disconnectGoogleCalendar}
+                        >
+                          Desconectar
+                        </Button>
+                      </div>
+                    ) : (
+                      <Button 
+                        className="w-full gap-2" 
+                        onClick={connectGoogleCalendar}
+                        disabled={googleConnecting}
+                      >
+                        {googleConnecting ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <ExternalLink className="h-4 w-4" />
+                        )}
+                        {googleConnecting ? "Conectando..." : "Conectar Google Calendar"}
+                      </Button>
+                    )}
+                  </CardContent>
+                </Card>
+
                 <Card>
                   <CardHeader className="pb-3">
                     <CardTitle className="text-lg flex items-center gap-2">
@@ -314,7 +394,13 @@ export default function Calendar() {
                         <div 
                           key={event.id} 
                           className="flex gap-3 p-2 rounded-lg bg-muted/50 cursor-pointer hover:bg-muted"
-                          onClick={() => event.dbEvent && handleEventClick(event, { stopPropagation: () => {} } as React.MouseEvent)}
+                          onClick={() => {
+                            if (event.dbEvent) {
+                              handleEventClick(event, { stopPropagation: () => {} } as React.MouseEvent);
+                            } else if (event.googleEvent?.htmlLink) {
+                              window.open(event.googleEvent.htmlLink, "_blank");
+                            }
+                          }}
                         >
                           <div className="text-center min-w-[40px]">
                             <div className="text-lg font-bold">{format(event.date, "d")}</div>
