@@ -1,11 +1,13 @@
 import { useState } from "react";
 import { Header } from "@/components/layout/Header";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { StatusBadge } from "@/components/ui/status-badge";
 import { DashboardWidgetCard } from "@/components/dashboard/DashboardWidgetCard";
 import { StatWidget } from "@/components/dashboard/StatWidget";
 import { AddWidgetDialog } from "@/components/dashboard/AddWidgetDialog";
+import { RecentActivityWidget } from "@/components/dashboard/RecentActivityWidget";
+import { UpcomingTasksWidget } from "@/components/dashboard/UpcomingTasksWidget";
+import { RevenueExpensesChart } from "@/components/dashboard/RevenueExpensesChart";
+import { SalesPipelineChart } from "@/components/dashboard/SalesPipelineChart";
 import { useDashboardStats } from "@/hooks/useDashboardWidgets";
 import type { DashboardWidget } from "@/hooks/useDashboardWidgets";
 import {
@@ -13,13 +15,13 @@ import {
   Building2,
   FileText,
   Receipt,
-  TrendingUp,
-  Calendar,
-  ArrowUpRight,
   Plus,
   Pencil,
   Check,
   Wallet,
+  TrendingUp,
+  Activity,
+  Calendar,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -28,21 +30,10 @@ const defaultWidgets: DashboardWidget[] = [
   { id: "stat-clients", type: "stat", title: "Clientes Activos", entity: "clients", config: { field: "count" }, size: "small", order: 1 },
   { id: "stat-quotes", type: "stat", title: "Presupuestos Pendientes", entity: "quotes", config: { field: "count" }, size: "small", order: 2 },
   { id: "stat-invoices", type: "stat", title: "Facturación Mensual", entity: "invoices", config: { field: "sum" }, size: "small", order: 3 },
-];
-
-const recentActivities = [
-  { id: 1, action: "Nuevo contacto añadido", entity: "María García", time: "Hace 5 min", type: "contact" },
-  { id: 2, action: "Presupuesto enviado", entity: "PP-2024-0042", time: "Hace 15 min", type: "quote" },
-  { id: 3, action: "Contrato firmado", entity: "CN-2024-0018", time: "Hace 1 hora", type: "contract" },
-  { id: 4, action: "Factura emitida", entity: "FF-2024-0156", time: "Hace 2 horas", type: "invoice" },
-  { id: 5, action: "Cliente convertido", entity: "Tech Solutions SL", time: "Hace 3 horas", type: "client" },
-];
-
-const upcomingTasks = [
-  { id: 1, title: "Reunión con Acme Corp", date: "Hoy, 15:00", priority: "high" },
-  { id: 2, title: "Enviar propuesta a Digital Labs", date: "Mañana, 10:00", priority: "medium" },
-  { id: 3, title: "Renovación contrato GlobalTech", date: "15 Dic, 2024", priority: "high" },
-  { id: 4, title: "Seguimiento lead España Digital", date: "16 Dic, 2024", priority: "low" },
+  { id: "widget-activity", type: "activity", title: "Actividad Reciente", config: {}, size: "large", order: 4 },
+  { id: "widget-tasks", type: "table", title: "Próximas Tareas", config: {}, size: "medium", order: 5 },
+  { id: "widget-revenue", type: "chart", title: "Ingresos vs Gastos", entity: "invoices", config: { chartType: "area" }, size: "large", order: 6 },
+  { id: "widget-pipeline", type: "chart", title: "Pipeline de Ventas", entity: "quotes", config: { chartType: "bar" }, size: "large", order: 7 },
 ];
 
 export default function Dashboard() {
@@ -95,11 +86,11 @@ export default function Dashboard() {
   const getWidgetChange = (widget: DashboardWidget) => {
     if (!stats) return undefined;
     switch (widget.entity) {
-      case "contacts": return { value: 12, label: "este mes" };
-      case "clients": return { value: 8, label: "este mes" };
-      case "quotes": return { value: -3, label: "vs. anterior" };
-      case "invoices": return { value: 23, label: "este mes" };
-      case "expenses": return { value: 15, label: "este mes" };
+      case "contacts": return { value: stats.contacts.newThisMonth, label: "este mes" };
+      case "clients": return { value: stats.clients.active, label: "activos" };
+      case "quotes": return { value: stats.quotes.pending, label: "pendientes" };
+      case "invoices": return { value: 0, label: "este mes" };
+      case "expenses": return { value: stats.expenses.pending, label: "pendientes" };
       default: return undefined;
     }
   };
@@ -108,6 +99,31 @@ export default function Dashboard() {
     const change = getWidgetChange(widget);
     if (!change) return "neutral";
     return change.value >= 0 ? "up" : "down";
+  };
+
+  const statWidgets = widgets.filter((w) => w.type === "stat");
+  const otherWidgets = widgets.filter((w) => w.type !== "stat");
+
+  const renderWidget = (widget: DashboardWidget) => {
+    switch (widget.type) {
+      case "activity":
+        return <RecentActivityWidget key={widget.id} />;
+      case "table":
+        if (widget.title.includes("Tarea")) {
+          return <UpcomingTasksWidget key={widget.id} />;
+        }
+        return null;
+      case "chart":
+        if (widget.config.chartType === "area" || widget.title.includes("Ingresos")) {
+          return <RevenueExpensesChart key={widget.id} />;
+        }
+        if (widget.config.chartType === "bar" || widget.title.includes("Pipeline")) {
+          return <SalesPipelineChart key={widget.id} />;
+        }
+        return null;
+      default:
+        return null;
+    }
   };
 
   return (
@@ -144,154 +160,124 @@ export default function Dashboard() {
       />
 
       <div className="p-6 space-y-6">
-        {/* Editable Stat Widgets */}
+        {/* Stat Widgets */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          {widgets
-            .filter((w) => w.type === "stat")
-            .map((widget) => (
-              <DashboardWidgetCard
-                key={widget.id}
-                widget={widget}
-                isEditing={isEditing}
-                onRemove={() => handleRemoveWidget(widget.id)}
-              >
-                <StatWidget
-                  title={widget.title}
-                  value={getWidgetValue(widget)}
-                  change={getWidgetChange(widget)}
-                  icon={getWidgetIcon(widget.entity)}
-                  trend={getWidgetTrend(widget)}
-                  format={widget.entity === "invoices" || widget.entity === "expenses" ? "currency" : "number"}
-                />
-              </DashboardWidgetCard>
-            ))}
+          {statWidgets.map((widget) => (
+            <DashboardWidgetCard
+              key={widget.id}
+              widget={widget}
+              isEditing={isEditing}
+              onRemove={() => handleRemoveWidget(widget.id)}
+            >
+              <StatWidget
+                title={widget.title}
+                value={getWidgetValue(widget)}
+                change={getWidgetChange(widget)}
+                icon={getWidgetIcon(widget.entity)}
+                trend={getWidgetTrend(widget)}
+                format={widget.entity === "invoices" || widget.entity === "expenses" ? "currency" : "number"}
+              />
+            </DashboardWidgetCard>
+          ))}
         </div>
 
         {/* Expenses Summary Card */}
         {stats && (
-          <Card className="bg-gradient-to-r from-primary/5 to-primary/10 border-primary/20">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-base flex items-center gap-2">
-                <Wallet className="h-5 w-5 text-primary" />
-                Resumen de Gastos
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-3 gap-4">
-                <div>
-                  <p className="text-sm text-muted-foreground">Este Mes</p>
-                  <p className="text-xl font-semibold">{formatCurrency(stats.expenses.monthlyTotal)}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Pendientes</p>
-                  <p className="text-xl font-semibold text-warning">{stats.expenses.pending}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Balance</p>
-                  <p className="text-xl font-semibold text-success">
-                    {formatCurrency(stats.invoices.monthlyTotal - stats.expenses.monthlyTotal)}
-                  </p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Main Content Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Recent Activity */}
-          <Card className="lg:col-span-2">
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-base">Actividad Reciente</CardTitle>
-              <Button variant="ghost" size="sm" className="text-primary">
-                Ver todo
-                <ArrowUpRight className="ml-1 h-4 w-4" />
-              </Button>
-            </CardHeader>
-            <CardContent className="p-0">
-              <div className="divide-y divide-border">
-                {recentActivities.map((activity) => (
-                  <div
-                    key={activity.id}
-                    className="flex items-center justify-between p-4 hover:bg-muted/30 transition-colors"
-                  >
-                    <div className="flex items-center gap-4">
-                      <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                        {activity.type === "contact" && <Users className="h-5 w-5" />}
-                        {activity.type === "quote" && <FileText className="h-5 w-5" />}
-                        {activity.type === "contract" && <FileText className="h-5 w-5" />}
-                        {activity.type === "invoice" && <Receipt className="h-5 w-5" />}
-                        {activity.type === "client" && <Building2 className="h-5 w-5" />}
-                      </div>
-                      <div>
-                        <p className="text-sm font-medium">{activity.action}</p>
-                        <p className="text-sm text-muted-foreground">{activity.entity}</p>
-                      </div>
-                    </div>
-                    <span className="text-xs text-muted-foreground">{activity.time}</span>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Upcoming Tasks */}
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-base">Próximas Tareas</CardTitle>
-              <Button variant="ghost" size="icon" className="text-muted-foreground">
-                <Calendar className="h-5 w-5" />
-              </Button>
-            </CardHeader>
-            <CardContent className="p-0">
-              <div className="divide-y divide-border">
-                {upcomingTasks.map((task) => (
-                  <div key={task.id} className="p-4 hover:bg-muted/30 transition-colors">
-                    <div className="flex items-start justify-between">
-                      <div>
-                        <p className="text-sm font-medium">{task.title}</p>
-                        <p className="mt-1 text-xs text-muted-foreground">{task.date}</p>
-                      </div>
-                      <StatusBadge
-                        variant={
-                          task.priority === "high"
-                            ? "danger"
-                            : task.priority === "medium"
-                            ? "pending"
-                            : "inactive"
-                        }
-                      >
-                        {task.priority === "high" ? "Alta" : task.priority === "medium" ? "Media" : "Baja"}
-                      </StatusBadge>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Pipeline Chart Placeholder */}
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle className="text-base">Pipeline de Ventas</CardTitle>
-            <div className="flex gap-2">
-              <Button variant="outline" size="sm">Semanal</Button>
-              <Button variant="outline" size="sm" className="bg-primary text-primary-foreground">Mensual</Button>
-              <Button variant="outline" size="sm">Anual</Button>
+          <div className="bg-gradient-to-r from-primary/5 to-primary/10 border border-primary/20 rounded-lg p-6">
+            <div className="flex items-center gap-2 mb-4">
+              <Wallet className="h-5 w-5 text-primary" />
+              <h3 className="font-semibold">Resumen Financiero del Mes</h3>
             </div>
-          </CardHeader>
-          <CardContent>
-            <div className="h-64 flex items-center justify-center bg-muted/30 rounded-lg border border-dashed border-border">
-              <div className="text-center">
-                <TrendingUp className="h-12 w-12 mx-auto text-muted-foreground/50" />
-                <p className="mt-2 text-sm text-muted-foreground">
-                  Gráfico de pipeline de ventas
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div>
+                <p className="text-sm text-muted-foreground">Ingresos</p>
+                <p className="text-xl font-semibold text-success">{formatCurrency(stats.invoices.monthlyTotal)}</p>
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">Gastos</p>
+                <p className="text-xl font-semibold text-destructive">{formatCurrency(stats.expenses.monthlyTotal)}</p>
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">Balance</p>
+                <p className={`text-xl font-semibold ${stats.invoices.monthlyTotal - stats.expenses.monthlyTotal >= 0 ? "text-success" : "text-destructive"}`}>
+                  {formatCurrency(stats.invoices.monthlyTotal - stats.expenses.monthlyTotal)}
                 </p>
               </div>
+              <div>
+                <p className="text-sm text-muted-foreground">Pendiente Cobro</p>
+                <p className="text-xl font-semibold text-warning">{formatCurrency(stats.quotes.pendingAmount)}</p>
+              </div>
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        )}
+
+        {/* Activity and Tasks Row */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {otherWidgets.find(w => w.type === "activity") && (
+            <div className={`${isEditing ? "ring-2 ring-primary/20 ring-offset-2 rounded-lg relative" : ""} lg:col-span-2`}>
+              {isEditing && (
+                <Button
+                  variant="destructive"
+                  size="icon"
+                  className="absolute -top-2 -right-2 h-6 w-6 rounded-full shadow-md z-10"
+                  onClick={() => handleRemoveWidget("widget-activity")}
+                >
+                  ×
+                </Button>
+              )}
+              <RecentActivityWidget />
+            </div>
+          )}
+          {otherWidgets.find(w => w.type === "table") && (
+            <div className={isEditing ? "ring-2 ring-primary/20 ring-offset-2 rounded-lg relative" : ""}>
+              {isEditing && (
+                <Button
+                  variant="destructive"
+                  size="icon"
+                  className="absolute -top-2 -right-2 h-6 w-6 rounded-full shadow-md z-10"
+                  onClick={() => handleRemoveWidget("widget-tasks")}
+                >
+                  ×
+                </Button>
+              )}
+              <UpcomingTasksWidget />
+            </div>
+          )}
+        </div>
+
+        {/* Charts Row */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {otherWidgets.find(w => w.title.includes("Ingresos") || w.config.chartType === "area") && (
+            <div className={isEditing ? "ring-2 ring-primary/20 ring-offset-2 rounded-lg relative" : ""}>
+              {isEditing && (
+                <Button
+                  variant="destructive"
+                  size="icon"
+                  className="absolute -top-2 -right-2 h-6 w-6 rounded-full shadow-md z-10"
+                  onClick={() => handleRemoveWidget("widget-revenue")}
+                >
+                  ×
+                </Button>
+              )}
+              <RevenueExpensesChart />
+            </div>
+          )}
+          {otherWidgets.find(w => w.title.includes("Pipeline") || w.config.chartType === "bar") && (
+            <div className={isEditing ? "ring-2 ring-primary/20 ring-offset-2 rounded-lg relative" : ""}>
+              {isEditing && (
+                <Button
+                  variant="destructive"
+                  size="icon"
+                  className="absolute -top-2 -right-2 h-6 w-6 rounded-full shadow-md z-10"
+                  onClick={() => handleRemoveWidget("widget-pipeline")}
+                >
+                  ×
+                </Button>
+              )}
+              <SalesPipelineChart />
+            </div>
+          )}
+        </div>
       </div>
 
       <AddWidgetDialog

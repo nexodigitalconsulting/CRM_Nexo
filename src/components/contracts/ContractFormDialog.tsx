@@ -306,8 +306,8 @@ export function ContractFormDialog({ open, onOpenChange, contract }: ContractFor
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
-        <DialogHeader>
+      <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col">
+        <DialogHeader className="flex-shrink-0">
           <DialogTitle className="flex items-center gap-2">
             <FileText className="h-5 w-5" />
             {contract ? "Editar Contrato" : "Nuevo Contrato"}
@@ -315,8 +315,8 @@ export function ContractFormDialog({ open, onOpenChange, contract }: ContractFor
         </DialogHeader>
 
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col flex-1 overflow-hidden">
-            <ScrollArea className="flex-1 px-1">
+          <form onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col flex-1 min-h-0">
+            <ScrollArea className="flex-1 pr-4" style={{ maxHeight: "calc(90vh - 180px)" }}>
               {!contract && (
                 <Tabs value={activeTab} onValueChange={setActiveTab} className="mb-6">
                   <TabsList className="grid w-full grid-cols-2">

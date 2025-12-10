@@ -1,53 +1,40 @@
+import { useState } from "react";
 import { Header } from "@/components/layout/Header";
 import { DataTable } from "@/components/ui/data-table";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Plus, Filter, Download, CreditCard, FileText, FileCode } from "lucide-react";
-
-interface Remittance {
-  id: string;
-  code: string;
-  issueDate: string;
-  totalAmount: number;
-  invoiceCount: number;
-  status: string;
-  hasXml: boolean;
-  hasN19: boolean;
-}
-
-const remittances: Remittance[] = [
-  {
-    id: "RM-2024-0001",
-    code: "REM-DIC-2024-001",
-    issueDate: "2024-12-01",
-    totalAmount: 12500,
-    invoiceCount: 5,
-    status: "pending",
-    hasXml: true,
-    hasN19: true,
-  },
-  {
-    id: "RM-2024-0002",
-    code: "REM-NOV-2024-003",
-    issueDate: "2024-11-15",
-    totalAmount: 8750,
-    invoiceCount: 3,
-    status: "paid",
-    hasXml: true,
-    hasN19: true,
-  },
-  {
-    id: "RM-2024-0003",
-    code: "REM-NOV-2024-002",
-    issueDate: "2024-11-01",
-    totalAmount: 15200,
-    invoiceCount: 7,
-    status: "partial",
-    hasXml: true,
-    hasN19: false,
-  },
-];
+import { ExportDropdown } from "@/components/common/ExportDropdown";
+import { entityExportConfigs } from "@/lib/exportUtils";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Plus, Filter, CreditCard, FileText, FileCode, Loader2, Trash2 } from "lucide-react";
+import {
+  useRemittances,
+  useCreateRemittance,
+  useDeleteRemittance,
+  useAvailableInvoicesForRemittance,
+  Remittance,
+} from "@/hooks/useRemittances";
+import { format } from "date-fns";
 
 const statusMap: Record<string, "active" | "pending" | "danger"> = {
   paid: "active",
@@ -56,80 +43,169 @@ const statusMap: Record<string, "active" | "pending" | "danger"> = {
   overdue: "danger",
 };
 
+const statusLabels: Record<string, string> = {
+  paid: "Cobrada",
+  pending: "Pendiente",
+  partial: "Parcial",
+  overdue: "Vencida",
+};
+
 const formatCurrency = (amount: number) =>
   new Intl.NumberFormat("es-ES", { style: "currency", currency: "EUR" }).format(amount);
 
-const columns = [
-  {
-    key: "code",
-    label: "Código Remesa",
-    render: (remittance: Remittance) => (
-      <div className="flex items-center gap-2">
-        <CreditCard className="h-4 w-4 text-muted-foreground" />
-        <span className="font-mono font-medium">{remittance.code}</span>
-      </div>
-    ),
-  },
-  {
-    key: "issueDate",
-    label: "Fecha Emisión",
-    render: (remittance: Remittance) => (
-      <span className="text-sm">{new Date(remittance.issueDate).toLocaleDateString("es-ES")}</span>
-    ),
-  },
-  {
-    key: "invoiceCount",
-    label: "Facturas",
-    render: (remittance: Remittance) => (
-      <span className="text-sm">{remittance.invoiceCount} facturas</span>
-    ),
-  },
-  {
-    key: "totalAmount",
-    label: "Importe Total",
-    render: (remittance: Remittance) => (
-      <span className="font-semibold">{formatCurrency(remittance.totalAmount)}</span>
-    ),
-  },
-  {
-    key: "status",
-    label: "Estado",
-    render: (remittance: Remittance) => (
-      <StatusBadge variant={statusMap[remittance.status]}>
-        {remittance.status === "paid" ? "Cobrada" : remittance.status === "pending" ? "Pendiente" : "Parcial"}
-      </StatusBadge>
-    ),
-  },
-  {
-    key: "files",
-    label: "Ficheros",
-    render: (remittance: Remittance) => (
-      <div className="flex gap-2">
-        {remittance.hasXml && (
-          <Button variant="outline" size="sm" className="h-7 px-2 text-xs gap-1">
-            <FileCode className="h-3 w-3" />
-            XML
-          </Button>
-        )}
-        {remittance.hasN19 && (
-          <Button variant="outline" size="sm" className="h-7 px-2 text-xs gap-1">
-            <FileText className="h-3 w-3" />
-            N19
-          </Button>
-        )}
-      </div>
-    ),
-  },
-];
-
 export default function Remittances() {
-  const totalPending = remittances
-    .filter((r) => r.status === "pending" || r.status === "partial")
-    .reduce((sum, r) => sum + r.totalAmount, 0);
+  const { data: remittances, isLoading } = useRemittances();
+  const { data: availableInvoices } = useAvailableInvoicesForRemittance();
+  const createRemittance = useCreateRemittance();
+  const deleteRemittance = useDeleteRemittance();
 
-  const totalPaid = remittances
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [remittanceToDelete, setRemittanceToDelete] = useState<Remittance | null>(null);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [selectedInvoices, setSelectedInvoices] = useState<string[]>([]);
+  const [code, setCode] = useState("");
+
+  const handleCreate = async () => {
+    if (selectedInvoices.length === 0) return;
+
+    const selectedInvoiceData = availableInvoices?.filter((inv) =>
+      selectedInvoices.includes(inv.id)
+    ) || [];
+
+    const totalAmount = selectedInvoiceData.reduce(
+      (sum, inv) => sum + Number(inv.total || 0),
+      0
+    );
+
+    await createRemittance.mutateAsync({
+      remittance: {
+        code: code || `REM-${format(new Date(), "MMM-yyyy").toUpperCase()}-${String(Math.floor(Math.random() * 1000)).padStart(3, "0")}`,
+        issue_date: format(new Date(), "yyyy-MM-dd"),
+        invoice_count: selectedInvoices.length,
+        total_amount: totalAmount,
+        status: "pending",
+      },
+      invoiceIds: selectedInvoices,
+    });
+
+    setDialogOpen(false);
+    setSelectedInvoices([]);
+    setCode("");
+  };
+
+  const handleDelete = (remittance: Remittance) => {
+    setRemittanceToDelete(remittance);
+    setDeleteDialogOpen(true);
+  };
+
+  const confirmDelete = async () => {
+    if (remittanceToDelete) {
+      await deleteRemittance.mutateAsync(remittanceToDelete.id);
+      setDeleteDialogOpen(false);
+      setRemittanceToDelete(null);
+    }
+  };
+
+  const toggleInvoice = (invoiceId: string) => {
+    setSelectedInvoices((prev) =>
+      prev.includes(invoiceId)
+        ? prev.filter((id) => id !== invoiceId)
+        : [...prev, invoiceId]
+    );
+  };
+
+  const filteredRemittances = remittances?.filter((r) =>
+    r.code?.toLowerCase().includes(searchTerm.toLowerCase())
+  ) || [];
+
+  const totalPending = filteredRemittances
+    .filter((r) => r.status === "pending" || r.status === "partial")
+    .reduce((sum, r) => sum + Number(r.total_amount || 0), 0);
+
+  const totalPaid = filteredRemittances
     .filter((r) => r.status === "paid")
-    .reduce((sum, r) => sum + r.totalAmount, 0);
+    .reduce((sum, r) => sum + Number(r.total_amount || 0), 0);
+
+  const columns = [
+    {
+      key: "code",
+      label: "Código Remesa",
+      render: (remittance: Remittance) => (
+        <div className="flex items-center gap-2">
+          <CreditCard className="h-4 w-4 text-muted-foreground" />
+          <span className="font-mono font-medium">{remittance.code || `RM-${String(remittance.remittance_number).padStart(4, "0")}`}</span>
+        </div>
+      ),
+    },
+    {
+      key: "issue_date",
+      label: "Fecha Emisión",
+      render: (remittance: Remittance) => (
+        <span className="text-sm">{new Date(remittance.issue_date).toLocaleDateString("es-ES")}</span>
+      ),
+    },
+    {
+      key: "invoice_count",
+      label: "Facturas",
+      render: (remittance: Remittance) => (
+        <span className="text-sm">{remittance.invoice_count || 0} facturas</span>
+      ),
+    },
+    {
+      key: "total_amount",
+      label: "Importe Total",
+      render: (remittance: Remittance) => (
+        <span className="font-semibold">{formatCurrency(Number(remittance.total_amount || 0))}</span>
+      ),
+    },
+    {
+      key: "status",
+      label: "Estado",
+      render: (remittance: Remittance) => (
+        <StatusBadge variant={statusMap[remittance.status || "pending"]}>
+          {statusLabels[remittance.status || "pending"]}
+        </StatusBadge>
+      ),
+    },
+    {
+      key: "files",
+      label: "Ficheros",
+      render: (remittance: Remittance) => (
+        <div className="flex gap-2">
+          {remittance.xml_file_url && (
+            <Button variant="outline" size="sm" className="h-7 px-2 text-xs gap-1">
+              <FileCode className="h-3 w-3" />
+              XML
+            </Button>
+          )}
+          {remittance.n19_file_url && (
+            <Button variant="outline" size="sm" className="h-7 px-2 text-xs gap-1">
+              <FileText className="h-3 w-3" />
+              N19
+            </Button>
+          )}
+        </div>
+      ),
+    },
+    {
+      key: "actions",
+      label: "",
+      render: (remittance: Remittance) => (
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-8 w-8 text-destructive"
+          onClick={(e) => {
+            e.stopPropagation();
+            handleDelete(remittance);
+          }}
+        >
+          <Trash2 className="h-4 w-4" />
+        </Button>
+      ),
+    },
+  ];
 
   return (
     <div className="animate-fade-in">
@@ -137,7 +213,7 @@ export default function Remittances() {
         title="Remesas de Cobro"
         subtitle="Gestión de domiciliaciones bancarias SEPA"
         actions={
-          <Button className="gap-2">
+          <Button className="gap-2" onClick={() => setDialogOpen(true)}>
             <Plus className="h-4 w-4" />
             Nueva Remesa
           </Button>
@@ -147,7 +223,7 @@ export default function Remittances() {
         <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
           <div className="bg-card rounded-lg border border-border p-4">
             <p className="text-sm text-muted-foreground">Total Remesas</p>
-            <p className="text-2xl font-semibold mt-1">{remittances.length}</p>
+            <p className="text-2xl font-semibold mt-1">{remittances?.length || 0}</p>
           </div>
           <div className="bg-card rounded-lg border border-border p-4">
             <p className="text-sm text-muted-foreground">Pendiente de Cobro</p>
@@ -158,10 +234,8 @@ export default function Remittances() {
             <p className="text-2xl font-semibold mt-1 text-success">{formatCurrency(totalPaid)}</p>
           </div>
           <div className="bg-card rounded-lg border border-border p-4">
-            <p className="text-sm text-muted-foreground">Facturas incluidas</p>
-            <p className="text-2xl font-semibold mt-1">
-              {remittances.reduce((sum, r) => sum + r.invoiceCount, 0)}
-            </p>
+            <p className="text-sm text-muted-foreground">Facturas disponibles</p>
+            <p className="text-2xl font-semibold mt-1">{availableInvoices?.length || 0}</p>
           </div>
         </div>
 
@@ -180,19 +254,151 @@ export default function Remittances() {
         </div>
 
         <div className="flex flex-col sm:flex-row gap-4">
-          <Input placeholder="Buscar remesas..." className="sm:w-80" />
+          <Input
+            placeholder="Buscar remesas..."
+            className="sm:w-80"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
           <div className="flex gap-2 ml-auto">
             <Button variant="outline" size="icon">
               <Filter className="h-4 w-4" />
             </Button>
-            <Button variant="outline" size="icon">
-              <Download className="h-4 w-4" />
-            </Button>
+            <ExportDropdown
+              data={filteredRemittances}
+              columns={entityExportConfigs.remittances.columns as any}
+              filename={entityExportConfigs.remittances.filename}
+            />
           </div>
         </div>
 
-        <DataTable columns={columns} data={remittances} />
+        {isLoading ? (
+          <div className="flex items-center justify-center py-12">
+            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+          </div>
+        ) : (
+          <DataTable columns={columns} data={filteredRemittances} />
+        )}
       </div>
+
+      {/* Create Remittance Dialog */}
+      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Nueva Remesa de Cobro</DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label>Código de Remesa (opcional)</Label>
+              <Input
+                value={code}
+                onChange={(e) => setCode(e.target.value)}
+                placeholder={`REM-${format(new Date(), "MMM-yyyy").toUpperCase()}-001`}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label>Seleccionar Facturas</Label>
+              {availableInvoices && availableInvoices.length > 0 ? (
+                <ScrollArea className="h-64 border rounded-lg p-2">
+                  <div className="space-y-2">
+                    {availableInvoices.map((invoice) => (
+                      <div
+                        key={invoice.id}
+                        className={`flex items-center justify-between p-3 rounded-lg border cursor-pointer transition-colors ${
+                          selectedInvoices.includes(invoice.id)
+                            ? "border-primary bg-primary/5"
+                            : "border-border hover:bg-muted/50"
+                        }`}
+                        onClick={() => toggleInvoice(invoice.id)}
+                      >
+                        <div className="flex items-center gap-3">
+                          <Checkbox
+                            checked={selectedInvoices.includes(invoice.id)}
+                            onCheckedChange={() => toggleInvoice(invoice.id)}
+                          />
+                          <div>
+                            <p className="font-mono text-sm">
+                              FF-{String(invoice.invoice_number).padStart(4, "0")}
+                            </p>
+                            <p className="text-sm text-muted-foreground">
+                              {invoice.client?.name}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <p className="font-semibold">{formatCurrency(Number(invoice.total || 0))}</p>
+                          <p className="text-xs text-muted-foreground">
+                            Vence: {invoice.due_date ? new Date(invoice.due_date).toLocaleDateString("es-ES") : "—"}
+                          </p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </ScrollArea>
+              ) : (
+                <div className="text-center py-8 text-muted-foreground border rounded-lg">
+                  No hay facturas disponibles para incluir en remesa
+                </div>
+              )}
+            </div>
+
+            {selectedInvoices.length > 0 && (
+              <div className="bg-muted/50 rounded-lg p-4">
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Facturas seleccionadas:</span>
+                  <span className="font-medium">{selectedInvoices.length}</span>
+                </div>
+                <div className="flex justify-between mt-2">
+                  <span className="text-muted-foreground">Total:</span>
+                  <span className="font-bold text-lg">
+                    {formatCurrency(
+                      availableInvoices
+                        ?.filter((inv) => selectedInvoices.includes(inv.id))
+                        .reduce((sum, inv) => sum + Number(inv.total || 0), 0) || 0
+                    )}
+                  </span>
+                </div>
+              </div>
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDialogOpen(false)}>
+              Cancelar
+            </Button>
+            <Button
+              onClick={handleCreate}
+              disabled={selectedInvoices.length === 0 || createRemittance.isPending}
+            >
+              {createRemittance.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Crear Remesa
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Confirmation */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Eliminar remesa?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta acción eliminará la remesa y las facturas volverán a estar disponibles para nuevas remesas.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmDelete}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Eliminar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
