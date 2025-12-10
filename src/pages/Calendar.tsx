@@ -1,12 +1,14 @@
 import { Header } from "@/components/layout/Header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, FileText, AlertTriangle, Plus, Settings, ExternalLink, Loader2 } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, FileText, AlertTriangle, Plus, Settings, ExternalLink, Loader2, Link2, Copy, Check } from "lucide-react";
 import { useState, useMemo } from "react";
 import { useContracts } from "@/hooks/useContracts";
 import { useInvoices } from "@/hooks/useInvoices";
 import { useCalendarEvents, useCreateCalendarEvent, useDeleteCalendarEvent, CalendarEvent as DBCalendarEvent } from "@/hooks/useCalendarEvents";
 import { useGoogleCalendar, GoogleCalendarEvent } from "@/hooks/useGoogleCalendar";
+import { useAuth } from "@/hooks/useAuth";
 import { format, addDays, isSameMonth, isSameDay, startOfMonth, endOfMonth, eachDayOfInterval, getDay, isWithinInterval, addMonths } from "date-fns";
 import { es } from "date-fns/locale";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -14,6 +16,7 @@ import { CalendarEventDialog } from "@/components/calendar/CalendarEventDialog";
 import { AvailabilityManager } from "@/components/calendar/AvailabilityManager";
 import { CategoryManager } from "@/components/calendar/CategoryManager";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { toast } from "sonner";
 
 interface CalendarDisplayEvent {
   id: string;
@@ -63,7 +66,9 @@ export default function Calendar() {
   const [eventDialogOpen, setEventDialogOpen] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState<DBCalendarEvent | null>(null);
   const [activeTab, setActiveTab] = useState<string>("calendar");
+  const [iCalCopied, setICalCopied] = useState(false);
   
+  const { session } = useAuth();
   const { data: contracts = [], isLoading: contractsLoading } = useContracts();
   const { data: invoices = [], isLoading: invoicesLoading } = useInvoices();
   const { data: customEvents = [], isLoading: eventsLoading } = useCalendarEvents();
@@ -80,6 +85,20 @@ export default function Calendar() {
   } = useGoogleCalendar();
   
   const isLoading = contractsLoading || invoicesLoading || eventsLoading;
+
+  // iCal subscription URL
+  const iCalUrl = session?.user?.id 
+    ? `https://honfwrfkiukckyoelsdm.supabase.co/functions/v1/calendar-ical?user_id=${session.user.id}`
+    : null;
+
+  const copyICalUrl = () => {
+    if (iCalUrl) {
+      navigator.clipboard.writeText(iCalUrl);
+      setICalCopied(true);
+      toast.success("URL copiada al portapapeles");
+      setTimeout(() => setICalCopied(false), 2000);
+    }
+  };
 
   // Generate events from contracts, invoices, and custom events
   const events = useMemo(() => {
@@ -378,6 +397,50 @@ export default function Calendar() {
                     )}
                   </CardContent>
                 </Card>
+
+                {/* iCal Subscription */}
+                {iCalUrl && (
+                  <Card className="border-orange-500/30">
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-lg flex items-center gap-2">
+                        <Link2 className="h-5 w-5 text-orange-500" />
+                        Suscripción iCal
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                      <p className="text-xs text-muted-foreground">
+                        Añade esta URL a Google Calendar, Outlook u otro cliente para ver tus eventos del CRM.
+                      </p>
+                      <div className="flex gap-2">
+                        <Input 
+                          value={iCalUrl} 
+                          readOnly 
+                          className="text-xs font-mono"
+                        />
+                        <Button 
+                          variant="outline" 
+                          size="icon"
+                          onClick={copyICalUrl}
+                        >
+                          {iCalCopied ? (
+                            <Check className="h-4 w-4 text-green-500" />
+                          ) : (
+                            <Copy className="h-4 w-4" />
+                          )}
+                        </Button>
+                      </div>
+                      <div className="text-xs text-muted-foreground space-y-1">
+                        <p className="font-medium">Cómo añadir a Google Calendar:</p>
+                        <ol className="list-decimal list-inside space-y-0.5">
+                          <li>Abre Google Calendar</li>
+                          <li>Clic en + junto a "Otros calendarios"</li>
+                          <li>Selecciona "Desde URL"</li>
+                          <li>Pega la URL copiada</li>
+                        </ol>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
 
                 <Card>
                   <CardHeader className="pb-3">

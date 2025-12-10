@@ -49,14 +49,25 @@ const segmentColors: Record<string, string> = {
   individual: "bg-muted text-muted-foreground",
 };
 
-// Define column configuration for visibility control
+// Define ALL column configurations for visibility control (includes all DB fields)
 const columnConfigs: ColumnConfig[] = [
   { key: "client_number", label: "ID", defaultVisible: true },
-  { key: "name", label: "Cliente", defaultVisible: true },
-  { key: "email", label: "Contacto", defaultVisible: true },
+  { key: "name", label: "Nombre", defaultVisible: true },
+  { key: "cif", label: "CIF/NIF", defaultVisible: false },
+  { key: "email", label: "Email", defaultVisible: true },
+  { key: "phone", label: "Teléfono", defaultVisible: false },
+  { key: "address", label: "Dirección", defaultVisible: false },
+  { key: "city", label: "Ciudad", defaultVisible: false },
+  { key: "postal_code", label: "Código Postal", defaultVisible: false },
+  { key: "province", label: "Provincia", defaultVisible: false },
+  { key: "country", label: "País", defaultVisible: false },
+  { key: "iban", label: "IBAN", defaultVisible: false },
   { key: "segment", label: "Segmento", defaultVisible: true },
   { key: "source", label: "Fuente", defaultVisible: true },
   { key: "status", label: "Estado", defaultVisible: true },
+  { key: "notes", label: "Notas", defaultVisible: false },
+  { key: "created_at", label: "Fecha Creación", defaultVisible: false },
+  { key: "updated_at", label: "Última Actualización", defaultVisible: false },
   { key: "actions", label: "Acciones", defaultVisible: true },
 ];
 
@@ -129,31 +140,65 @@ export default function Clients() {
     },
     {
       key: "name",
-      label: "Cliente",
+      label: "Nombre",
       render: (client: Client) => (
         <div className="flex items-center gap-3">
           <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 text-primary">
             <Building2 className="h-4 w-4" />
           </div>
-          <div>
-            <p className="font-medium text-foreground">{client.name}</p>
-            <p className="text-xs text-muted-foreground">{client.cif || "-"}</p>
-          </div>
+          <p className="font-medium text-foreground">{client.name}</p>
         </div>
       ),
     },
     {
+      key: "cif",
+      label: "CIF/NIF",
+      render: (client: Client) => <span className="text-sm font-mono">{client.cif || "-"}</span>,
+    },
+    {
       key: "email",
-      label: "Contacto",
+      label: "Email",
       render: (client: Client) => (
-        <div>
-          <div className="flex items-center gap-2">
-            <Mail className="h-3.5 w-3.5 text-muted-foreground" />
-            <span className="text-sm">{client.email || "-"}</span>
-          </div>
-          <p className="text-xs text-muted-foreground mt-0.5">{client.phone || "-"}</p>
+        <div className="flex items-center gap-2">
+          <Mail className="h-3.5 w-3.5 text-muted-foreground" />
+          <span className="text-sm">{client.email || "-"}</span>
         </div>
       ),
+    },
+    {
+      key: "phone",
+      label: "Teléfono",
+      render: (client: Client) => <span className="text-sm">{client.phone || "-"}</span>,
+    },
+    {
+      key: "address",
+      label: "Dirección",
+      render: (client: Client) => <span className="text-sm truncate max-w-[200px]">{client.address || "-"}</span>,
+    },
+    {
+      key: "city",
+      label: "Ciudad",
+      render: (client: Client) => <span className="text-sm">{client.city || "-"}</span>,
+    },
+    {
+      key: "postal_code",
+      label: "Código Postal",
+      render: (client: Client) => <span className="text-sm font-mono">{client.postal_code || "-"}</span>,
+    },
+    {
+      key: "province",
+      label: "Provincia",
+      render: (client: Client) => <span className="text-sm">{client.province || "-"}</span>,
+    },
+    {
+      key: "country",
+      label: "País",
+      render: (client: Client) => <span className="text-sm">{client.country || "-"}</span>,
+    },
+    {
+      key: "iban",
+      label: "IBAN",
+      render: (client: Client) => <span className="text-sm font-mono">{client.iban || "-"}</span>,
     },
     {
       key: "segment",
@@ -176,6 +221,29 @@ export default function Clients() {
         <StatusBadge variant={statusMap[client.status || "active"]}>
           {client.status === "active" ? "Activo" : "Inactivo"}
         </StatusBadge>
+      ),
+    },
+    {
+      key: "notes",
+      label: "Notas",
+      render: (client: Client) => <span className="text-sm truncate max-w-[150px]">{client.notes || "-"}</span>,
+    },
+    {
+      key: "created_at",
+      label: "Fecha Creación",
+      render: (client: Client) => (
+        <span className="text-sm text-muted-foreground">
+          {client.created_at ? new Date(client.created_at).toLocaleDateString("es-ES") : "-"}
+        </span>
+      ),
+    },
+    {
+      key: "updated_at",
+      label: "Última Actualización",
+      render: (client: Client) => (
+        <span className="text-sm text-muted-foreground">
+          {client.updated_at ? new Date(client.updated_at).toLocaleDateString("es-ES") : "-"}
+        </span>
       ),
     },
     {
