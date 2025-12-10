@@ -233,10 +233,11 @@ export function InvoiceFormDialog({ open, onOpenChange, invoice }: Props) {
                   <FormItem>
                     <FormLabel>Contrato (opcional)</FormLabel>
                     <Select 
-                      value={field.value} 
+                      value={field.value || "none"} 
                       onValueChange={(value) => {
-                        field.onChange(value);
-                        handleContractSelect(value);
+                        const actualValue = value === "none" ? "" : value;
+                        field.onChange(actualValue);
+                        handleContractSelect(actualValue);
                       }}
                     >
                       <FormControl>
@@ -245,8 +246,8 @@ export function InvoiceFormDialog({ open, onOpenChange, invoice }: Props) {
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        <SelectItem value="">Sin contrato</SelectItem>
-                        {contracts.map((contract) => (
+                        <SelectItem value="none">Sin contrato</SelectItem>
+                        {contracts.filter(c => c.id).map((contract) => (
                           <SelectItem key={contract.id} value={contract.id}>
                             #{contract.contract_number} - {contract.name || contract.client?.name}
                           </SelectItem>
