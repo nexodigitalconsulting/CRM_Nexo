@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Header } from "@/components/layout/Header";
-import { DataTable } from "@/components/ui/data-table";
+import { DataTable, Column } from "@/components/ui/data-table";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -16,6 +16,8 @@ import { useClients, useDeleteClient, Client } from "@/hooks/useClients";
 import { ClientFormDialog } from "@/components/clients/ClientFormDialog";
 import { ClientDetailDialog } from "@/components/clients/ClientDetailDialog";
 import { ExportDropdown } from "@/components/common/ExportDropdown";
+import { TableViewManager, ColumnConfig } from "@/components/common/TableViewManager";
+import { useDefaultTableView } from "@/hooks/useTableViews";
 import { entityExportConfigs } from "@/lib/exportUtils";
 import {
   AlertDialog,
@@ -47,9 +49,21 @@ const segmentColors: Record<string, string> = {
   individual: "bg-muted text-muted-foreground",
 };
 
+// Define column configuration for visibility control
+const columnConfigs: ColumnConfig[] = [
+  { key: "client_number", label: "ID", defaultVisible: true },
+  { key: "name", label: "Cliente", defaultVisible: true },
+  { key: "email", label: "Contacto", defaultVisible: true },
+  { key: "segment", label: "Segmento", defaultVisible: true },
+  { key: "source", label: "Fuente", defaultVisible: true },
+  { key: "status", label: "Estado", defaultVisible: true },
+  { key: "actions", label: "Acciones", defaultVisible: true },
+];
+
 export default function Clients() {
   const { data: clients, isLoading, error } = useClients();
   const deleteClient = useDeleteClient();
+  const { data: defaultView } = useDefaultTableView("clients");
   
   const [dialogOpen, setDialogOpen] = useState(false);
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
@@ -60,6 +74,18 @@ export default function Clients() {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [segmentFilter, setSegmentFilter] = useState("all");
+  
+  // Visible columns state
+  const [visibleColumns, setVisibleColumns] = useState<string[]>(
+    columnConfigs.filter(c => c.defaultVisible).map(c => c.key)
+  );
+
+  // Load default view if exists
+  useEffect(() => {
+    if (defaultView?.visible_columns) {
+      setVisibleColumns(defaultView.visible_columns);
+    }
+  }, [defaultView]);
 
   const handleView = (client: Client) => {
     setViewingClient(client);
@@ -93,7 +119,7 @@ export default function Clients() {
     return matchesSearch && matchesStatus && matchesSegment;
   }) || [];
 
-  const columns = [
+  const columns: Column<Client>[] = [
     {
       key: "client_number",
       label: "ID",
@@ -246,6 +272,14 @@ export default function Clients() {
             </SelectContent>
           </Select>
           <div className="flex gap-2 ml-auto">
+            <TableViewManager
+              entityName="clients"
+              columns={columnConfigs}
+              visibleColumns={visibleColumns}
+              onVisibleColumnsChange={setVisibleColumns}
+              tableName="clients"
+              filters={{ status: statusFilter, segment: segmentFilter }}
+            />
             <ExportDropdown
               data={filteredClients}
               columns={entityExportConfigs.clients.columns}
@@ -260,7 +294,11 @@ export default function Clients() {
             <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
           </div>
         ) : (
-          <DataTable columns={columns} data={filteredClients} />
+          <DataTable 
+            columns={columns} 
+            data={filteredClients} 
+            visibleColumns={visibleColumns}
+          />
         )}
       </div>
 
@@ -286,6 +324,15 @@ export default function Clients() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {viewingClient && (
+        <ClientDetailDialog
+          open={detailDialogOpen}
+          onOpenChange={setDetailDialogOpen}
+          client={viewingClient}
+          onEdit={() => handleEdit(viewingClient)}
+        />
+      )}
     </div>
   );
 }

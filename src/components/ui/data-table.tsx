@@ -2,7 +2,7 @@ import { cn } from "@/lib/utils";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "./button";
 
-interface Column<T> {
+export interface Column<T> {
   key: string;
   label: string;
   render?: (item: T) => React.ReactNode;
@@ -14,6 +14,7 @@ interface DataTableProps<T> {
   data: T[];
   onRowClick?: (item: T) => void;
   className?: string;
+  visibleColumns?: string[];
 }
 
 export function DataTable<T extends { id: string | number }>({
@@ -21,14 +22,20 @@ export function DataTable<T extends { id: string | number }>({
   data,
   onRowClick,
   className,
+  visibleColumns,
 }: DataTableProps<T>) {
+  // Filter columns based on visibility if provided
+  const displayColumns = visibleColumns
+    ? columns.filter((col) => visibleColumns.includes(col.key) || col.key === "actions")
+    : columns;
+
   return (
     <div className={cn("overflow-hidden rounded-xl border border-border bg-card", className)}>
       <div className="overflow-x-auto">
         <table className="data-table">
           <thead>
             <tr>
-              {columns.map((col) => (
+              {displayColumns.map((col) => (
                 <th key={col.key} className={col.className}>
                   {col.label}
                 </th>
@@ -42,7 +49,7 @@ export function DataTable<T extends { id: string | number }>({
                 onClick={() => onRowClick?.(item)}
                 className={cn(onRowClick && "cursor-pointer")}
               >
-                {columns.map((col) => (
+                {displayColumns.map((col) => (
                   <td key={col.key} className={col.className}>
                     {col.render
                       ? col.render(item)

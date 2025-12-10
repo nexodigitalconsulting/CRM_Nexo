@@ -1225,6 +1225,48 @@ export type Database = {
         }
         Relationships: []
       }
+      user_table_views: {
+        Row: {
+          column_order: Json | null
+          created_at: string | null
+          entity_name: string
+          filters: Json | null
+          id: string
+          is_default: boolean | null
+          sort_config: Json | null
+          updated_at: string | null
+          user_id: string
+          view_name: string
+          visible_columns: Json
+        }
+        Insert: {
+          column_order?: Json | null
+          created_at?: string | null
+          entity_name: string
+          filters?: Json | null
+          id?: string
+          is_default?: boolean | null
+          sort_config?: Json | null
+          updated_at?: string | null
+          user_id: string
+          view_name: string
+          visible_columns?: Json
+        }
+        Update: {
+          column_order?: Json | null
+          created_at?: string | null
+          entity_name?: string
+          filters?: Json | null
+          id?: string
+          is_default?: boolean | null
+          sort_config?: Json | null
+          updated_at?: string | null
+          user_id?: string
+          view_name?: string
+          visible_columns?: Json
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
