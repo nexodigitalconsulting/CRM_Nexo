@@ -7,11 +7,13 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { useCalendarCategories, useCreateCalendarEvent, useUpdateCalendarEvent, CalendarEvent, CalendarEventInsert } from "@/hooks/useCalendarEvents";
+import { useUserAvailability } from "@/hooks/useCalendarEvents";
 import { useClients } from "@/hooks/useClients";
 import { useContacts } from "@/hooks/useContacts";
-import { format } from "date-fns";
-import { Loader2, MapPin, Clock, User, FileText } from "lucide-react";
+import { format, getDay } from "date-fns";
+import { Loader2, MapPin, Clock, User, FileText, AlertTriangle } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { AvailabilityWarningDialog } from "./AvailabilityWarningDialog";
 
 interface CalendarEventDialogProps {
   open: boolean;
@@ -24,6 +26,7 @@ export function CalendarEventDialog({ open, onOpenChange, event, defaultDate }: 
   const { data: categories } = useCalendarCategories();
   const { data: clients } = useClients();
   const { data: contacts } = useContacts();
+  const { data: availability } = useUserAvailability();
   const createEvent = useCreateCalendarEvent();
   const updateEvent = useUpdateCalendarEvent();
 
@@ -41,6 +44,9 @@ export function CalendarEventDialog({ open, onOpenChange, event, defaultDate }: 
   const [contactId, setContactId] = useState("");
   const [reminderMinutes, setReminderMinutes] = useState("");
   const [notes, setNotes] = useState("");
+  
+  const [showAvailabilityWarning, setShowAvailabilityWarning] = useState(false);
+  const [pendingSubmit, setPendingSubmit] = useState(false);
 
   useEffect(() => {
     if (event) {
@@ -77,7 +83,57 @@ export function CalendarEventDialog({ open, onOpenChange, event, defaultDate }: 
     }
   }, [event, defaultDate, open]);
 
-  const handleSubmit = async () => {
+  const checkAvailability = () => {
+    if (!startDate || !availability) return { hasAvailability: true, availableHours: null, isOutsideHours: false };
+
+    const selectedDate = new Date(startDate);
+    const dayOfWeek = getDay(selectedDate);
+    // Convert Sunday=0 to 7 to match our availability format (1=Mon, 7=Sun)
+    const adjustedDay = dayOfWeek === 0 ? 7 : dayOfWeek;
+
+    const dayAvailability = availability.find(
+      (a) => a.day_of_week === adjustedDay && a.is_available
+    );
+
+    if (!dayAvailability) {
+      return { hasAvailability: false, availableHours: null, isOutsideHours: true };
+    }
+
+    // Check if event time is within available hours
+    const eventStart = startTime;
+    const eventEnd = endTime;
+    const availStart = dayAvailability.start_time;
+    const availEnd = dayAvailability.end_time;
+
+    const isOutsideHours = !allDay && (eventStart < availStart || eventEnd > availEnd);
+
+    return {
+      hasAvailability: true,
+      availableHours: { start: availStart, end: availEnd },
+      isOutsideHours,
+    };
+  };
+
+  const handleSubmitWithCheck = async () => {
+    const { hasAvailability, isOutsideHours } = checkAvailability();
+
+    // If editing an existing event, skip availability check
+    if (event) {
+      await submitEvent();
+      return;
+    }
+
+    // Show warning if no availability or outside hours
+    if (!hasAvailability || isOutsideHours) {
+      setPendingSubmit(true);
+      setShowAvailabilityWarning(true);
+      return;
+    }
+
+    await submitEvent();
+  };
+
+  const submitEvent = async (createAsAlert = false) => {
     const startDatetime = allDay 
       ? `${startDate}T00:00:00`
       : `${startDate}T${startTime}:00`;
@@ -86,18 +142,20 @@ export function CalendarEventDialog({ open, onOpenChange, event, defaultDate }: 
       : `${endDate}T${endTime}:00`;
 
     const eventData: CalendarEventInsert = {
-      title,
+      title: createAsAlert ? `⚠️ ${title}` : title,
       description: description || null,
       start_datetime: startDatetime,
       end_datetime: endDatetime,
       all_day: allDay,
       category_id: categoryId || null,
-      importance,
+      importance: createAsAlert ? "high" : importance,
       location: location || null,
       client_id: clientId || null,
       contact_id: contactId || null,
-      reminder_minutes: reminderMinutes ? parseInt(reminderMinutes) : null,
-      notes: notes || null,
+      reminder_minutes: createAsAlert ? 1440 : (reminderMinutes ? parseInt(reminderMinutes) : null), // 24h reminder for alerts
+      notes: createAsAlert 
+        ? `${notes ? notes + "\n\n" : ""}[ALERTA] Evento creado fuera del horario de disponibilidad.`
+        : (notes || null),
     };
 
     if (event) {
@@ -108,6 +166,18 @@ export function CalendarEventDialog({ open, onOpenChange, event, defaultDate }: 
     onOpenChange(false);
   };
 
+  const handleConfirmOutsideAvailability = async () => {
+    setShowAvailabilityWarning(false);
+    setPendingSubmit(false);
+    await submitEvent(true); // Create as alert
+  };
+
+  const handleCancelOutsideAvailability = () => {
+    setShowAvailabilityWarning(false);
+    setPendingSubmit(false);
+  };
+
+  const { hasAvailability, availableHours, isOutsideHours } = checkAvailability();
   const isLoading = createEvent.isPending || updateEvent.isPending;
 
   return (
@@ -324,12 +394,23 @@ export function CalendarEventDialog({ open, onOpenChange, event, defaultDate }: 
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Cancelar
           </Button>
-          <Button onClick={handleSubmit} disabled={!title || !startDate || !endDate || isLoading}>
+          <Button onClick={handleSubmitWithCheck} disabled={!title || !startDate || !endDate || isLoading}>
             {isLoading && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
             {event ? "Guardar cambios" : "Crear evento"}
           </Button>
         </DialogFooter>
       </DialogContent>
+
+      {/* Availability Warning Dialog */}
+      <AvailabilityWarningDialog
+        open={showAvailabilityWarning}
+        onOpenChange={setShowAvailabilityWarning}
+        onConfirm={handleConfirmOutsideAvailability}
+        onCancel={handleCancelOutsideAvailability}
+        selectedDate={startDate ? new Date(startDate) : new Date()}
+        availableHours={availableHours}
+        isOutsideAvailability={!hasAvailability || isOutsideHours}
+      />
     </Dialog>
   );
 }
