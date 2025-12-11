@@ -94,7 +94,7 @@ serve(async (req) => {
       });
     }
 
-    // Fetch contracts for billing/renewal events
+    // Fetch contracts for billing/renewal events (filtered by user)
     const { data: contracts, error: contractsError } = await supabase
       .from('contracts')
       .select(`
@@ -106,11 +106,13 @@ serve(async (req) => {
         next_billing_date,
         status,
         total,
+        created_by,
         clients(name)
       `)
+      .eq('created_by', userId)
       .eq('status', 'active');
 
-    // Fetch invoices for due dates
+    // Fetch invoices for due dates (filtered by user)
     const { data: invoices, error: invoicesError } = await supabase
       .from('invoices')
       .select(`
@@ -119,8 +121,10 @@ serve(async (req) => {
         due_date,
         status,
         total,
+        created_by,
         clients(name)
       `)
+      .eq('created_by', userId)
       .eq('status', 'issued');
 
     // Build iCal content
