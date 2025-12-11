@@ -18,12 +18,14 @@ import {
   Shield,
   Bell,
   FileText,
-  Save,
   Settings2,
+  Mail,
 } from "lucide-react";
 import { TemplateManager } from "@/components/settings/TemplateManager";
 import { EntityConfigManager } from "@/components/settings/EntityConfigManager";
 import { CompanySettings } from "@/components/settings/CompanySettings";
+import { EmailSettings } from "@/components/settings/EmailSettings";
+import { NotificationRulesSettings } from "@/components/settings/NotificationRulesSettings";
 
 export default function Settings() {
   return (
@@ -32,10 +34,18 @@ export default function Settings() {
 
       <div className="p-6">
         <Tabs defaultValue="company" className="space-y-6">
-          <TabsList className="bg-muted/50 p-1">
+          <TabsList className="bg-muted/50 p-1 flex-wrap h-auto">
             <TabsTrigger value="company" className="gap-2">
               <Building2 className="h-4 w-4" />
               Empresa
+            </TabsTrigger>
+            <TabsTrigger value="email" className="gap-2">
+              <Mail className="h-4 w-4" />
+              Correo
+            </TabsTrigger>
+            <TabsTrigger value="notifications" className="gap-2">
+              <Bell className="h-4 w-4" />
+              Notificaciones
             </TabsTrigger>
             <TabsTrigger value="database" className="gap-2">
               <Database className="h-4 w-4" />
@@ -49,10 +59,6 @@ export default function Settings() {
               <Shield className="h-4 w-4" />
               Seguridad
             </TabsTrigger>
-            <TabsTrigger value="notifications" className="gap-2">
-              <Bell className="h-4 w-4" />
-              Notificaciones
-            </TabsTrigger>
             <TabsTrigger value="templates" className="gap-2">
               <FileText className="h-4 w-4" />
               Plantillas
@@ -65,6 +71,14 @@ export default function Settings() {
 
           <TabsContent value="company" className="space-y-6">
             <CompanySettings />
+          </TabsContent>
+
+          <TabsContent value="email" className="space-y-6">
+            <EmailSettings />
+          </TabsContent>
+
+          <TabsContent value="notifications" className="space-y-6">
+            <NotificationRulesSettings />
           </TabsContent>
 
           <TabsContent value="database" className="space-y-6">
@@ -242,52 +256,6 @@ export default function Settings() {
                       <SelectItem value="24h">24 horas</SelectItem>
                     </SelectContent>
                   </Select>
-                </div>
-              </div>
-            </div>
-          </TabsContent>
-
-          <TabsContent value="notifications" className="space-y-6">
-            <div className="bg-card rounded-xl border border-border p-6">
-              <h3 className="text-lg font-semibold mb-6">
-                Preferencias de Notificaciones
-              </h3>
-              <div className="space-y-4">
-                <div className="flex items-center justify-between p-4 border border-border rounded-lg">
-                  <div>
-                    <p className="font-medium">Nuevos contactos</p>
-                    <p className="text-sm text-muted-foreground">
-                      Notificar cuando se añada un nuevo contacto
-                    </p>
-                  </div>
-                  <Switch defaultChecked />
-                </div>
-                <div className="flex items-center justify-between p-4 border border-border rounded-lg">
-                  <div>
-                    <p className="font-medium">Presupuestos aprobados</p>
-                    <p className="text-sm text-muted-foreground">
-                      Notificar cuando un presupuesto sea aprobado
-                    </p>
-                  </div>
-                  <Switch defaultChecked />
-                </div>
-                <div className="flex items-center justify-between p-4 border border-border rounded-lg">
-                  <div>
-                    <p className="font-medium">Facturas vencidas</p>
-                    <p className="text-sm text-muted-foreground">
-                      Alertas de facturas próximas a vencer
-                    </p>
-                  </div>
-                  <Switch defaultChecked />
-                </div>
-                <div className="flex items-center justify-between p-4 border border-border rounded-lg">
-                  <div>
-                    <p className="font-medium">Contratos por renovar</p>
-                    <p className="text-sm text-muted-foreground">
-                      Recordatorios de contratos próximos a vencer
-                    </p>
-                  </div>
-                  <Switch defaultChecked />
                 </div>
               </div>
             </div>

@@ -11,3 +11,9 @@ verify_jwt = true
 
 [functions.calendar-ical]
 verify_jwt = false
+
+[functions.send-email]
+verify_jwt = true
+
+[functions.process-notifications]
+verify_jwt = false
