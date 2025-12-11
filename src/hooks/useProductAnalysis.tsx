@@ -83,10 +83,18 @@ export function useProductStats() {
   const { data: quoteProducts } = useQuoteProducts();
 
   const invoiceStats = invoiceProducts ? {
-    // Only count paid invoices for revenue
-    totalRevenue: invoiceProducts.filter(p => p.invoice_status === 'paid').reduce((sum, p) => sum + Number(p.total), 0),
-    // Total of all invoices (excluding subtotal which would double count)
-    totalInvoiced: invoiceProducts.reduce((sum, p) => sum + Number(p.subtotal), 0),
+    // Total facturado (todas las facturas excepto canceladas)
+    totalInvoiced: invoiceProducts
+      .filter(p => p.invoice_status !== 'cancelled')
+      .reduce((sum, p) => sum + Number(p.total), 0),
+    // Solo cobradas
+    totalPaid: invoiceProducts
+      .filter(p => p.invoice_status === 'paid')
+      .reduce((sum, p) => sum + Number(p.total), 0),
+    // Pendiente de cobro
+    totalPending: invoiceProducts
+      .filter(p => p.invoice_status === 'issued')
+      .reduce((sum, p) => sum + Number(p.total), 0),
     productCount: invoiceProducts.length,
     uniqueProducts: new Set(invoiceProducts.map(p => p.service_id)).size,
     topProducts: getTopProducts(invoiceProducts),
@@ -94,8 +102,12 @@ export function useProductStats() {
   } : null;
 
   const quoteStats = quoteProducts ? {
-    totalQuoted: quoteProducts.reduce((sum, p) => sum + Number(p.subtotal), 0),
-    approvedTotal: quoteProducts.filter(p => p.quote_status === 'approved').reduce((sum, p) => sum + Number(p.subtotal), 0),
+    totalQuoted: quoteProducts
+      .filter(p => p.quote_status !== 'rejected')
+      .reduce((sum, p) => sum + Number(p.total), 0),
+    approvedTotal: quoteProducts
+      .filter(p => p.quote_status === 'approved')
+      .reduce((sum, p) => sum + Number(p.total), 0),
     productCount: quoteProducts.length,
     uniqueProducts: new Set(quoteProducts.map(p => p.service_id)).size,
     topProducts: getTopProducts(quoteProducts),

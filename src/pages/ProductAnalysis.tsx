@@ -286,7 +286,7 @@ export default function ProductAnalysis() {
               <p className="text-sm text-muted-foreground">Facturado Total</p>
             </div>
             <p className="text-2xl font-semibold mt-1 text-success">
-              {invoiceStats ? formatCurrency(invoiceStats.totalRevenue) : <Skeleton className="h-8 w-24" />}
+              {invoiceStats ? formatCurrency(invoiceStats.totalInvoiced) : <Skeleton className="h-8 w-24" />}
             </p>
           </div>
           <div className="bg-card rounded-lg border border-border p-4">
