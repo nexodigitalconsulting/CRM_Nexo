@@ -11,7 +11,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Plus, Filter, FileText, Edit, Trash2, Printer } from "lucide-react";
+import { Plus, Filter, FileText, Edit, Trash2, Printer, Mail } from "lucide-react";
 import { ExportDropdown } from "@/components/common/ExportDropdown";
 import { TableViewManager, ColumnConfig } from "@/components/common/TableViewManager";
 import { useDefaultTableView } from "@/hooks/useTableViews";
@@ -34,6 +34,7 @@ import {
 import { useDefaultTemplate } from "@/hooks/useTemplates";
 import { useCompanySettings } from "@/hooks/useCompanySettings";
 import { printDocument, formatInvoiceData } from "@/lib/pdfGenerator";
+import { SendEmailDialog } from "@/components/common/SendEmailDialog";
 import { toast } from "sonner";
 
 const statusMap: Record<string, "active" | "pending" | "inactive" | "danger"> = {
@@ -89,6 +90,10 @@ export default function Invoices() {
   const [visibleColumns, setVisibleColumns] = useState<string[]>(
     columnConfigs.filter((c) => c.defaultVisible).map((c) => c.key)
   );
+  
+  // Email dialog state
+  const [emailDialogOpen, setEmailDialogOpen] = useState(false);
+  const [emailInvoice, setEmailInvoice] = useState<InvoiceWithDetails | null>(null);
 
   // Apply default view
   if (defaultView && visibleColumns.length === columnConfigs.filter(c => c.defaultVisible).length) {
@@ -273,6 +278,17 @@ export default function Invoices() {
           <Button
             variant="ghost"
             size="icon"
+            onClick={() => {
+              setEmailInvoice(invoice);
+              setEmailDialogOpen(true);
+            }}
+            title="Enviar por email"
+          >
+            <Mail className="h-4 w-4" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
             onClick={() => handleEdit(invoice)}
           >
             <Edit className="h-4 w-4" />
@@ -421,6 +437,23 @@ export default function Invoices() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {emailInvoice && (
+        <SendEmailDialog
+          open={emailDialogOpen}
+          onOpenChange={(open) => {
+            setEmailDialogOpen(open);
+            if (!open) setEmailInvoice(null);
+          }}
+          entityType="invoice"
+          entityId={emailInvoice.id}
+          entityNumber={emailInvoice.invoice_number}
+          clientName={emailInvoice.client?.name || ""}
+          clientEmail={emailInvoice.client?.email || ""}
+          total={emailInvoice.total || 0}
+          dueDate={emailInvoice.due_date || undefined}
+        />
+      )}
     </div>
   );
 }

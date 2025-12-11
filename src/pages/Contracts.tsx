@@ -11,7 +11,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Plus, Filter, Calendar, Edit, Trash2, Printer, Mail, CalendarSync } from "lucide-react";
+import { Plus, Filter, Calendar, Edit, Trash2, Printer, Mail } from "lucide-react";
 import { ExportDropdown } from "@/components/common/ExportDropdown";
 import { TableViewManager, ColumnConfig } from "@/components/common/TableViewManager";
 import { useDefaultTableView } from "@/hooks/useTableViews";
@@ -19,7 +19,6 @@ import { entityExportConfigs } from "@/lib/exportUtils";
 import { useContracts, useDeleteContract, useContract, ContractWithDetails } from "@/hooks/useContracts";
 import { useDefaultTemplate } from "@/hooks/useTemplates";
 import { useCompanySettings } from "@/hooks/useCompanySettings";
-import { useCalendarSync } from "@/hooks/useCalendarSync";
 import { printDocument, formatContractData } from "@/lib/pdfGenerator";
 import { toast } from "sonner";
 import { ContractFormDialog } from "@/components/contracts/ContractFormDialog";
@@ -101,7 +100,6 @@ export default function Contracts() {
   const { data: contractTemplate } = useDefaultTemplate("contract");
   const { data: companySettings } = useCompanySettings();
   const { data: defaultView } = useDefaultTableView("contracts");
-  const { syncContractToGoogle, isSyncing } = useCalendarSync();
   
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingContract, setEditingContract] = useState<ContractWithDetails | null>(null);
@@ -328,19 +326,6 @@ export default function Contracts() {
                 </Button>
               </TooltipTrigger>
               <TooltipContent>Enviar por email</TooltipContent>
-            </Tooltip>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => syncContractToGoogle(contract)}
-                  disabled={isSyncing}
-                >
-                  <CalendarSync className="h-4 w-4" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>Sincronizar con Google Calendar</TooltipContent>
             </Tooltip>
             <Tooltip>
               <TooltipTrigger asChild>

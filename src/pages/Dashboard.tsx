@@ -8,6 +8,7 @@ import { RecentActivityWidget } from "@/components/dashboard/RecentActivityWidge
 import { UpcomingTasksWidget } from "@/components/dashboard/UpcomingTasksWidget";
 import { RevenueExpensesChart } from "@/components/dashboard/RevenueExpensesChart";
 import { SalesPipelineChart } from "@/components/dashboard/SalesPipelineChart";
+import { DynamicTableWidget } from "@/components/dashboard/DynamicTableWidget";
 import { useDashboardStats } from "@/hooks/useDashboardWidgets";
 import type { DashboardWidget } from "@/hooks/useDashboardWidgets";
 import {
@@ -31,7 +32,7 @@ const defaultWidgets: DashboardWidget[] = [
   { id: "stat-quotes", type: "stat", title: "Presupuestos Pendientes", entity: "quotes", config: { field: "count" }, size: "small", order: 2 },
   { id: "stat-invoices", type: "stat", title: "Facturación Mensual", entity: "invoices", config: { field: "sum" }, size: "small", order: 3 },
   { id: "widget-activity", type: "activity", title: "Actividad Reciente", config: {}, size: "large", order: 4 },
-  { id: "widget-tasks", type: "table", title: "Próximas Tareas", config: {}, size: "medium", order: 5 },
+  { id: "widget-tasks", type: "table", title: "Próximas Tareas", config: { isTaskWidget: true }, size: "medium", order: 5 },
   { id: "widget-revenue", type: "chart", title: "Ingresos vs Gastos", entity: "invoices", config: { chartType: "area" }, size: "large", order: 6 },
   { id: "widget-pipeline", type: "chart", title: "Pipeline de Ventas", entity: "quotes", config: { chartType: "bar" }, size: "large", order: 7 },
 ];
@@ -140,10 +141,12 @@ export default function Dashboard() {
       case "activity":
         return <RecentActivityWidget key={widget.id} />;
       case "table":
-        if (widget.title.includes("Tarea")) {
+        // Check if it's the special tasks widget
+        if (widget.config?.isTaskWidget || widget.title.includes("Tarea")) {
           return <UpcomingTasksWidget key={widget.id} />;
         }
-        return null;
+        // Otherwise render dynamic table with entity data
+        return <DynamicTableWidget key={widget.id} title={widget.title} entity={widget.entity} />;
       case "chart":
         if (widget.config.chartType === "area" || widget.title.includes("Ingresos")) {
           return <RevenueExpensesChart key={widget.id} />;
