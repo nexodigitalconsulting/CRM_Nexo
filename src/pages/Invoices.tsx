@@ -13,6 +13,8 @@ import {
 } from "@/components/ui/select";
 import { Plus, Filter, FileText, Edit, Trash2, Printer } from "lucide-react";
 import { ExportDropdown } from "@/components/common/ExportDropdown";
+import { TableViewManager, ColumnConfig } from "@/components/common/TableViewManager";
+import { useDefaultTableView } from "@/hooks/useTableViews";
 import { entityExportConfigs } from "@/lib/exportUtils";
 import { useInvoices, useDeleteInvoice, useInvoice, InvoiceWithDetails } from "@/hooks/useInvoices";
 import { InvoiceFormDialog } from "@/components/invoices/InvoiceFormDialog";
@@ -30,6 +32,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useDefaultTemplate } from "@/hooks/useTemplates";
+import { useCompanySettings } from "@/hooks/useCompanySettings";
 import { printDocument, formatInvoiceData } from "@/lib/pdfGenerator";
 import { toast } from "sonner";
 
@@ -54,10 +57,28 @@ const formatCurrency = (amount: number | null) => {
   }).format(amount || 0);
 };
 
+const columnConfigs: ColumnConfig[] = [
+  { key: "invoice_number", label: "Nº Factura", defaultVisible: true },
+  { key: "client", label: "Cliente", defaultVisible: true },
+  { key: "issue_date", label: "Fecha Emisión", defaultVisible: true },
+  { key: "due_date", label: "Vencimiento", defaultVisible: true },
+  { key: "subtotal", label: "Base Imponible", defaultVisible: true },
+  { key: "iva_amount", label: "IVA", defaultVisible: false },
+  { key: "total", label: "Total", defaultVisible: true },
+  { key: "status", label: "Estado", defaultVisible: true },
+  { key: "contract", label: "Contrato", defaultVisible: false },
+  { key: "remittance", label: "Remesa", defaultVisible: false },
+  { key: "notes", label: "Notas", defaultVisible: false },
+  { key: "actions", label: "Acciones", defaultVisible: true },
+];
+
 export default function Invoices() {
   const { data: invoices = [], isLoading } = useInvoices();
   const deleteInvoice = useDeleteInvoice();
   const { data: invoiceTemplate } = useDefaultTemplate("invoice");
+  const { data: companySettings } = useCompanySettings();
+  const { data: defaultView } = useDefaultTableView("invoices");
+  
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingInvoice, setEditingInvoice] = useState<InvoiceWithDetails | null>(null);
   const [invoiceForPrint, setInvoiceForPrint] = useState<string | null>(null);
@@ -65,6 +86,15 @@ export default function Invoices() {
   const [invoiceToDelete, setInvoiceToDelete] = useState<InvoiceWithDetails | null>(null);
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [searchTerm, setSearchTerm] = useState("");
+  const [visibleColumns, setVisibleColumns] = useState<string[]>(
+    columnConfigs.filter((c) => c.defaultVisible).map((c) => c.key)
+  );
+
+  // Apply default view
+  if (defaultView && visibleColumns.length === columnConfigs.filter(c => c.defaultVisible).length) {
+    const cols = defaultView.visible_columns as string[];
+    if (cols.length > 0) setVisibleColumns(cols);
+  }
 
   // Fetch full invoice for printing
   const { data: fullInvoice } = useInvoice(invoiceForPrint || undefined);
@@ -101,11 +131,15 @@ export default function Invoices() {
 
   // Effect to print when full invoice is loaded
   if (fullInvoice && invoiceForPrint && invoiceTemplate) {
-    const data = formatInvoiceData(fullInvoice as unknown as Record<string, unknown>);
+    const data = formatInvoiceData(
+      fullInvoice as unknown as Record<string, unknown>,
+      companySettings as unknown as Record<string, unknown>
+    );
     printDocument({
       template: invoiceTemplate.content,
       data,
       filename: `factura-${fullInvoice.invoice_number}.html`,
+      logoUrl: companySettings?.logo_url || undefined,
     });
     setInvoiceForPrint(null);
   }
@@ -166,6 +200,13 @@ export default function Invoices() {
       ),
     },
     {
+      key: "iva_amount",
+      label: "IVA",
+      render: (invoice: InvoiceWithDetails) => (
+        <span className="text-sm">{formatCurrency(invoice.iva_amount)}</span>
+      ),
+    },
+    {
       key: "total",
       label: "Total",
       render: (invoice: InvoiceWithDetails) => (
@@ -181,6 +222,33 @@ export default function Invoices() {
         <StatusBadge variant={statusMap[invoice.status]}>
           {statusLabels[invoice.status]}
         </StatusBadge>
+      ),
+    },
+    {
+      key: "contract",
+      label: "Contrato",
+      render: (invoice: InvoiceWithDetails) => (
+        <span className="text-sm text-muted-foreground">
+          {invoice.contract_id ? "Sí" : "-"}
+        </span>
+      ),
+    },
+    {
+      key: "remittance",
+      label: "Remesa",
+      render: (invoice: InvoiceWithDetails) => (
+        <span className="text-sm text-muted-foreground">
+          {invoice.remittance_id ? "Sí" : "-"}
+        </span>
+      ),
+    },
+    {
+      key: "notes",
+      label: "Notas",
+      render: (invoice: InvoiceWithDetails) => (
+        <span className="text-sm text-muted-foreground truncate max-w-[150px] block">
+          {invoice.notes || "-"}
+        </span>
       ),
     },
     {
@@ -303,6 +371,13 @@ export default function Invoices() {
             <Button variant="outline" size="icon">
               <Filter className="h-4 w-4" />
             </Button>
+            <TableViewManager
+              entityName="invoices"
+              columns={columnConfigs}
+              visibleColumns={visibleColumns}
+              onVisibleColumnsChange={setVisibleColumns}
+              filters={{ status: statusFilter }}
+            />
             <ExportDropdown
               data={filteredInvoices}
               columns={entityExportConfigs.invoices.columns as any}
@@ -319,7 +394,7 @@ export default function Invoices() {
             ))}
           </div>
         ) : (
-          <DataTable columns={columns} data={filteredInvoices} />
+          <DataTable columns={columns} data={filteredInvoices} visibleColumns={visibleColumns} />
         )}
       </div>
 

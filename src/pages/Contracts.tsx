@@ -11,11 +11,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Plus, Filter, Calendar, Edit, Trash2, FileText, Printer } from "lucide-react";
+import { Plus, Filter, Calendar, Edit, Trash2, Printer } from "lucide-react";
 import { ExportDropdown } from "@/components/common/ExportDropdown";
+import { TableViewManager, ColumnConfig } from "@/components/common/TableViewManager";
+import { useDefaultTableView } from "@/hooks/useTableViews";
 import { entityExportConfigs } from "@/lib/exportUtils";
 import { useContracts, useDeleteContract, useContract, ContractWithDetails } from "@/hooks/useContracts";
 import { useDefaultTemplate } from "@/hooks/useTemplates";
+import { useCompanySettings } from "@/hooks/useCompanySettings";
 import { printDocument, formatContractData } from "@/lib/pdfGenerator";
 import { toast } from "sonner";
 import { ContractFormDialog } from "@/components/contracts/ContractFormDialog";
@@ -69,10 +72,28 @@ const billingLabels: Record<string, string> = {
   other: "Otro",
 };
 
+const columnConfigs: ColumnConfig[] = [
+  { key: "name", label: "Contrato", defaultVisible: true },
+  { key: "client", label: "Cliente", defaultVisible: true },
+  { key: "dates", label: "Período", defaultVisible: true },
+  { key: "billing", label: "Facturación", defaultVisible: true },
+  { key: "subtotal", label: "Subtotal", defaultVisible: false },
+  { key: "iva_total", label: "IVA", defaultVisible: false },
+  { key: "total", label: "Total", defaultVisible: true },
+  { key: "status", label: "Estado", defaultVisible: true },
+  { key: "paymentStatus", label: "Estado Pago", defaultVisible: true },
+  { key: "next_billing_date", label: "Próx. Facturación", defaultVisible: false },
+  { key: "notes", label: "Notas", defaultVisible: false },
+  { key: "actions", label: "Acciones", defaultVisible: true },
+];
+
 export default function Contracts() {
   const { data: contracts = [], isLoading } = useContracts();
   const deleteContract = useDeleteContract();
   const { data: contractTemplate } = useDefaultTemplate("contract");
+  const { data: companySettings } = useCompanySettings();
+  const { data: defaultView } = useDefaultTableView("contracts");
+  
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingContract, setEditingContract] = useState<ContractWithDetails | null>(null);
   const [contractForPrint, setContractForPrint] = useState<string | null>(null);
@@ -81,16 +102,29 @@ export default function Contracts() {
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [billingFilter, setBillingFilter] = useState<string>("all");
   const [searchTerm, setSearchTerm] = useState("");
+  const [visibleColumns, setVisibleColumns] = useState<string[]>(
+    columnConfigs.filter((c) => c.defaultVisible).map((c) => c.key)
+  );
+
+  // Apply default view
+  if (defaultView && visibleColumns.length === columnConfigs.filter(c => c.defaultVisible).length) {
+    const cols = defaultView.visible_columns as string[];
+    if (cols.length > 0) setVisibleColumns(cols);
+  }
 
   const { data: fullContract } = useContract(contractForPrint || undefined);
 
   // Print when contract is loaded
   if (fullContract && contractForPrint && contractTemplate) {
-    const data = formatContractData(fullContract as unknown as Record<string, unknown>);
+    const data = formatContractData(
+      fullContract as unknown as Record<string, unknown>,
+      companySettings as unknown as Record<string, unknown>
+    );
     printDocument({
       template: contractTemplate.content,
       data,
       filename: `contrato-${fullContract.contract_number}.html`,
+      logoUrl: companySettings?.logo_url || undefined,
     });
     setContractForPrint(null);
   }
@@ -144,8 +178,17 @@ export default function Contracts() {
           <p className="font-medium text-foreground">
             {contract.name || `Contrato #${contract.contract_number}`}
           </p>
-          <p className="text-xs text-muted-foreground">{contract.client?.name}</p>
+          <p className="text-xs text-muted-foreground font-mono">
+            CN-{String(contract.contract_number).padStart(4, "0")}
+          </p>
         </div>
+      ),
+    },
+    {
+      key: "client",
+      label: "Cliente",
+      render: (contract: ContractWithDetails) => (
+        <span className="text-sm">{contract.client?.name || "-"}</span>
       ),
     },
     {
@@ -169,6 +212,24 @@ export default function Contracts() {
       render: (contract: ContractWithDetails) => (
         <span className="text-sm">
           {billingLabels[contract.billing_period || "monthly"]}
+        </span>
+      ),
+    },
+    {
+      key: "subtotal",
+      label: "Subtotal",
+      render: (contract: ContractWithDetails) => (
+        <span className="text-sm">
+          {Number(contract.subtotal || 0).toLocaleString("es-ES", { style: "currency", currency: "EUR" })}
+        </span>
+      ),
+    },
+    {
+      key: "iva_total",
+      label: "IVA",
+      render: (contract: ContractWithDetails) => (
+        <span className="text-sm">
+          {Number(contract.iva_total || 0).toLocaleString("es-ES", { style: "currency", currency: "EUR" })}
         </span>
       ),
     },
@@ -200,6 +261,26 @@ export default function Contracts() {
         <StatusBadge variant={paymentStatusMap[contract.payment_status || "pending"]}>
           {paymentLabels[contract.payment_status || "pending"]}
         </StatusBadge>
+      ),
+    },
+    {
+      key: "next_billing_date",
+      label: "Próx. Facturación",
+      render: (contract: ContractWithDetails) => (
+        <span className="text-sm text-muted-foreground">
+          {contract.next_billing_date 
+            ? format(new Date(contract.next_billing_date), "dd MMM yyyy", { locale: es })
+            : "-"}
+        </span>
+      ),
+    },
+    {
+      key: "notes",
+      label: "Notas",
+      render: (contract: ContractWithDetails) => (
+        <span className="text-sm text-muted-foreground truncate max-w-[150px] block">
+          {contract.notes || "-"}
+        </span>
       ),
     },
     {
@@ -322,6 +403,13 @@ export default function Contracts() {
             <Button variant="outline" size="icon">
               <Filter className="h-4 w-4" />
             </Button>
+            <TableViewManager
+              entityName="contracts"
+              columns={columnConfigs}
+              visibleColumns={visibleColumns}
+              onVisibleColumnsChange={setVisibleColumns}
+              filters={{ status: statusFilter, billing: billingFilter }}
+            />
             <ExportDropdown
               data={filteredContracts}
               columns={entityExportConfigs.contracts.columns as any}
@@ -338,7 +426,7 @@ export default function Contracts() {
             ))}
           </div>
         ) : (
-          <DataTable columns={columns} data={filteredContracts} />
+          <DataTable columns={columns} data={filteredContracts} visibleColumns={visibleColumns} />
         )}
       </div>
 

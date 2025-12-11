@@ -6,6 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Plus, Filter, Receipt, Eye, Pencil, Trash2 } from "lucide-react";
 import { ExportDropdown } from "@/components/common/ExportDropdown";
+import { TableViewManager, ColumnConfig } from "@/components/common/TableViewManager";
+import { useDefaultTableView } from "@/hooks/useTableViews";
 import { entityExportConfigs } from "@/lib/exportUtils";
 import { useExpenses, useDeleteExpense, useExpenseStats, type Expense } from "@/hooks/useExpenses";
 import { ExpenseFormDialog } from "@/components/expenses/ExpenseFormDialog";
@@ -47,15 +49,43 @@ const formatDate = (dateStr: string) =>
 const formatExpenseId = (expenseNumber: number) =>
   `GT-${new Date().getFullYear()}-${String(expenseNumber).padStart(4, "0")}`;
 
+const columnConfigs: ColumnConfig[] = [
+  { key: "id", label: "ID", defaultVisible: true },
+  { key: "supplier", label: "Proveedor", defaultVisible: true },
+  { key: "invoiceNumber", label: "Nº Factura", defaultVisible: true },
+  { key: "concept", label: "Concepto", defaultVisible: true },
+  { key: "issueDate", label: "Fecha", defaultVisible: true },
+  { key: "dueDate", label: "Vencimiento", defaultVisible: false },
+  { key: "subtotal", label: "Subtotal", defaultVisible: false },
+  { key: "iva_percent", label: "% IVA", defaultVisible: false },
+  { key: "iva_amount", label: "IVA", defaultVisible: false },
+  { key: "irpf_percent", label: "% IRPF", defaultVisible: false },
+  { key: "irpf_amount", label: "IRPF", defaultVisible: false },
+  { key: "total", label: "Total", defaultVisible: true },
+  { key: "status", label: "Estado", defaultVisible: true },
+  { key: "notes", label: "Notas", defaultVisible: false },
+  { key: "actions", label: "", defaultVisible: true },
+];
+
 export default function Expenses() {
   const { data: expenses = [], isLoading } = useExpenses();
   const { data: stats } = useExpenseStats();
   const deleteExpense = useDeleteExpense();
+  const { data: defaultView } = useDefaultTableView("expenses");
 
   const [showFormDialog, setShowFormDialog] = useState(false);
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
   const [deletingExpense, setDeletingExpense] = useState<Expense | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [visibleColumns, setVisibleColumns] = useState<string[]>(
+    columnConfigs.filter((c) => c.defaultVisible).map((c) => c.key)
+  );
+
+  // Apply default view
+  if (defaultView && visibleColumns.length === columnConfigs.filter(c => c.defaultVisible).length) {
+    const cols = defaultView.visible_columns as string[];
+    if (cols.length > 0) setVisibleColumns(cols);
+  }
 
   const filteredExpenses = expenses.filter((expense) => {
     const search = searchQuery.toLowerCase();
@@ -126,6 +156,48 @@ export default function Expenses() {
       ),
     },
     {
+      key: "dueDate",
+      label: "Vencimiento",
+      render: (expense: Expense) => (
+        <span className="text-sm">{expense.due_date ? formatDate(expense.due_date) : "—"}</span>
+      ),
+    },
+    {
+      key: "subtotal",
+      label: "Subtotal",
+      render: (expense: Expense) => (
+        <span className="text-sm">{formatCurrency(Number(expense.subtotal))}</span>
+      ),
+    },
+    {
+      key: "iva_percent",
+      label: "% IVA",
+      render: (expense: Expense) => (
+        <span className="text-sm">{expense.iva_percent || 21}%</span>
+      ),
+    },
+    {
+      key: "iva_amount",
+      label: "IVA",
+      render: (expense: Expense) => (
+        <span className="text-sm">{formatCurrency(Number(expense.iva_amount))}</span>
+      ),
+    },
+    {
+      key: "irpf_percent",
+      label: "% IRPF",
+      render: (expense: Expense) => (
+        <span className="text-sm">{expense.irpf_percent || 0}%</span>
+      ),
+    },
+    {
+      key: "irpf_amount",
+      label: "IRPF",
+      render: (expense: Expense) => (
+        <span className="text-sm">{formatCurrency(Number(expense.irpf_amount))}</span>
+      ),
+    },
+    {
       key: "total",
       label: "Total",
       render: (expense: Expense) => (
@@ -139,6 +211,15 @@ export default function Expenses() {
         <StatusBadge variant={statusMap[expense.status || "pending"]}>
           {statusLabels[expense.status || "pending"]}
         </StatusBadge>
+      ),
+    },
+    {
+      key: "notes",
+      label: "Notas",
+      render: (expense: Expense) => (
+        <span className="text-sm text-muted-foreground truncate max-w-[150px] block">
+          {expense.notes || "—"}
+        </span>
       ),
     },
     {
@@ -220,6 +301,13 @@ export default function Expenses() {
             <Button variant="outline" size="icon">
               <Filter className="h-4 w-4" />
             </Button>
+            <TableViewManager
+              entityName="expenses"
+              columns={columnConfigs}
+              visibleColumns={visibleColumns}
+              onVisibleColumnsChange={setVisibleColumns}
+              filters={{}}
+            />
             <ExportDropdown
               data={filteredExpenses}
               columns={entityExportConfigs.expenses.columns as any}
@@ -234,7 +322,7 @@ export default function Expenses() {
             Cargando gastos...
           </div>
         ) : (
-          <DataTable columns={columns} data={filteredExpenses} />
+          <DataTable columns={columns} data={filteredExpenses} visibleColumns={visibleColumns} />
         )}
       </div>
 

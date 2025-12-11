@@ -66,7 +66,7 @@ serve(async (req) => {
       });
     }
 
-    // Fetch calendar events for this user
+    // Fetch calendar events for this user - include all non-cancelled events
     const { data: calendarEvents, error: eventsError } = await supabase
       .from('calendar_events')
       .select(`
@@ -84,7 +84,7 @@ serve(async (req) => {
         calendar_categories(name, color)
       `)
       .eq('user_id', userId)
-      .eq('status', 'scheduled');
+      .neq('status', 'cancelled');
 
     if (eventsError) {
       console.error('Error fetching events:', eventsError);

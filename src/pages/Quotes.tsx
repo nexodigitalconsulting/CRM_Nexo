@@ -1,9 +1,10 @@
 import { useState } from "react";
 import { Header } from "@/components/layout/Header";
+import { DataTable } from "@/components/ui/data-table";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Plus, Filter, MoreVertical, FileText, Send, Check, X, Loader2, ArrowRight, Printer } from "lucide-react";
+import { Plus, Filter, MoreVertical, FileText, Send, Check, X, Loader2, ArrowRight, Printer, LayoutGrid, List } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -24,6 +25,8 @@ import {
 import { useQuotes, useQuote, useDeleteQuote, useUpdateQuoteStatus, QuoteWithDetails } from "@/hooks/useQuotes";
 import { QuoteFormDialog } from "@/components/quotes/QuoteFormDialog";
 import { ExportDropdown } from "@/components/common/ExportDropdown";
+import { TableViewManager, ColumnConfig } from "@/components/common/TableViewManager";
+import { useDefaultTableView } from "@/hooks/useTableViews";
 import { entityExportConfigs } from "@/lib/exportUtils";
 import { useDefaultTemplate } from "@/hooks/useTemplates";
 import { useCompanySettings } from "@/hooks/useCompanySettings";
@@ -54,12 +57,27 @@ const statusIcons: Record<string, React.ElementType> = {
 const formatCurrency = (amount: number) =>
   new Intl.NumberFormat("es-ES", { style: "currency", currency: "EUR" }).format(amount);
 
+const columnConfigs: ColumnConfig[] = [
+  { key: "quote_number", label: "Nº Presupuesto", defaultVisible: true },
+  { key: "name", label: "Nombre", defaultVisible: true },
+  { key: "client", label: "Cliente/Contacto", defaultVisible: true },
+  { key: "status", label: "Estado", defaultVisible: true },
+  { key: "subtotal", label: "Subtotal", defaultVisible: false },
+  { key: "iva_total", label: "IVA", defaultVisible: false },
+  { key: "total", label: "Total", defaultVisible: true },
+  { key: "valid_until", label: "Validez", defaultVisible: true },
+  { key: "created_at", label: "Creado", defaultVisible: false },
+  { key: "notes", label: "Notas", defaultVisible: false },
+  { key: "actions", label: "Acciones", defaultVisible: true },
+];
+
 export default function Quotes() {
   const { data: quotes, isLoading, error } = useQuotes();
   const deleteQuote = useDeleteQuote();
   const updateStatus = useUpdateQuoteStatus();
   const { data: quoteTemplate } = useDefaultTemplate("quote");
   const { data: companySettings } = useCompanySettings();
+  const { data: defaultView } = useDefaultTableView("quotes");
   
   const [dialogOpen, setDialogOpen] = useState(false);
   const [selectedQuote, setSelectedQuote] = useState<QuoteWithDetails | null>(null);
@@ -67,6 +85,16 @@ export default function Quotes() {
   const [quoteToDelete, setQuoteToDelete] = useState<QuoteWithDetails | null>(null);
   const [quoteForPrint, setQuoteForPrint] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
+  const [viewMode, setViewMode] = useState<"kanban" | "table">("kanban");
+  const [visibleColumns, setVisibleColumns] = useState<string[]>(
+    columnConfigs.filter((c) => c.defaultVisible).map((c) => c.key)
+  );
+
+  // Apply default view
+  if (defaultView && visibleColumns.length === columnConfigs.filter(c => c.defaultVisible).length) {
+    const cols = defaultView.visible_columns as string[];
+    if (cols.length > 0) setVisibleColumns(cols);
+  }
 
   // Fetch full quote for printing
   const { data: fullQuote } = useQuote(quoteForPrint || undefined);
@@ -129,6 +157,106 @@ export default function Quotes() {
 
   const statuses = ["draft", "sent", "approved", "rejected"];
 
+  const columns = [
+    {
+      key: "quote_number",
+      label: "Nº",
+      render: (quote: QuoteWithDetails) => (
+        <span className="font-mono text-xs">PP-{String(quote.quote_number).padStart(4, "0")}</span>
+      ),
+    },
+    {
+      key: "name",
+      label: "Nombre",
+      render: (quote: QuoteWithDetails) => <span className="font-medium">{quote.name || "Sin nombre"}</span>,
+    },
+    {
+      key: "client",
+      label: "Cliente/Contacto",
+      render: (quote: QuoteWithDetails) => (
+        <span>{quote.client?.name || quote.contact?.name || "Sin cliente"}</span>
+      ),
+    },
+    {
+      key: "status",
+      label: "Estado",
+      render: (quote: QuoteWithDetails) => (
+        <StatusBadge variant={statusMap[quote.status || "draft"]}>
+          {statusLabels[quote.status || "draft"]}
+        </StatusBadge>
+      ),
+    },
+    {
+      key: "subtotal",
+      label: "Subtotal",
+      render: (quote: QuoteWithDetails) => <span className="text-sm">{formatCurrency(Number(quote.subtotal) || 0)}</span>,
+    },
+    {
+      key: "iva_total",
+      label: "IVA",
+      render: (quote: QuoteWithDetails) => <span className="text-sm">{formatCurrency(Number(quote.iva_total) || 0)}</span>,
+    },
+    {
+      key: "total",
+      label: "Total",
+      render: (quote: QuoteWithDetails) => (
+        <span className="font-semibold">{formatCurrency(Number(quote.total) || 0)}</span>
+      ),
+    },
+    {
+      key: "valid_until",
+      label: "Validez",
+      render: (quote: QuoteWithDetails) => (
+        <span className="text-sm text-muted-foreground">
+          {quote.valid_until ? new Date(quote.valid_until).toLocaleDateString("es-ES") : "-"}
+        </span>
+      ),
+    },
+    {
+      key: "created_at",
+      label: "Creado",
+      render: (quote: QuoteWithDetails) => (
+        <span className="text-sm text-muted-foreground">
+          {quote.created_at ? new Date(quote.created_at).toLocaleDateString("es-ES") : "-"}
+        </span>
+      ),
+    },
+    {
+      key: "notes",
+      label: "Notas",
+      render: (quote: QuoteWithDetails) => (
+        <span className="text-sm text-muted-foreground truncate max-w-[150px] block">{quote.notes || "-"}</span>
+      ),
+    },
+    {
+      key: "actions",
+      label: "Acciones",
+      render: (quote: QuoteWithDetails) => (
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" size="icon" className="h-8 w-8">
+              <MoreVertical className="h-4 w-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem onClick={() => handleEdit(quote)}>Editar</DropdownMenuItem>
+            <DropdownMenuItem onClick={() => handlePrint(quote.id)}>
+              <Printer className="h-4 w-4 mr-2" /> Imprimir
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => {
+              setSelectedQuote({ ...quote, id: "" } as QuoteWithDetails);
+              setDialogOpen(true);
+            }}>Duplicar</DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem className="text-destructive" onClick={() => handleDelete(quote)}>
+              Eliminar
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      ),
+    },
+  ];
+
   if (error) {
     return <div className="p-6 text-destructive">Error al cargar presupuestos: {error.message}</div>;
   }
@@ -188,10 +316,35 @@ export default function Quotes() {
             onChange={(e) => setSearchTerm(e.target.value)}
           />
           <div className="flex gap-2 ml-auto">
+            <div className="flex border border-border rounded-lg overflow-hidden">
+              <Button
+                variant={viewMode === "kanban" ? "default" : "ghost"}
+                size="icon"
+                className="rounded-none"
+                onClick={() => setViewMode("kanban")}
+              >
+                <LayoutGrid className="h-4 w-4" />
+              </Button>
+              <Button
+                variant={viewMode === "table" ? "default" : "ghost"}
+                size="icon"
+                className="rounded-none"
+                onClick={() => setViewMode("table")}
+              >
+                <List className="h-4 w-4" />
+              </Button>
+            </div>
             <Button variant="outline" className="gap-2">
               <Filter className="h-4 w-4" />
               Filtros
             </Button>
+            <TableViewManager
+              entityName="quotes"
+              columns={columnConfigs}
+              visibleColumns={visibleColumns}
+              onVisibleColumnsChange={setVisibleColumns}
+              filters={{}}
+            />
             <ExportDropdown
               data={filteredQuotes}
               columns={entityExportConfigs.quotes.columns as any}
@@ -200,11 +353,13 @@ export default function Quotes() {
           </div>
         </div>
 
-        {/* Kanban View */}
+        {/* Content */}
         {isLoading ? (
           <div className="flex items-center justify-center py-12">
             <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
           </div>
+        ) : viewMode === "table" ? (
+          <DataTable columns={columns} data={filteredQuotes} visibleColumns={visibleColumns} />
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
             {statuses.map((status) => {

@@ -13,6 +13,8 @@ import {
 } from "@/components/ui/select";
 import { Plus, Filter, Mail, Phone, Edit, Trash2, UserPlus, Loader2 } from "lucide-react";
 import { ExportDropdown } from "@/components/common/ExportDropdown";
+import { TableViewManager, ColumnConfig } from "@/components/common/TableViewManager";
+import { useDefaultTableView } from "@/hooks/useTableViews";
 import { entityExportConfigs } from "@/lib/exportUtils";
 import { useContacts, useDeleteContact, useConvertToClient, Contact } from "@/hooks/useContacts";
 import { ContactFormDialog } from "@/components/contacts/ContactFormDialog";
@@ -49,10 +51,26 @@ const statusLabels: Record<string, string> = {
   discarded: "Descartado",
 };
 
+const columnConfigs: ColumnConfig[] = [
+  { key: "contact_number", label: "ID", defaultVisible: true },
+  { key: "name", label: "Nombre", defaultVisible: true },
+  { key: "email", label: "Email", defaultVisible: true },
+  { key: "phone", label: "Teléfono", defaultVisible: true },
+  { key: "source", label: "Origen", defaultVisible: true },
+  { key: "status", label: "Estado", defaultVisible: true },
+  { key: "meeting_date", label: "Fecha Reunión", defaultVisible: false },
+  { key: "presentation_url", label: "URL Presentación", defaultVisible: false },
+  { key: "quote_url", label: "URL Presupuesto", defaultVisible: false },
+  { key: "notes", label: "Notas", defaultVisible: false },
+  { key: "created_at", label: "Fecha Captación", defaultVisible: true },
+  { key: "actions", label: "Acciones", defaultVisible: true },
+];
+
 export default function Contacts() {
   const { data: contacts, isLoading, error } = useContacts();
   const deleteContact = useDeleteContact();
   const convertToClient = useConvertToClient();
+  const { data: defaultView } = useDefaultTableView("contacts");
   
   const [dialogOpen, setDialogOpen] = useState(false);
   const [selectedContact, setSelectedContact] = useState<Contact | null>(null);
@@ -61,6 +79,15 @@ export default function Contacts() {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [sourceFilter, setSourceFilter] = useState("all");
+  const [visibleColumns, setVisibleColumns] = useState<string[]>(
+    columnConfigs.filter((c) => c.defaultVisible).map((c) => c.key)
+  );
+
+  // Apply default view
+  if (defaultView && visibleColumns.length === columnConfigs.filter(c => c.defaultVisible).length) {
+    const cols = defaultView.visible_columns as string[];
+    if (cols.length > 0) setVisibleColumns(cols);
+  }
 
   const handleEdit = (contact: Contact) => {
     setSelectedContact(contact);
@@ -140,6 +167,44 @@ export default function Contacts() {
         <StatusBadge variant={statusMap[contact.status || "new"]}>
           {statusLabels[contact.status || "new"]}
         </StatusBadge>
+      ),
+    },
+    {
+      key: "meeting_date",
+      label: "Fecha Reunión",
+      render: (contact: Contact) => (
+        <span className="text-sm text-muted-foreground">
+          {contact.meeting_date ? new Date(contact.meeting_date).toLocaleDateString("es-ES") : "-"}
+        </span>
+      ),
+    },
+    {
+      key: "presentation_url",
+      label: "Presentación",
+      render: (contact: Contact) => (
+        contact.presentation_url ? (
+          <a href={contact.presentation_url} target="_blank" rel="noopener noreferrer" className="text-primary text-sm hover:underline">
+            Ver
+          </a>
+        ) : <span className="text-sm text-muted-foreground">-</span>
+      ),
+    },
+    {
+      key: "quote_url",
+      label: "Presupuesto",
+      render: (contact: Contact) => (
+        contact.quote_url ? (
+          <a href={contact.quote_url} target="_blank" rel="noopener noreferrer" className="text-primary text-sm hover:underline">
+            Ver
+          </a>
+        ) : <span className="text-sm text-muted-foreground">-</span>
+      ),
+    },
+    {
+      key: "notes",
+      label: "Notas",
+      render: (contact: Contact) => (
+        <span className="text-sm text-muted-foreground truncate max-w-[150px] block">{contact.notes || "-"}</span>
       ),
     },
     {
@@ -284,6 +349,13 @@ export default function Contacts() {
             <Button variant="outline" size="icon">
               <Filter className="h-4 w-4" />
             </Button>
+            <TableViewManager
+              entityName="contacts"
+              columns={columnConfigs}
+              visibleColumns={visibleColumns}
+              onVisibleColumnsChange={setVisibleColumns}
+              filters={{ status: statusFilter, source: sourceFilter }}
+            />
             <ExportDropdown
               data={filteredContacts}
               columns={entityExportConfigs.contacts.columns as any}
@@ -298,7 +370,7 @@ export default function Contacts() {
             <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
           </div>
         ) : (
-          <DataTable columns={columns} data={filteredContacts} />
+          <DataTable columns={columns} data={filteredContacts} visibleColumns={visibleColumns} />
         )}
       </div>
 
