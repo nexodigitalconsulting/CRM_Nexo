@@ -5,14 +5,15 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Download, FileSpreadsheet, FileText } from "lucide-react";
-import { exportToCSV, exportToExcel, ExportColumn } from "@/lib/exportUtils";
+import { Download, FileSpreadsheet, FileText, Database } from "lucide-react";
+import { exportToCSV, exportToExcel, exportToSQL, ExportColumn } from "@/lib/exportUtils";
 import { toast } from "sonner";
 
 interface ExportDropdownProps<T> {
   data: T[];
   columns: ExportColumn<T>[];
   filename: string;
+  tableName?: string;
   disabled?: boolean;
 }
 
@@ -20,6 +21,7 @@ export function ExportDropdown<T extends Record<string, any>>({
   data,
   columns,
   filename,
+  tableName,
   disabled = false,
 }: ExportDropdownProps<T>) {
   const handleExportCSV = () => {
@@ -40,6 +42,15 @@ export function ExportDropdown<T extends Record<string, any>>({
     }
   };
 
+  const handleExportSQL = () => {
+    try {
+      exportToSQL(data, tableName || filename, filename);
+      toast.success("Archivo SQL exportado correctamente");
+    } catch (error) {
+      toast.error("Error al exportar SQL");
+    }
+  };
+
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -55,6 +66,10 @@ export function ExportDropdown<T extends Record<string, any>>({
         <DropdownMenuItem onClick={handleExportExcel} className="gap-2">
           <FileSpreadsheet className="h-4 w-4" />
           Exportar Excel
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={handleExportSQL} className="gap-2">
+          <Database className="h-4 w-4" />
+          Exportar SQL
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

@@ -303,9 +303,10 @@ export function useContractsForInvoice() {
           name,
           contract_number,
           client_id,
+          status,
           client:clients(id, name, cif)
         `)
-        .eq("status", "active")
+        .in("status", ["active", "pending_activation"])
         .order("contract_number", { ascending: false });
       
       if (error) throw error;
