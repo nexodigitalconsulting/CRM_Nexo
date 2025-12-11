@@ -4,6 +4,7 @@ import { toast } from "sonner";
 
 export type WidgetType = "stat" | "chart" | "table" | "activity";
 export type WidgetSize = "small" | "medium" | "large";
+export type WidgetHeight = "auto" | "small" | "medium" | "large";
 
 export interface DashboardWidget {
   id: string;
@@ -12,6 +13,7 @@ export interface DashboardWidget {
   entity?: string;
   config: Record<string, unknown>;
   size: WidgetSize;
+  height?: WidgetHeight;
   order: number;
 }
 

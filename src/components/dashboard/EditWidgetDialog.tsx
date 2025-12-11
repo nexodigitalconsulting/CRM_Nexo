@@ -16,7 +16,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import type { DashboardWidget, WidgetSize } from "@/hooks/useDashboardWidgets";
+import type { DashboardWidget, WidgetSize, WidgetHeight } from "@/hooks/useDashboardWidgets";
 import {
   Users,
   Building2,
@@ -47,16 +47,25 @@ const sizes: { value: WidgetSize; label: string }[] = [
   { value: "large", label: "Grande (3 columnas)" },
 ];
 
+const heights: { value: WidgetHeight; label: string }[] = [
+  { value: "auto", label: "Automático" },
+  { value: "small", label: "Compacto (200px)" },
+  { value: "medium", label: "Normal (300px)" },
+  { value: "large", label: "Grande (450px)" },
+];
+
 export function EditWidgetDialog({ open, onOpenChange, widget, onSave }: EditWidgetDialogProps) {
   const [title, setTitle] = useState("");
   const [entity, setEntity] = useState("");
   const [size, setSize] = useState<WidgetSize>("small");
+  const [height, setHeight] = useState<WidgetHeight>("auto");
 
   useEffect(() => {
     if (widget) {
       setTitle(widget.title);
       setEntity(widget.entity || "");
       setSize(widget.size);
+      setHeight(widget.height || "auto");
     }
   }, [widget]);
 
@@ -68,12 +77,15 @@ export function EditWidgetDialog({ open, onOpenChange, widget, onSave }: EditWid
       title,
       entity: entity || undefined,
       size,
+      height,
     });
 
     onOpenChange(false);
   };
 
   if (!widget) return null;
+
+  const showHeightControl = widget.type === "chart" || widget.type === "table" || widget.type === "activity";
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -118,9 +130,9 @@ export function EditWidgetDialog({ open, onOpenChange, widget, onSave }: EditWid
             </div>
           )}
 
-          {/* Size */}
+          {/* Size (columns) */}
           <div className="space-y-2">
-            <Label>Tamaño</Label>
+            <Label>Ancho (Columnas)</Label>
             <Select value={size} onValueChange={(v) => setSize(v as WidgetSize)}>
               <SelectTrigger>
                 <SelectValue />
@@ -134,6 +146,25 @@ export function EditWidgetDialog({ open, onOpenChange, widget, onSave }: EditWid
               </SelectContent>
             </Select>
           </div>
+
+          {/* Height */}
+          {showHeightControl && (
+            <div className="space-y-2">
+              <Label>Altura</Label>
+              <Select value={height} onValueChange={(v) => setHeight(v as WidgetHeight)}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {heights.map((h) => (
+                    <SelectItem key={h.value} value={h.value}>
+                      {h.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
         </div>
 
         <DialogFooter className="pt-4">
