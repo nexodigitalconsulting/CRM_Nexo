@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { DashboardWidgetCard } from "@/components/dashboard/DashboardWidgetCard";
 import { StatWidget } from "@/components/dashboard/StatWidget";
 import { AddWidgetDialog } from "@/components/dashboard/AddWidgetDialog";
+import { EditWidgetDialog } from "@/components/dashboard/EditWidgetDialog";
 import { RecentActivityWidget } from "@/components/dashboard/RecentActivityWidget";
 import { UpcomingTasksWidget } from "@/components/dashboard/UpcomingTasksWidget";
 import { RevenueExpensesChart } from "@/components/dashboard/RevenueExpensesChart";
@@ -42,6 +43,7 @@ export default function Dashboard() {
   const [isEditing, setIsEditing] = useState(false);
   const [widgets, setWidgets] = useState<DashboardWidget[]>(defaultWidgets);
   const [showAddWidget, setShowAddWidget] = useState(false);
+  const [editingWidget, setEditingWidget] = useState<DashboardWidget | null>(null);
   const [draggedWidget, setDraggedWidget] = useState<string | null>(null);
   const [dragOverWidget, setDragOverWidget] = useState<string | null>(null);
 
@@ -58,6 +60,15 @@ export default function Dashboard() {
   const handleRemoveWidget = (id: string) => {
     setWidgets(widgets.filter((w) => w.id !== id));
     toast.success("Widget eliminado");
+  };
+
+  const handleEditWidget = (widget: DashboardWidget) => {
+    setEditingWidget(widget);
+  };
+
+  const handleSaveWidget = (updatedWidget: DashboardWidget) => {
+    setWidgets(widgets.map(w => w.id === updatedWidget.id ? updatedWidget : w));
+    toast.success("Widget actualizado");
   };
 
   const handleDragStart = (e: React.DragEvent, widgetId: string) => {
@@ -209,18 +220,29 @@ export default function Dashboard() {
               onDragStart={(e) => handleDragStart(e, widget.id)}
               onDragOver={(e) => handleDragOver(e, widget.id)}
               onDragEnd={handleDragEnd}
+              onDoubleClick={() => handleEditWidget(widget)}
               className={cn(
                 "relative transition-all",
                 isEditing && "cursor-grab active:cursor-grabbing",
                 draggedWidget === widget.id && "opacity-50",
-                dragOverWidget === widget.id && "ring-2 ring-primary ring-offset-2 rounded-lg"
+                dragOverWidget === widget.id && "ring-2 ring-primary ring-offset-2 rounded-lg",
+                "hover:ring-1 hover:ring-primary/30"
               )}
+              title="Doble clic para editar"
             >
               {isEditing && (
                 <>
                   <div className="absolute -top-2 left-1/2 -translate-x-1/2 z-10">
                     <GripVertical className="h-4 w-4 text-muted-foreground" />
                   </div>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    className="absolute -top-2 -left-2 h-6 w-6 rounded-full shadow-md z-10 bg-background"
+                    onClick={() => handleEditWidget(widget)}
+                  >
+                    <Pencil className="h-3 w-3" />
+                  </Button>
                   <Button
                     variant="destructive"
                     size="icon"
@@ -288,19 +310,30 @@ export default function Dashboard() {
               onDragStart={(e) => handleDragStart(e, widget.id)}
               onDragOver={(e) => handleDragOver(e, widget.id)}
               onDragEnd={handleDragEnd}
+              onDoubleClick={() => handleEditWidget(widget)}
               className={cn(
                 "relative transition-all",
                 getWidgetGridClass(widget),
                 isEditing && "cursor-grab active:cursor-grabbing",
                 draggedWidget === widget.id && "opacity-50",
-                dragOverWidget === widget.id && "ring-2 ring-primary ring-offset-2 rounded-lg"
+                dragOverWidget === widget.id && "ring-2 ring-primary ring-offset-2 rounded-lg",
+                "hover:ring-1 hover:ring-primary/30"
               )}
+              title="Doble clic para editar"
             >
               {isEditing && (
                 <>
                   <div className="absolute -top-2 left-1/2 -translate-x-1/2 z-10">
                     <GripVertical className="h-4 w-4 text-muted-foreground" />
                   </div>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    className="absolute -top-2 -left-2 h-6 w-6 rounded-full shadow-md z-10 bg-background"
+                    onClick={() => handleEditWidget(widget)}
+                  >
+                    <Pencil className="h-3 w-3" />
+                  </Button>
                   <Button
                     variant="destructive"
                     size="icon"
@@ -325,18 +358,29 @@ export default function Dashboard() {
               onDragStart={(e) => handleDragStart(e, widget.id)}
               onDragOver={(e) => handleDragOver(e, widget.id)}
               onDragEnd={handleDragEnd}
+              onDoubleClick={() => handleEditWidget(widget)}
               className={cn(
                 "relative transition-all",
                 isEditing && "cursor-grab active:cursor-grabbing",
                 draggedWidget === widget.id && "opacity-50",
-                dragOverWidget === widget.id && "ring-2 ring-primary ring-offset-2 rounded-lg"
+                dragOverWidget === widget.id && "ring-2 ring-primary ring-offset-2 rounded-lg",
+                "hover:ring-1 hover:ring-primary/30"
               )}
+              title="Doble clic para editar"
             >
               {isEditing && (
                 <>
                   <div className="absolute -top-2 left-1/2 -translate-x-1/2 z-10">
                     <GripVertical className="h-4 w-4 text-muted-foreground" />
                   </div>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    className="absolute -top-2 -left-2 h-6 w-6 rounded-full shadow-md z-10 bg-background"
+                    onClick={() => handleEditWidget(widget)}
+                  >
+                    <Pencil className="h-3 w-3" />
+                  </Button>
                   <Button
                     variant="destructive"
                     size="icon"
@@ -357,6 +401,13 @@ export default function Dashboard() {
         open={showAddWidget}
         onOpenChange={setShowAddWidget}
         onAdd={handleAddWidget}
+      />
+
+      <EditWidgetDialog
+        open={!!editingWidget}
+        onOpenChange={(open) => !open && setEditingWidget(null)}
+        widget={editingWidget}
+        onSave={handleSaveWidget}
       />
     </div>
   );
