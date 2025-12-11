@@ -7,6 +7,7 @@ import { Switch } from "@/components/ui/switch";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Mail, Server, Lock, Save, TestTube } from "lucide-react";
 import { useEmailSettings, useUpdateEmailSettings, useTestEmailConnection } from "@/hooks/useEmailSettings";
+import { toast } from "sonner";
 
 export function EmailSettings() {
   const { data: settings, isLoading } = useEmailSettings();
@@ -40,11 +41,26 @@ export function EmailSettings() {
   }, [settings]);
 
   const handleSave = () => {
-    updateSettings.mutate(formData);
+    updateSettings.mutate(formData, {
+      onSuccess: () => {
+        // After saving, we can test if user wants
+      }
+    });
   };
 
   const handleTest = () => {
-    testConnection.mutate();
+    // First save, then test
+    if (!formData.smtp_host || !formData.smtp_user || !formData.smtp_password || !formData.from_email) {
+      toast.error("Completa todos los campos de configuración SMTP antes de probar");
+      return;
+    }
+    
+    // Save first, then test
+    updateSettings.mutate(formData, {
+      onSuccess: () => {
+        testConnection.mutate();
+      }
+    });
   };
 
   if (isLoading) {

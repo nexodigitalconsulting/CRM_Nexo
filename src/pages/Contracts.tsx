@@ -11,7 +11,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Plus, Filter, Calendar, Edit, Trash2, Printer } from "lucide-react";
+import { Plus, Filter, Calendar, Edit, Trash2, Printer, Mail, CalendarSync } from "lucide-react";
 import { ExportDropdown } from "@/components/common/ExportDropdown";
 import { TableViewManager, ColumnConfig } from "@/components/common/TableViewManager";
 import { useDefaultTableView } from "@/hooks/useTableViews";
@@ -19,9 +19,11 @@ import { entityExportConfigs } from "@/lib/exportUtils";
 import { useContracts, useDeleteContract, useContract, ContractWithDetails } from "@/hooks/useContracts";
 import { useDefaultTemplate } from "@/hooks/useTemplates";
 import { useCompanySettings } from "@/hooks/useCompanySettings";
+import { useCalendarSync } from "@/hooks/useCalendarSync";
 import { printDocument, formatContractData } from "@/lib/pdfGenerator";
 import { toast } from "sonner";
 import { ContractFormDialog } from "@/components/contracts/ContractFormDialog";
+import { SendEmailDialog } from "@/components/common/SendEmailDialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
@@ -35,6 +37,12 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 const statusMap: Record<string, "active" | "pending" | "inactive" | "danger"> = {
   active: "active",
@@ -93,6 +101,7 @@ export default function Contracts() {
   const { data: contractTemplate } = useDefaultTemplate("contract");
   const { data: companySettings } = useCompanySettings();
   const { data: defaultView } = useDefaultTableView("contracts");
+  const { syncContractToGoogle, isSyncing } = useCalendarSync();
   
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingContract, setEditingContract] = useState<ContractWithDetails | null>(null);
@@ -105,6 +114,10 @@ export default function Contracts() {
   const [visibleColumns, setVisibleColumns] = useState<string[]>(
     columnConfigs.filter((c) => c.defaultVisible).map((c) => c.key)
   );
+  
+  // Email dialog state
+  const [emailDialogOpen, setEmailDialogOpen] = useState(false);
+  const [emailContract, setEmailContract] = useState<ContractWithDetails | null>(null);
 
   // Apply default view
   if (defaultView && visibleColumns.length === columnConfigs.filter(c => c.defaultVisible).length) {
@@ -287,30 +300,74 @@ export default function Contracts() {
       key: "actions",
       label: "Acciones",
       render: (contract: ContractWithDetails) => (
-        <div className="flex items-center gap-1">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => handlePrint(contract.id)}
-            title="Imprimir"
-          >
-            <Printer className="h-4 w-4" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => handleEdit(contract)}
-          >
-            <Edit className="h-4 w-4" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => handleDelete(contract)}
-          >
-            <Trash2 className="h-4 w-4 text-destructive" />
-          </Button>
-        </div>
+        <TooltipProvider>
+          <div className="flex items-center gap-1">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => handlePrint(contract.id)}
+                >
+                  <Printer className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Imprimir</TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => {
+                    setEmailContract(contract);
+                    setEmailDialogOpen(true);
+                  }}
+                >
+                  <Mail className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Enviar por email</TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => syncContractToGoogle(contract)}
+                  disabled={isSyncing}
+                >
+                  <CalendarSync className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Sincronizar con Google Calendar</TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => handleEdit(contract)}
+                >
+                  <Edit className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Editar</TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => handleDelete(contract)}
+                >
+                  <Trash2 className="h-4 w-4 text-destructive" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Eliminar</TooltipContent>
+            </Tooltip>
+          </div>
+        </TooltipProvider>
       ),
     },
   ];
@@ -453,6 +510,20 @@ export default function Contracts() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {emailContract && (
+        <SendEmailDialog
+          open={emailDialogOpen}
+          onOpenChange={setEmailDialogOpen}
+          entityType="contract"
+          entityId={emailContract.id}
+          entityNumber={emailContract.contract_number}
+          clientName={emailContract.client?.name || ""}
+          clientEmail={emailContract.client?.email || ""}
+          total={emailContract.total || 0}
+          dueDate={emailContract.end_date || undefined}
+        />
+      )}
     </div>
   );
 }
