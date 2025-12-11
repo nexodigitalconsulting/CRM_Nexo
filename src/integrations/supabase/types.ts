@@ -214,6 +214,41 @@ export type Database = {
         }
         Relationships: []
       }
+      client_notification_preferences: {
+        Row: {
+          client_id: string
+          created_at: string | null
+          id: string
+          is_enabled: boolean | null
+          rule_type: string
+          updated_at: string | null
+        }
+        Insert: {
+          client_id: string
+          created_at?: string | null
+          id?: string
+          is_enabled?: boolean | null
+          rule_type: string
+          updated_at?: string | null
+        }
+        Update: {
+          client_id?: string
+          created_at?: string | null
+          id?: string
+          is_enabled?: boolean | null
+          rule_type?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_notification_preferences_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       clients: {
         Row: {
           address: string | null
@@ -615,6 +650,81 @@ export type Database = {
         }
         Relationships: []
       }
+      email_settings: {
+        Row: {
+          created_at: string | null
+          from_email: string
+          from_name: string | null
+          id: string
+          is_active: boolean | null
+          smtp_host: string
+          smtp_password: string
+          smtp_port: number
+          smtp_secure: boolean | null
+          smtp_user: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          from_email: string
+          from_name?: string | null
+          id?: string
+          is_active?: boolean | null
+          smtp_host: string
+          smtp_password: string
+          smtp_port?: number
+          smtp_secure?: boolean | null
+          smtp_user: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          from_email?: string
+          from_name?: string | null
+          id?: string
+          is_active?: boolean | null
+          smtp_host?: string
+          smtp_password?: string
+          smtp_port?: number
+          smtp_secure?: boolean | null
+          smtp_user?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      email_templates: {
+        Row: {
+          body_html: string
+          created_at: string | null
+          id: string
+          is_active: boolean | null
+          name: string
+          subject: string
+          template_type: string
+          updated_at: string | null
+        }
+        Insert: {
+          body_html: string
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          name: string
+          subject: string
+          template_type: string
+          updated_at?: string | null
+        }
+        Update: {
+          body_html?: string
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          name?: string
+          subject?: string
+          template_type?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       entity_configurations: {
         Row: {
           created_at: string | null
@@ -1003,6 +1113,94 @@ export type Database = {
             columns: ["contract_id"]
             isOneToOne: false
             referencedRelation: "contracts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      notification_queue: {
+        Row: {
+          client_id: string | null
+          created_at: string | null
+          entity_id: string
+          entity_type: string
+          error_message: string | null
+          id: string
+          rule_type: string
+          sent_at: string | null
+          status: string | null
+        }
+        Insert: {
+          client_id?: string | null
+          created_at?: string | null
+          entity_id: string
+          entity_type: string
+          error_message?: string | null
+          id?: string
+          rule_type: string
+          sent_at?: string | null
+          status?: string | null
+        }
+        Update: {
+          client_id?: string | null
+          created_at?: string | null
+          entity_id?: string
+          entity_type?: string
+          error_message?: string | null
+          id?: string
+          rule_type?: string
+          sent_at?: string | null
+          status?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notification_queue_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      notification_rules: {
+        Row: {
+          created_at: string | null
+          days_threshold: number | null
+          description: string | null
+          id: string
+          is_active: boolean | null
+          name: string
+          rule_type: string
+          template_id: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          days_threshold?: number | null
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          name: string
+          rule_type: string
+          template_id?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          days_threshold?: number | null
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          name?: string
+          rule_type?: string
+          template_id?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notification_rules_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "email_templates"
             referencedColumns: ["id"]
           },
         ]
