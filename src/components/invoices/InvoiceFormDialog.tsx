@@ -34,6 +34,7 @@ import {
   useCreateInvoice, 
   useUpdateInvoice, 
   useContractsForInvoice,
+  useInvoice,
   InvoiceWithDetails 
 } from "@/hooks/useInvoices";
 
@@ -68,6 +69,8 @@ export function InvoiceFormDialog({ open, onOpenChange, invoice }: Props) {
   const { data: clients = [] } = useClients();
   const { data: services = [] } = useServices();
   const { data: contracts = [] } = useContractsForInvoice();
+  // Fetch full invoice with services when editing
+  const { data: fullInvoice } = useInvoice(invoice?.id);
   const createInvoice = useCreateInvoice();
   const updateInvoice = useUpdateInvoice();
   const [totals, setTotals] = useState({ subtotal: 0, iva: 0, total: 0 });
@@ -91,17 +94,26 @@ export function InvoiceFormDialog({ open, onOpenChange, invoice }: Props) {
   });
 
   const watchServices = form.watch("services");
+  const selectedClientId = form.watch("client_id");
+  
+  // Filter contracts by selected client
+  const filteredContracts = contracts.filter(c => 
+    !selectedClientId || c.client_id === selectedClientId
+  );
+
+  // Use fullInvoice (with services) when available for editing
+  const invoiceData = fullInvoice || invoice;
 
   useEffect(() => {
-    if (invoice) {
+    if (invoiceData) {
       form.reset({
-        client_id: invoice.client_id,
-        contract_id: invoice.contract_id || "",
-        issue_date: invoice.issue_date,
-        due_date: invoice.due_date || "",
-        status: invoice.status,
-        notes: invoice.notes || "",
-        services: invoice.services?.map((s) => ({
+        client_id: invoiceData.client_id,
+        contract_id: invoiceData.contract_id || "",
+        issue_date: invoiceData.issue_date,
+        due_date: invoiceData.due_date || "",
+        status: invoiceData.status,
+        notes: invoiceData.notes || "",
+        services: invoiceData.services?.map((s) => ({
           service_id: s.service_id,
           quantity: s.quantity,
           unit_price: s.unit_price,
@@ -121,7 +133,7 @@ export function InvoiceFormDialog({ open, onOpenChange, invoice }: Props) {
         services: [],
       });
     }
-  }, [invoice, form]);
+  }, [invoiceData, form]);
 
   useEffect(() => {
     let subtotal = 0;
@@ -247,7 +259,7 @@ export function InvoiceFormDialog({ open, onOpenChange, invoice }: Props) {
                       </FormControl>
                       <SelectContent>
                         <SelectItem value="none">Sin contrato</SelectItem>
-                        {contracts.filter(c => c.id).map((contract) => (
+                        {filteredContracts.filter(c => c.id).map((contract) => (
                           <SelectItem key={contract.id} value={contract.id}>
                             #{contract.contract_number} - {contract.name || contract.client?.name}
                           </SelectItem>

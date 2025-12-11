@@ -11,7 +11,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useCreateQuote, useUpdateQuote, QuoteWithDetails } from "@/hooks/useQuotes";
+import { useCreateQuote, useUpdateQuote, useQuote, QuoteWithDetails } from "@/hooks/useQuotes";
 import { useClients } from "@/hooks/useClients";
 import { useContacts } from "@/hooks/useContacts";
 import { useActiveServices, Service } from "@/hooks/useServices";
@@ -40,10 +40,14 @@ export function QuoteFormDialog({ open, onOpenChange, quote }: QuoteFormDialogPr
   const { data: contacts } = useContacts();
   const { data: services } = useActiveServices();
   
+  // Fetch full quote with services when editing
+  const { data: fullQuote } = useQuote(quote?.id);
+  const quoteWithServices = fullQuote || quote;
+  
   const createQuote = useCreateQuote();
   const updateQuote = useUpdateQuote();
   
-  const isEditing = !!quote?.id;
+  const isEditing = !!quoteWithServices?.id;
   const isLoading = createQuote.isPending || updateQuote.isPending;
 
   const [name, setName] = useState("");
@@ -54,15 +58,15 @@ export function QuoteFormDialog({ open, onOpenChange, quote }: QuoteFormDialogPr
   const [serviceLines, setServiceLines] = useState<ServiceLine[]>([]);
 
   useEffect(() => {
-    if (quote) {
-      setName(quote.name || "");
-      setClientId(quote.client_id || "");
-      setContactId(quote.contact_id || "");
-      setValidUntil(quote.valid_until || "");
-      setNotes(quote.notes || "");
+    if (quoteWithServices) {
+      setName(quoteWithServices.name || "");
+      setClientId(quoteWithServices.client_id || "");
+      setContactId(quoteWithServices.contact_id || "");
+      setValidUntil(quoteWithServices.valid_until || "");
+      setNotes(quoteWithServices.notes || "");
       
-      if (quote.services && quote.services.length > 0) {
-        setServiceLines(quote.services.map(s => ({
+      if (quoteWithServices.services && quoteWithServices.services.length > 0) {
+        setServiceLines(quoteWithServices.services.map(s => ({
           service_id: s.service_id,
           quantity: s.quantity || 1,
           unit_price: s.unit_price,
@@ -80,7 +84,7 @@ export function QuoteFormDialog({ open, onOpenChange, quote }: QuoteFormDialogPr
       setNotes("");
       setServiceLines([]);
     }
-  }, [quote, open]);
+  }, [quoteWithServices, open]);
 
   const addServiceLine = () => {
     if (services && services.length > 0) {
@@ -179,8 +183,8 @@ export function QuoteFormDialog({ open, onOpenChange, quote }: QuoteFormDialogPr
     });
 
     try {
-      if (isEditing && quote) {
-        await updateQuote.mutateAsync({ id: quote.id, quote: quoteData, services: servicesData });
+      if (isEditing && quoteWithServices) {
+        await updateQuote.mutateAsync({ id: quoteWithServices.id, quote: quoteData, services: servicesData });
       } else {
         await createQuote.mutateAsync({ quote: quoteData, services: servicesData });
       }
