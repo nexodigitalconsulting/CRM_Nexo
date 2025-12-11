@@ -4,16 +4,18 @@ import { DataTable } from "@/components/ui/data-table";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Filter, FileText, Receipt, TrendingUp, Package } from "lucide-react";
+import { Filter, FileText, Receipt, TrendingUp, Package, FileCheck } from "lucide-react";
 import { ExportDropdown } from "@/components/common/ExportDropdown";
 import { TableViewManager, ColumnConfig } from "@/components/common/TableViewManager";
 import { useDefaultTableView } from "@/hooks/useTableViews";
 import {
   useInvoiceProducts,
   useQuoteProducts,
+  useContractProducts,
   useProductStats,
   InvoiceProduct,
   QuoteProduct,
+  ContractProduct,
 } from "@/hooks/useProductAnalysis";
 import { Skeleton } from "@/components/ui/skeleton";
 import { StatusBadge } from "@/components/ui/status-badge";
@@ -36,6 +38,13 @@ const quoteStatusMap: Record<string, "inactive" | "new" | "active" | "danger"> =
   sent: "new",
   approved: "active",
   rejected: "danger",
+};
+
+const contractStatusMap: Record<string, "active" | "pending" | "inactive" | "danger"> = {
+  active: "active",
+  pending_activation: "pending",
+  expired: "inactive",
+  cancelled: "danger",
 };
 
 const invoiceColumnConfigs: ColumnConfig[] = [
@@ -70,10 +79,26 @@ const quoteColumnConfigs: ColumnConfig[] = [
   { key: "total", label: "Total", defaultVisible: true },
 ];
 
+const contractColumnConfigs: ColumnConfig[] = [
+  { key: "contract_number", label: "Nº Contrato", defaultVisible: true },
+  { key: "contract_name", label: "Nombre", defaultVisible: true },
+  { key: "contract_status", label: "Estado", defaultVisible: true },
+  { key: "client_name", label: "Cliente", defaultVisible: true },
+  { key: "service_name", label: "Producto/Servicio", defaultVisible: true },
+  { key: "service_category", label: "Categoría", defaultVisible: true },
+  { key: "quantity", label: "Cantidad", defaultVisible: true },
+  { key: "unit_price", label: "Precio Unitario", defaultVisible: true },
+  { key: "billing_period", label: "Periodicidad", defaultVisible: true },
+  { key: "discount_percent", label: "% Descuento", defaultVisible: false },
+  { key: "subtotal", label: "Subtotal", defaultVisible: true },
+  { key: "total", label: "Total", defaultVisible: true },
+];
+
 export default function ProductAnalysis() {
   const { data: invoiceProducts = [], isLoading: loadingInvoices } = useInvoiceProducts();
   const { data: quoteProducts = [], isLoading: loadingQuotes } = useQuoteProducts();
-  const { invoiceStats, quoteStats } = useProductStats();
+  const { data: contractProducts = [], isLoading: loadingContracts } = useContractProducts();
+  const { invoiceStats, quoteStats, contractStats } = useProductStats();
 
   const [searchTerm, setSearchTerm] = useState("");
   const [activeTab, setActiveTab] = useState("invoices");
@@ -81,12 +106,16 @@ export default function ProductAnalysis() {
   // Table views
   const { data: defaultInvoiceView } = useDefaultTableView("invoice_products");
   const { data: defaultQuoteView } = useDefaultTableView("quote_products");
+  const { data: defaultContractView } = useDefaultTableView("contract_products");
 
   const [invoiceVisibleColumns, setInvoiceVisibleColumns] = useState<string[]>(
     invoiceColumnConfigs.filter((c) => c.defaultVisible).map((c) => c.key)
   );
   const [quoteVisibleColumns, setQuoteVisibleColumns] = useState<string[]>(
     quoteColumnConfigs.filter((c) => c.defaultVisible).map((c) => c.key)
+  );
+  const [contractVisibleColumns, setContractVisibleColumns] = useState<string[]>(
+    contractColumnConfigs.filter((c) => c.defaultVisible).map((c) => c.key)
   );
 
   // Apply default views when loaded
@@ -97,6 +126,10 @@ export default function ProductAnalysis() {
   if (defaultQuoteView && quoteVisibleColumns.length === quoteColumnConfigs.filter(c => c.defaultVisible).length) {
     const cols = defaultQuoteView.visible_columns as string[];
     if (cols.length > 0) setQuoteVisibleColumns(cols);
+  }
+  if (defaultContractView && contractVisibleColumns.length === contractColumnConfigs.filter(c => c.defaultVisible).length) {
+    const cols = defaultContractView.visible_columns as string[];
+    if (cols.length > 0) setContractVisibleColumns(cols);
   }
 
   const filteredInvoiceProducts = invoiceProducts.filter((p) =>
@@ -111,6 +144,21 @@ export default function ProductAnalysis() {
     (p.contact_name?.toLowerCase().includes(searchTerm.toLowerCase())) ||
     p.service_category?.toLowerCase().includes(searchTerm.toLowerCase())
   );
+
+  const filteredContractProducts = contractProducts.filter((p) =>
+    p.service_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    p.client_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    p.contract_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    p.service_category?.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  const billingPeriodLabels: Record<string, string> = {
+    monthly: "Mensual",
+    quarterly: "Trimestral",
+    annual: "Anual",
+    one_time: "Único",
+    other: "Otro",
+  };
 
   const invoiceColumns = [
     {
@@ -270,20 +318,94 @@ export default function ProductAnalysis() {
     },
   ];
 
+  const contractColumns = [
+    {
+      key: "contract_number",
+      label: "Nº Contrato",
+      render: (p: ContractProduct) => (
+        <span className="font-mono text-xs">CN-{String(p.contract_number).padStart(4, "0")}</span>
+      ),
+    },
+    {
+      key: "contract_name",
+      label: "Nombre",
+      render: (p: ContractProduct) => <span className="font-medium">{p.contract_name || "-"}</span>,
+    },
+    {
+      key: "contract_status",
+      label: "Estado",
+      render: (p: ContractProduct) => (
+        <StatusBadge variant={contractStatusMap[p.contract_status || "pending_activation"]}>
+          {p.contract_status === "active" ? "Activo" : p.contract_status === "pending_activation" ? "Pendiente" : p.contract_status}
+        </StatusBadge>
+      ),
+    },
+    {
+      key: "client_name",
+      label: "Cliente",
+      render: (p: ContractProduct) => <span className="font-medium">{p.client_name}</span>,
+    },
+    {
+      key: "service_name",
+      label: "Producto",
+      render: (p: ContractProduct) => (
+        <div>
+          <p className="font-medium">{p.service_name}</p>
+          {p.service_category && <p className="text-xs text-muted-foreground">{p.service_category}</p>}
+        </div>
+      ),
+    },
+    {
+      key: "service_category",
+      label: "Categoría",
+      render: (p: ContractProduct) => <span className="text-sm">{p.service_category || "-"}</span>,
+    },
+    {
+      key: "quantity",
+      label: "Cant.",
+      render: (p: ContractProduct) => <span>{p.quantity}</span>,
+    },
+    {
+      key: "unit_price",
+      label: "P. Unit.",
+      render: (p: ContractProduct) => <span className="text-sm">{formatCurrency(Number(p.unit_price))}</span>,
+    },
+    {
+      key: "billing_period",
+      label: "Periodicidad",
+      render: (p: ContractProduct) => <span className="text-sm">{billingPeriodLabels[p.billing_period || ""] || p.billing_period || "-"}</span>,
+    },
+    {
+      key: "discount_percent",
+      label: "% Dto.",
+      render: (p: ContractProduct) => <span className="text-sm">{p.discount_percent || 0}%</span>,
+    },
+    {
+      key: "subtotal",
+      label: "Subtotal",
+      render: (p: ContractProduct) => <span className="text-sm">{formatCurrency(Number(p.subtotal))}</span>,
+    },
+    {
+      key: "total",
+      label: "Total",
+      render: (p: ContractProduct) => <span className="font-semibold">{formatCurrency(Number(p.total))}</span>,
+    },
+  ];
+
   return (
     <div className="animate-fade-in">
       <Header
         title="Análisis de Productos"
-        subtitle="Ventas y presupuestos por producto/servicio"
+        subtitle="Ventas, presupuestos y contratos por producto/servicio"
       />
 
       <div className="p-6 space-y-6">
         {/* Stats */}
-        <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
           <div className="bg-card rounded-lg border border-border p-4">
             <div className="flex items-center gap-2">
               <Receipt className="h-5 w-5 text-success" />
-              <p className="text-sm text-muted-foreground">Facturado Total</p>
+              <p className="text-sm text-muted-foreground">Facturado (Base)</p>
             </div>
             <p className="text-2xl font-semibold mt-1 text-success">
               {invoiceStats ? formatCurrency(invoiceStats.totalInvoiced) : <Skeleton className="h-8 w-24" />}
@@ -296,6 +418,15 @@ export default function ProductAnalysis() {
             </div>
             <p className="text-2xl font-semibold mt-1 text-primary">
               {quoteStats ? formatCurrency(quoteStats.totalQuoted) : <Skeleton className="h-8 w-24" />}
+            </p>
+          </div>
+          <div className="bg-card rounded-lg border border-border p-4">
+            <div className="flex items-center gap-2">
+              <FileCheck className="h-5 w-5 text-info" />
+              <p className="text-sm text-muted-foreground">Contratado Activo</p>
+            </div>
+            <p className="text-2xl font-semibold mt-1 text-info">
+              {contractStats ? formatCurrency(contractStats.totalContracted) : <Skeleton className="h-8 w-24" />}
             </p>
           </div>
           <div className="bg-card rounded-lg border border-border p-4">
@@ -323,11 +454,15 @@ export default function ProductAnalysis() {
             <TabsList>
               <TabsTrigger value="invoices" className="gap-2">
                 <Receipt className="h-4 w-4" />
-                Productos Facturados
+                Facturados
               </TabsTrigger>
               <TabsTrigger value="quotes" className="gap-2">
                 <FileText className="h-4 w-4" />
-                Productos Presupuestados
+                Presupuestados
+              </TabsTrigger>
+              <TabsTrigger value="contracts" className="gap-2">
+                <FileCheck className="h-4 w-4" />
+                Contratados
               </TabsTrigger>
             </TabsList>
 
@@ -341,7 +476,7 @@ export default function ProductAnalysis() {
               <Button variant="outline" size="icon">
                 <Filter className="h-4 w-4" />
               </Button>
-              {activeTab === "invoices" ? (
+              {activeTab === "invoices" && (
                 <>
                   <TableViewManager
                     entityName="invoice_products"
@@ -354,9 +489,11 @@ export default function ProductAnalysis() {
                     data={filteredInvoiceProducts}
                     columns={invoiceColumns.map((c) => ({ key: c.key, label: c.label }))}
                     filename="productos-facturados"
+                    tableName="invoice_products"
                   />
                 </>
-              ) : (
+              )}
+              {activeTab === "quotes" && (
                 <>
                   <TableViewManager
                     entityName="quote_products"
@@ -369,6 +506,24 @@ export default function ProductAnalysis() {
                     data={filteredQuoteProducts}
                     columns={quoteColumns.map((c) => ({ key: c.key, label: c.label }))}
                     filename="productos-presupuestados"
+                    tableName="quote_products"
+                  />
+                </>
+              )}
+              {activeTab === "contracts" && (
+                <>
+                  <TableViewManager
+                    entityName="contract_products"
+                    columns={contractColumnConfigs}
+                    visibleColumns={contractVisibleColumns}
+                    onVisibleColumnsChange={setContractVisibleColumns}
+                    filters={{}}
+                  />
+                  <ExportDropdown
+                    data={filteredContractProducts}
+                    columns={contractColumns.map((c) => ({ key: c.key, label: c.label }))}
+                    filename="productos-contratados"
+                    tableName="contract_services"
                   />
                 </>
               )}
@@ -403,6 +558,22 @@ export default function ProductAnalysis() {
                 columns={quoteColumns}
                 data={filteredQuoteProducts}
                 visibleColumns={quoteVisibleColumns}
+              />
+            )}
+          </TabsContent>
+
+          <TabsContent value="contracts" className="mt-6">
+            {loadingContracts ? (
+              <div className="space-y-4">
+                {[...Array(5)].map((_, i) => (
+                  <Skeleton key={i} className="h-16 w-full" />
+                ))}
+              </div>
+            ) : (
+              <DataTable
+                columns={contractColumns}
+                data={filteredContractProducts}
+                visibleColumns={contractVisibleColumns}
               />
             )}
           </TabsContent>

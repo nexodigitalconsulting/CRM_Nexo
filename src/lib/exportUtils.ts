@@ -131,6 +131,43 @@ export function exportToExcel<T extends Record<string, any>>(
   document.body.removeChild(link);
 }
 
+export function exportToSQL<T extends Record<string, any>>(
+  data: T[],
+  tableName: string,
+  filename: string
+): void {
+  if (data.length === 0) return;
+
+  const columns = Object.keys(data[0]);
+  
+  const escapeSQL = (value: any): string => {
+    if (value === null || value === undefined) return "NULL";
+    if (typeof value === "number") return String(value);
+    if (typeof value === "boolean") return value ? "TRUE" : "FALSE";
+    if (typeof value === "object") return `'${JSON.stringify(value).replace(/'/g, "''")}'`;
+    return `'${String(value).replace(/'/g, "''")}'`;
+  };
+
+  const insertStatements = data.map((row) => {
+    const values = columns.map((col) => escapeSQL(row[col]));
+    return `INSERT INTO ${tableName} (${columns.join(", ")}) VALUES (${values.join(", ")});`;
+  });
+
+  const sqlContent = `-- Exportación de ${tableName}\n-- Fecha: ${format(new Date(), "yyyy-MM-dd HH:mm:ss")}\n-- Total registros: ${data.length}\n\n${insertStatements.join("\n")}`;
+
+  const blob = new Blob([sqlContent], { type: "text/sql;charset=utf-8;" });
+  const link = document.createElement("a");
+  const url = URL.createObjectURL(blob);
+
+  link.setAttribute("href", url);
+  link.setAttribute("download", `${filename}_${format(new Date(), "yyyy-MM-dd")}.sql`);
+  link.style.visibility = "hidden";
+
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+}
+
 // Pre-configured export functions for each entity
 export const entityExportConfigs = {
   contacts: {
