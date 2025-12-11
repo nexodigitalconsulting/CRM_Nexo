@@ -139,6 +139,9 @@ serve(async (req) => {
       'METHOD:PUBLISH',
       `X-WR-CALNAME:${escapeICalText(calendarName)}`,
       'X-WR-TIMEZONE:Europe/Madrid',
+      // Force calendar apps to refresh every 5 minutes
+      'REFRESH-INTERVAL;VALUE=DURATION:PT5M',
+      'X-PUBLISHED-TTL:PT5M',
     ];
 
     // Add timezone definition
@@ -301,6 +304,12 @@ serve(async (req) => {
         ...corsHeaders,
         'Content-Type': 'text/calendar; charset=utf-8',
         'Content-Disposition': 'attachment; filename="crm-calendar.ics"',
+        // Force frequent refreshes - prevent caching
+        'Cache-Control': 'no-cache, no-store, must-revalidate, max-age=0',
+        'Pragma': 'no-cache',
+        'Expires': '0',
+        // Tell calendar apps to refresh more frequently
+        'X-WR-REFRESH-INTERVAL': 'PT5M',
       },
     });
 

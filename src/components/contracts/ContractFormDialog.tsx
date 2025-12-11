@@ -31,7 +31,7 @@ import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useClients } from "@/hooks/useClients";
 import { useActiveServices } from "@/hooks/useServices";
-import { useApprovedQuotes, ContractWithDetails, useCreateContract, useUpdateContract } from "@/hooks/useContracts";
+import { useApprovedQuotes, ContractWithDetails, useCreateContract, useUpdateContract, useContract } from "@/hooks/useContracts";
 import { Plus, Trash2, FileText, ArrowRight, Calculator, Calendar } from "lucide-react";
 import { format, addMonths, addYears } from "date-fns";
 import { es } from "date-fns/locale";
@@ -83,8 +83,13 @@ export function ContractFormDialog({ open, onOpenChange, contract }: ContractFor
   const { data: clients } = useClients();
   const { data: services } = useActiveServices();
   const { data: approvedQuotes } = useApprovedQuotes();
+  // Fetch full contract with services when editing
+  const { data: fullContract } = useContract(contract?.id);
   const createContract = useCreateContract();
   const updateContract = useUpdateContract();
+  
+  // Use fullContract when available for editing
+  const contractData = fullContract || contract;
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -102,21 +107,21 @@ export function ContractFormDialog({ open, onOpenChange, contract }: ContractFor
   });
 
   useEffect(() => {
-    if (contract) {
+    if (contractData) {
       setActiveTab("manual");
       form.reset({
-        name: contract.name || "",
-        client_id: contract.client_id,
-        quote_id: contract.quote_id || "",
-        start_date: contract.start_date,
-        end_date: contract.end_date || "",
-        billing_period: contract.billing_period || "monthly",
-        status: contract.status || "pending_activation",
-        payment_status: contract.payment_status || "pending",
-        notes: contract.notes || "",
+        name: contractData.name || "",
+        client_id: contractData.client_id,
+        quote_id: contractData.quote_id || "",
+        start_date: contractData.start_date,
+        end_date: contractData.end_date || "",
+        billing_period: contractData.billing_period || "monthly",
+        status: contractData.status || "pending_activation",
+        payment_status: contractData.payment_status || "pending",
+        notes: contractData.notes || "",
       });
-      if (contract.services) {
-        setServiceLines(contract.services.map(s => ({
+      if (contractData.services) {
+        setServiceLines(contractData.services.map(s => ({
           service_id: s.service_id,
           service_name: s.service?.name || "",
           quantity: s.quantity || 1,
@@ -134,7 +139,7 @@ export function ContractFormDialog({ open, onOpenChange, contract }: ContractFor
       setServiceLines([]);
       setSelectedQuoteId(null);
     }
-  }, [contract, form, open]);
+  }, [contractData, form, open]);
 
   const handleSelectQuote = (quoteId: string) => {
     const quote = approvedQuotes?.find(q => q.id === quoteId);
