@@ -4,7 +4,7 @@ import { DataTable } from "@/components/ui/data-table";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Plus, Filter, MoreVertical, FileText, Send, Check, X, Loader2, ArrowRight, Printer, LayoutGrid, List } from "lucide-react";
+import { Plus, Filter, MoreVertical, FileText, Send, Check, X, Loader2, ArrowRight, Printer, LayoutGrid, List, Mail } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -31,6 +31,7 @@ import { entityExportConfigs } from "@/lib/exportUtils";
 import { useDefaultTemplate } from "@/hooks/useTemplates";
 import { useCompanySettings } from "@/hooks/useCompanySettings";
 import { printDocument, formatQuoteData } from "@/lib/pdfGenerator";
+import { SendEmailDialog } from "@/components/common/SendEmailDialog";
 import { toast } from "sonner";
 
 const statusMap: Record<string, "inactive" | "new" | "active" | "danger"> = {
@@ -89,6 +90,10 @@ export default function Quotes() {
   const [visibleColumns, setVisibleColumns] = useState<string[]>(
     columnConfigs.filter((c) => c.defaultVisible).map((c) => c.key)
   );
+  
+  // Email dialog state
+  const [emailDialogOpen, setEmailDialogOpen] = useState(false);
+  const [emailQuote, setEmailQuote] = useState<QuoteWithDetails | null>(null);
 
   // Apply default view
   if (defaultView && visibleColumns.length === columnConfigs.filter(c => c.defaultVisible).length) {
@@ -242,6 +247,12 @@ export default function Quotes() {
             <DropdownMenuItem onClick={() => handleEdit(quote)}>Editar</DropdownMenuItem>
             <DropdownMenuItem onClick={() => handlePrint(quote.id)}>
               <Printer className="h-4 w-4 mr-2" /> Imprimir
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => {
+              setEmailQuote(quote);
+              setEmailDialogOpen(true);
+            }}>
+              <Mail className="h-4 w-4 mr-2" /> Enviar por email
             </DropdownMenuItem>
             <DropdownMenuItem onClick={() => {
               setSelectedQuote({ ...quote, id: "" } as QuoteWithDetails);
@@ -495,6 +506,24 @@ export default function Quotes() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {emailQuote && (
+        <SendEmailDialog
+          open={emailDialogOpen}
+          onOpenChange={(open) => {
+            setEmailDialogOpen(open);
+            if (!open) setEmailQuote(null);
+          }}
+          entityType="quote"
+          entityId={emailQuote.id}
+          entityNumber={emailQuote.quote_number}
+          clientName={emailQuote.client?.name || emailQuote.contact?.name || ""}
+          clientEmail={emailQuote.client?.email || ""}
+          contactEmail={emailQuote.contact?.email || ""}
+          total={Number(emailQuote.total) || 0}
+          dueDate={emailQuote.valid_until || undefined}
+        />
+      )}
     </div>
   );
 }
