@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { Header } from "@/components/layout/Header";
 import { Button } from "@/components/ui/button";
 import { DashboardWidgetCard } from "@/components/dashboard/DashboardWidgetCard";
@@ -19,11 +19,11 @@ import {
   Pencil,
   Check,
   Wallet,
-  TrendingUp,
-  Activity,
-  Calendar,
+  GripVertical,
+  X,
 } from "lucide-react";
 import { toast } from "sonner";
+import { cn } from "@/lib/utils";
 
 const defaultWidgets: DashboardWidget[] = [
   { id: "stat-contacts", type: "stat", title: "Contactos", entity: "contacts", config: { field: "count" }, size: "small", order: 0 },
@@ -41,6 +41,8 @@ export default function Dashboard() {
   const [isEditing, setIsEditing] = useState(false);
   const [widgets, setWidgets] = useState<DashboardWidget[]>(defaultWidgets);
   const [showAddWidget, setShowAddWidget] = useState(false);
+  const [draggedWidget, setDraggedWidget] = useState<string | null>(null);
+  const [dragOverWidget, setDragOverWidget] = useState<string | null>(null);
 
   const handleAddWidget = (widget: Omit<DashboardWidget, "id" | "order">) => {
     const newWidget: DashboardWidget = {
@@ -55,6 +57,35 @@ export default function Dashboard() {
   const handleRemoveWidget = (id: string) => {
     setWidgets(widgets.filter((w) => w.id !== id));
     toast.success("Widget eliminado");
+  };
+
+  const handleDragStart = (e: React.DragEvent, widgetId: string) => {
+    if (!isEditing) return;
+    setDraggedWidget(widgetId);
+    e.dataTransfer.effectAllowed = "move";
+  };
+
+  const handleDragOver = (e: React.DragEvent, widgetId: string) => {
+    e.preventDefault();
+    if (!isEditing || draggedWidget === widgetId) return;
+    setDragOverWidget(widgetId);
+  };
+
+  const handleDragEnd = () => {
+    if (draggedWidget && dragOverWidget && draggedWidget !== dragOverWidget) {
+      const newWidgets = [...widgets];
+      const draggedIndex = newWidgets.findIndex(w => w.id === draggedWidget);
+      const dropIndex = newWidgets.findIndex(w => w.id === dragOverWidget);
+      
+      const [draggedItem] = newWidgets.splice(draggedIndex, 1);
+      newWidgets.splice(dropIndex, 0, draggedItem);
+      
+      // Update order
+      newWidgets.forEach((w, i) => w.order = i);
+      setWidgets(newWidgets);
+    }
+    setDraggedWidget(null);
+    setDragOverWidget(null);
   };
 
   const formatCurrency = (amount: number) =>
@@ -101,8 +132,8 @@ export default function Dashboard() {
     return change.value >= 0 ? "up" : "down";
   };
 
-  const statWidgets = widgets.filter((w) => w.type === "stat");
-  const otherWidgets = widgets.filter((w) => w.type !== "stat");
+  const statWidgets = widgets.filter((w) => w.type === "stat").sort((a, b) => a.order - b.order);
+  const otherWidgets = widgets.filter((w) => w.type !== "stat").sort((a, b) => a.order - b.order);
 
   const renderWidget = (widget: DashboardWidget) => {
     switch (widget.type) {
@@ -124,6 +155,12 @@ export default function Dashboard() {
       default:
         return null;
     }
+  };
+
+  const getWidgetGridClass = (widget: DashboardWidget) => {
+    if (widget.type === "activity") return "lg:col-span-2";
+    if (widget.type === "chart") return "";
+    return "";
   };
 
   return (
@@ -160,24 +197,52 @@ export default function Dashboard() {
       />
 
       <div className="p-6 space-y-6">
-        {/* Stat Widgets */}
+        {/* Stat Widgets - Draggable */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           {statWidgets.map((widget) => (
-            <DashboardWidgetCard
+            <div
               key={widget.id}
-              widget={widget}
-              isEditing={isEditing}
-              onRemove={() => handleRemoveWidget(widget.id)}
+              draggable={isEditing}
+              onDragStart={(e) => handleDragStart(e, widget.id)}
+              onDragOver={(e) => handleDragOver(e, widget.id)}
+              onDragEnd={handleDragEnd}
+              className={cn(
+                "relative transition-all",
+                isEditing && "cursor-grab active:cursor-grabbing",
+                draggedWidget === widget.id && "opacity-50",
+                dragOverWidget === widget.id && "ring-2 ring-primary ring-offset-2 rounded-lg"
+              )}
             >
-              <StatWidget
-                title={widget.title}
-                value={getWidgetValue(widget)}
-                change={getWidgetChange(widget)}
-                icon={getWidgetIcon(widget.entity)}
-                trend={getWidgetTrend(widget)}
-                format={widget.entity === "invoices" || widget.entity === "expenses" ? "currency" : "number"}
-              />
-            </DashboardWidgetCard>
+              {isEditing && (
+                <>
+                  <div className="absolute -top-2 left-1/2 -translate-x-1/2 z-10">
+                    <GripVertical className="h-4 w-4 text-muted-foreground" />
+                  </div>
+                  <Button
+                    variant="destructive"
+                    size="icon"
+                    className="absolute -top-2 -right-2 h-6 w-6 rounded-full shadow-md z-10"
+                    onClick={() => handleRemoveWidget(widget.id)}
+                  >
+                    <X className="h-3 w-3" />
+                  </Button>
+                </>
+              )}
+              <DashboardWidgetCard
+                widget={widget}
+                isEditing={false}
+                onRemove={() => {}}
+              >
+                <StatWidget
+                  title={widget.title}
+                  value={getWidgetValue(widget)}
+                  change={getWidgetChange(widget)}
+                  icon={getWidgetIcon(widget.entity)}
+                  trend={getWidgetTrend(widget)}
+                  format={widget.entity === "invoices" || widget.entity === "expenses" ? "currency" : "number"}
+                />
+              </DashboardWidgetCard>
+            </div>
           ))}
         </div>
 
@@ -211,72 +276,77 @@ export default function Dashboard() {
           </div>
         )}
 
-        {/* Activity and Tasks Row */}
+        {/* Activity and Tasks Row - Draggable */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {otherWidgets.find(w => w.type === "activity") && (
-            <div className={`${isEditing ? "ring-2 ring-primary/20 ring-offset-2 rounded-lg relative" : ""} lg:col-span-2`}>
-              {isEditing && (
-                <Button
-                  variant="destructive"
-                  size="icon"
-                  className="absolute -top-2 -right-2 h-6 w-6 rounded-full shadow-md z-10"
-                  onClick={() => handleRemoveWidget("widget-activity")}
-                >
-                  ×
-                </Button>
+          {otherWidgets.filter(w => w.type === "activity" || w.type === "table").map((widget) => (
+            <div
+              key={widget.id}
+              draggable={isEditing}
+              onDragStart={(e) => handleDragStart(e, widget.id)}
+              onDragOver={(e) => handleDragOver(e, widget.id)}
+              onDragEnd={handleDragEnd}
+              className={cn(
+                "relative transition-all",
+                getWidgetGridClass(widget),
+                isEditing && "cursor-grab active:cursor-grabbing",
+                draggedWidget === widget.id && "opacity-50",
+                dragOverWidget === widget.id && "ring-2 ring-primary ring-offset-2 rounded-lg"
               )}
-              <RecentActivityWidget />
-            </div>
-          )}
-          {otherWidgets.find(w => w.type === "table") && (
-            <div className={isEditing ? "ring-2 ring-primary/20 ring-offset-2 rounded-lg relative" : ""}>
+            >
               {isEditing && (
-                <Button
-                  variant="destructive"
-                  size="icon"
-                  className="absolute -top-2 -right-2 h-6 w-6 rounded-full shadow-md z-10"
-                  onClick={() => handleRemoveWidget("widget-tasks")}
-                >
-                  ×
-                </Button>
+                <>
+                  <div className="absolute -top-2 left-1/2 -translate-x-1/2 z-10">
+                    <GripVertical className="h-4 w-4 text-muted-foreground" />
+                  </div>
+                  <Button
+                    variant="destructive"
+                    size="icon"
+                    className="absolute -top-2 -right-2 h-6 w-6 rounded-full shadow-md z-10"
+                    onClick={() => handleRemoveWidget(widget.id)}
+                  >
+                    <X className="h-3 w-3" />
+                  </Button>
+                </>
               )}
-              <UpcomingTasksWidget />
+              {renderWidget(widget)}
             </div>
-          )}
+          ))}
         </div>
 
-        {/* Charts Row */}
+        {/* Charts Row - Draggable */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {otherWidgets.find(w => w.title.includes("Ingresos") || w.config.chartType === "area") && (
-            <div className={isEditing ? "ring-2 ring-primary/20 ring-offset-2 rounded-lg relative" : ""}>
-              {isEditing && (
-                <Button
-                  variant="destructive"
-                  size="icon"
-                  className="absolute -top-2 -right-2 h-6 w-6 rounded-full shadow-md z-10"
-                  onClick={() => handleRemoveWidget("widget-revenue")}
-                >
-                  ×
-                </Button>
+          {otherWidgets.filter(w => w.type === "chart").map((widget) => (
+            <div
+              key={widget.id}
+              draggable={isEditing}
+              onDragStart={(e) => handleDragStart(e, widget.id)}
+              onDragOver={(e) => handleDragOver(e, widget.id)}
+              onDragEnd={handleDragEnd}
+              className={cn(
+                "relative transition-all",
+                isEditing && "cursor-grab active:cursor-grabbing",
+                draggedWidget === widget.id && "opacity-50",
+                dragOverWidget === widget.id && "ring-2 ring-primary ring-offset-2 rounded-lg"
               )}
-              <RevenueExpensesChart />
-            </div>
-          )}
-          {otherWidgets.find(w => w.title.includes("Pipeline") || w.config.chartType === "bar") && (
-            <div className={isEditing ? "ring-2 ring-primary/20 ring-offset-2 rounded-lg relative" : ""}>
+            >
               {isEditing && (
-                <Button
-                  variant="destructive"
-                  size="icon"
-                  className="absolute -top-2 -right-2 h-6 w-6 rounded-full shadow-md z-10"
-                  onClick={() => handleRemoveWidget("widget-pipeline")}
-                >
-                  ×
-                </Button>
+                <>
+                  <div className="absolute -top-2 left-1/2 -translate-x-1/2 z-10">
+                    <GripVertical className="h-4 w-4 text-muted-foreground" />
+                  </div>
+                  <Button
+                    variant="destructive"
+                    size="icon"
+                    className="absolute -top-2 -right-2 h-6 w-6 rounded-full shadow-md z-10"
+                    onClick={() => handleRemoveWidget(widget.id)}
+                  >
+                    <X className="h-3 w-3" />
+                  </Button>
+                </>
               )}
-              <SalesPipelineChart />
+              {renderWidget(widget)}
             </div>
-          )}
+          ))}
         </div>
       </div>
 
