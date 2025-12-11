@@ -19,6 +19,7 @@ import Remittances from "./pages/Remittances";
 import Flows from "./pages/Flows";
 import Calendar from "./pages/Calendar";
 import Settings from "./pages/Settings";
+import ProductAnalysis from "./pages/ProductAnalysis";
 import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
 
@@ -49,6 +50,7 @@ const App = () => (
                       <Route path="/invoices" element={<Invoices />} />
                       <Route path="/remittances" element={<Remittances />} />
                       <Route path="/expenses" element={<Expenses />} />
+                      <Route path="/product-analysis" element={<ProductAnalysis />} />
                       <Route path="/flows" element={<Flows />} />
                       <Route path="/calendar" element={<Calendar />} />
                       <Route path="/settings" element={<Settings />} />

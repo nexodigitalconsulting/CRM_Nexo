@@ -13,14 +13,14 @@ import {
   Megaphone,
   Workflow,
   LogOut,
-  Wallet,
-  CreditCard,
+  BarChart3,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { useCompanySettings } from "@/hooks/useCompanySettings";
 
 interface NavItem {
   label: string;
@@ -52,6 +52,7 @@ const navigation: NavItem[] = [
       { label: "Gastos", href: "/expenses" },
     ],
   },
+  { label: "Análisis Productos", icon: BarChart3, href: "/product-analysis" },
   { label: "Flujos", icon: Workflow, href: "/flows" },
   { label: "Calendario", icon: CalendarDays, href: "/calendar" },
 ];
@@ -63,6 +64,7 @@ const bottomNav: NavItem[] = [
 export function Sidebar() {
   const location = useLocation();
   const { user, signOut, isAdmin } = useAuth();
+  const { data: companySettings } = useCompanySettings();
   const [expandedItems, setExpandedItems] = useState<string[]>(["Comercial", "Facturación"]);
 
   const toggleExpand = (label: string) => {
@@ -88,10 +90,20 @@ export function Sidebar() {
       <div className="flex h-full flex-col">
         {/* Logo */}
         <div className="flex h-16 items-center gap-3 px-6 border-b border-sidebar-border">
-          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary">
-            <TrendingUp className="h-5 w-5 text-primary-foreground" />
-          </div>
-          <span className="text-lg font-semibold text-sidebar-foreground">CRM Pro</span>
+          {companySettings?.logo_url ? (
+            <img 
+              src={companySettings.logo_url} 
+              alt={companySettings.name || "Logo"} 
+              className="h-9 w-9 rounded-lg object-contain"
+            />
+          ) : (
+            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary">
+              <TrendingUp className="h-5 w-5 text-primary-foreground" />
+            </div>
+          )}
+          <span className="text-lg font-semibold text-sidebar-foreground">
+            {companySettings?.name || "CRM Pro"}
+          </span>
         </div>
 
         {/* Navigation */}

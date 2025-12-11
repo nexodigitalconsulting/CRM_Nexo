@@ -1,9 +1,10 @@
 import { useState } from "react";
 import { Header } from "@/components/layout/Header";
+import { DataTable } from "@/components/ui/data-table";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Plus, Filter, Package, MoreVertical, Loader2 } from "lucide-react";
+import { Plus, Filter, Package, MoreVertical, Loader2, LayoutGrid, List } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -12,6 +13,9 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useServices, useDeleteService, Service } from "@/hooks/useServices";
 import { ServiceFormDialog } from "@/components/services/ServiceFormDialog";
+import { TableViewManager, ColumnConfig } from "@/components/common/TableViewManager";
+import { ExportDropdown } from "@/components/common/ExportDropdown";
+import { useDefaultTableView } from "@/hooks/useTableViews";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -43,15 +47,40 @@ const statusLabels: Record<string, string> = {
   inactive: "Inactivo",
 };
 
+const columnConfigs: ColumnConfig[] = [
+  { key: "service_number", label: "ID", defaultVisible: true },
+  { key: "name", label: "Nombre", defaultVisible: true },
+  { key: "category", label: "Categoría", defaultVisible: true },
+  { key: "status", label: "Estado", defaultVisible: true },
+  { key: "description", label: "Descripción", defaultVisible: false },
+  { key: "price", label: "Precio", defaultVisible: true },
+  { key: "iva_percent", label: "% IVA", defaultVisible: true },
+  { key: "price_with_iva", label: "Precio con IVA", defaultVisible: true },
+  { key: "created_at", label: "Fecha Creación", defaultVisible: false },
+  { key: "updated_at", label: "Última Actualización", defaultVisible: false },
+  { key: "actions", label: "Acciones", defaultVisible: true },
+];
+
 export default function Services() {
   const { data: services, isLoading, error } = useServices();
   const deleteService = useDeleteService();
+  const { data: defaultView } = useDefaultTableView("services");
   
   const [dialogOpen, setDialogOpen] = useState(false);
   const [selectedService, setSelectedService] = useState<Service | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [serviceToDelete, setServiceToDelete] = useState<Service | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
+  const [viewMode, setViewMode] = useState<"cards" | "table">("cards");
+  const [visibleColumns, setVisibleColumns] = useState<string[]>(
+    columnConfigs.filter((c) => c.defaultVisible).map((c) => c.key)
+  );
+
+  // Apply default view
+  if (defaultView && visibleColumns.length === columnConfigs.filter(c => c.defaultVisible).length) {
+    const cols = defaultView.visible_columns as string[];
+    if (cols.length > 0) setVisibleColumns(cols);
+  }
 
   const handleEdit = (service: Service) => {
     setSelectedService(service);
@@ -83,6 +112,108 @@ export default function Services() {
       service.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       service.category?.toLowerCase().includes(searchTerm.toLowerCase());
   }) || [];
+
+  const columns = [
+    {
+      key: "service_number",
+      label: "ID",
+      render: (service: Service) => (
+        <span className="font-mono text-xs text-muted-foreground">SV-{String(service.service_number).padStart(4, "0")}</span>
+      ),
+    },
+    {
+      key: "name",
+      label: "Nombre",
+      render: (service: Service) => <span className="font-medium">{service.name}</span>,
+    },
+    {
+      key: "category",
+      label: "Categoría",
+      render: (service: Service) => (
+        <span className={`status-badge ${categoryColors[service.category || ""] || categoryColors.default}`}>
+          {service.category || "Sin categoría"}
+        </span>
+      ),
+    },
+    {
+      key: "status",
+      label: "Estado",
+      render: (service: Service) => (
+        <StatusBadge variant={statusMap[service.status || "active"]}>
+          {statusLabels[service.status || "active"]}
+        </StatusBadge>
+      ),
+    },
+    {
+      key: "description",
+      label: "Descripción",
+      render: (service: Service) => (
+        <span className="text-sm text-muted-foreground truncate max-w-[200px] block">
+          {service.description || "-"}
+        </span>
+      ),
+    },
+    {
+      key: "price",
+      label: "Precio",
+      render: (service: Service) => <span>{formatCurrency(service.price)}</span>,
+    },
+    {
+      key: "iva_percent",
+      label: "% IVA",
+      render: (service: Service) => <span>{service.iva_percent || 21}%</span>,
+    },
+    {
+      key: "price_with_iva",
+      label: "Precio con IVA",
+      render: (service: Service) => (
+        <span className="font-semibold text-primary">
+          {formatCurrency(service.price * (1 + (service.iva_percent || 21) / 100))}
+        </span>
+      ),
+    },
+    {
+      key: "created_at",
+      label: "Creación",
+      render: (service: Service) => (
+        <span className="text-sm text-muted-foreground">
+          {service.created_at ? new Date(service.created_at).toLocaleDateString("es-ES") : "-"}
+        </span>
+      ),
+    },
+    {
+      key: "updated_at",
+      label: "Actualización",
+      render: (service: Service) => (
+        <span className="text-sm text-muted-foreground">
+          {service.updated_at ? new Date(service.updated_at).toLocaleDateString("es-ES") : "-"}
+        </span>
+      ),
+    },
+    {
+      key: "actions",
+      label: "Acciones",
+      render: (service: Service) => (
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" size="icon" className="h-8 w-8">
+              <MoreVertical className="h-4 w-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem onClick={() => handleEdit(service)}>Editar</DropdownMenuItem>
+            <DropdownMenuItem onClick={() => {
+              setSelectedService({ ...service, id: "" });
+              setDialogOpen(true);
+            }}>Duplicar</DropdownMenuItem>
+            <DropdownMenuItem className="text-destructive" onClick={() => handleDelete(service)}>
+              Eliminar
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      ),
+    },
+  ];
 
   if (error) {
     return <div className="p-6 text-destructive">Error al cargar servicios: {error.message}</div>;
@@ -136,17 +267,51 @@ export default function Services() {
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
-          <Button variant="outline" className="gap-2">
-            <Filter className="h-4 w-4" />
-            Filtros
-          </Button>
+          <div className="flex gap-2 ml-auto">
+            <div className="flex border border-border rounded-lg overflow-hidden">
+              <Button
+                variant={viewMode === "cards" ? "default" : "ghost"}
+                size="icon"
+                className="rounded-none"
+                onClick={() => setViewMode("cards")}
+              >
+                <LayoutGrid className="h-4 w-4" />
+              </Button>
+              <Button
+                variant={viewMode === "table" ? "default" : "ghost"}
+                size="icon"
+                className="rounded-none"
+                onClick={() => setViewMode("table")}
+              >
+                <List className="h-4 w-4" />
+              </Button>
+            </div>
+            <Button variant="outline" className="gap-2">
+              <Filter className="h-4 w-4" />
+              Filtros
+            </Button>
+            <TableViewManager
+              entityName="services"
+              columns={columnConfigs}
+              visibleColumns={visibleColumns}
+              onVisibleColumnsChange={setVisibleColumns}
+              filters={{}}
+            />
+            <ExportDropdown
+              data={filteredServices}
+              columns={columns.filter(c => c.key !== "actions").map(c => ({ key: c.key, label: c.label }))}
+              filename="servicios"
+            />
+          </div>
         </div>
 
-        {/* Services Grid */}
+        {/* Content */}
         {isLoading ? (
           <div className="flex items-center justify-center py-12">
             <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
           </div>
+        ) : viewMode === "table" ? (
+          <DataTable columns={columns} data={filteredServices} visibleColumns={visibleColumns} />
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {filteredServices.map((service) => (

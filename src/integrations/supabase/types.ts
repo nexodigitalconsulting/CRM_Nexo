@@ -768,6 +768,100 @@ export type Database = {
         }
         Relationships: []
       }
+      invoice_products: {
+        Row: {
+          client_cif: string | null
+          client_id: string
+          client_name: string
+          created_at: string | null
+          discount_amount: number | null
+          discount_percent: number | null
+          id: string
+          invoice_date: string
+          invoice_id: string
+          invoice_number: number
+          invoice_status: string | null
+          iva_amount: number | null
+          iva_percent: number | null
+          quantity: number
+          service_category: string | null
+          service_id: string
+          service_name: string
+          subtotal: number
+          total: number
+          unit_price: number
+          updated_at: string | null
+        }
+        Insert: {
+          client_cif?: string | null
+          client_id: string
+          client_name: string
+          created_at?: string | null
+          discount_amount?: number | null
+          discount_percent?: number | null
+          id?: string
+          invoice_date: string
+          invoice_id: string
+          invoice_number: number
+          invoice_status?: string | null
+          iva_amount?: number | null
+          iva_percent?: number | null
+          quantity?: number
+          service_category?: string | null
+          service_id: string
+          service_name: string
+          subtotal: number
+          total: number
+          unit_price: number
+          updated_at?: string | null
+        }
+        Update: {
+          client_cif?: string | null
+          client_id?: string
+          client_name?: string
+          created_at?: string | null
+          discount_amount?: number | null
+          discount_percent?: number | null
+          id?: string
+          invoice_date?: string
+          invoice_id?: string
+          invoice_number?: number
+          invoice_status?: string | null
+          iva_amount?: number | null
+          iva_percent?: number | null
+          quantity?: number
+          service_category?: string | null
+          service_id?: string
+          service_name?: string
+          subtotal?: number
+          total?: number
+          unit_price?: number
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "invoice_products_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invoice_products_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "invoices"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invoice_products_service_id_fkey"
+            columns: ["service_id"]
+            isOneToOne: false
+            referencedRelation: "services"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       invoice_services: {
         Row: {
           created_at: string | null
@@ -954,6 +1048,110 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      quote_products: {
+        Row: {
+          client_id: string | null
+          client_name: string | null
+          contact_id: string | null
+          contact_name: string | null
+          created_at: string | null
+          discount_amount: number | null
+          discount_percent: number | null
+          id: string
+          iva_amount: number | null
+          iva_percent: number | null
+          quantity: number
+          quote_date: string
+          quote_id: string
+          quote_number: number
+          quote_status: string | null
+          service_category: string | null
+          service_id: string
+          service_name: string
+          subtotal: number
+          total: number
+          unit_price: number
+          updated_at: string | null
+        }
+        Insert: {
+          client_id?: string | null
+          client_name?: string | null
+          contact_id?: string | null
+          contact_name?: string | null
+          created_at?: string | null
+          discount_amount?: number | null
+          discount_percent?: number | null
+          id?: string
+          iva_amount?: number | null
+          iva_percent?: number | null
+          quantity?: number
+          quote_date: string
+          quote_id: string
+          quote_number: number
+          quote_status?: string | null
+          service_category?: string | null
+          service_id: string
+          service_name: string
+          subtotal: number
+          total: number
+          unit_price: number
+          updated_at?: string | null
+        }
+        Update: {
+          client_id?: string | null
+          client_name?: string | null
+          contact_id?: string | null
+          contact_name?: string | null
+          created_at?: string | null
+          discount_amount?: number | null
+          discount_percent?: number | null
+          id?: string
+          iva_amount?: number | null
+          iva_percent?: number | null
+          quantity?: number
+          quote_date?: string
+          quote_id?: string
+          quote_number?: number
+          quote_status?: string | null
+          service_category?: string | null
+          service_id?: string
+          service_name?: string
+          subtotal?: number
+          total?: number
+          unit_price?: number
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "quote_products_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "quote_products_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "quote_products_quote_id_fkey"
+            columns: ["quote_id"]
+            isOneToOne: false
+            referencedRelation: "quotes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "quote_products_service_id_fkey"
+            columns: ["service_id"]
+            isOneToOne: false
+            referencedRelation: "services"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       quote_services: {
         Row: {
