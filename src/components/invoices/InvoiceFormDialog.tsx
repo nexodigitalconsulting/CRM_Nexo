@@ -164,14 +164,7 @@ export function InvoiceFormDialog({ open, onOpenChange, invoice }: Props) {
     }
   };
 
-  const handleContractSelect = (contractId: string) => {
-    if (contractId) {
-      const contract = contracts.find((c) => c.id === contractId);
-      if (contract) {
-        form.setValue("client_id", contract.client_id);
-      }
-    }
-  };
+  // Client is now selected first, then contracts are filtered by client
 
   const onSubmit = (values: FormValues) => {
     const servicesData = values.services.map((s) => {
@@ -240,44 +233,18 @@ export function InvoiceFormDialog({ open, onOpenChange, invoice }: Props) {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <FormField
                 control={form.control}
-                name="contract_id"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Contrato (opcional)</FormLabel>
-                    <Select 
-                      value={field.value || "none"} 
-                      onValueChange={(value) => {
-                        const actualValue = value === "none" ? "" : value;
-                        field.onChange(actualValue);
-                        handleContractSelect(actualValue);
-                      }}
-                    >
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Sin contrato" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value="none">Sin contrato</SelectItem>
-                        {filteredContracts.filter(c => c.id).map((contract) => (
-                          <SelectItem key={contract.id} value={contract.id}>
-                            #{contract.contract_number} - {contract.name || contract.client?.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
                 name="client_id"
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Cliente *</FormLabel>
-                    <Select value={field.value} onValueChange={field.onChange}>
+                    <Select 
+                      value={field.value} 
+                      onValueChange={(value) => {
+                        field.onChange(value);
+                        // Clear contract when client changes
+                        form.setValue("contract_id", "");
+                      }}
+                    >
                       <FormControl>
                         <SelectTrigger>
                           <SelectValue placeholder="Seleccionar cliente" />
@@ -291,6 +258,41 @@ export function InvoiceFormDialog({ open, onOpenChange, invoice }: Props) {
                         ))}
                       </SelectContent>
                     </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="contract_id"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Contrato (opcional)</FormLabel>
+                    <Select 
+                      value={field.value || "none"} 
+                      onValueChange={(value) => {
+                        field.onChange(value === "none" ? "" : value);
+                      }}
+                      disabled={!selectedClientId}
+                    >
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder={selectedClientId ? "Sin contrato" : "Selecciona un cliente primero"} />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="none">Sin contrato</SelectItem>
+                        {filteredContracts.map((contract) => (
+                          <SelectItem key={contract.id} value={contract.id}>
+                            #{contract.contract_number} - {contract.name || contract.client?.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    {selectedClientId && filteredContracts.length === 0 && (
+                      <p className="text-xs text-muted-foreground">Este cliente no tiene contratos activos</p>
+                    )}
                     <FormMessage />
                   </FormItem>
                 )}

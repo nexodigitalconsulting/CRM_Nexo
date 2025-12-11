@@ -165,6 +165,13 @@ serve(async (req) => {
       'END:VTIMEZONE'
     );
 
+    // Calculate SEQUENCE based on updated_at timestamp to force calendar updates
+    const getSequence = (updatedAt: string | null, createdAt: string): number => {
+      const updated = new Date(updatedAt || createdAt);
+      // Use minutes since epoch as sequence - ensures updates are detected
+      return Math.floor(updated.getTime() / 60000);
+    };
+
     // Add calendar events
     if (calendarEvents) {
       for (const event of calendarEvents) {
@@ -172,11 +179,13 @@ serve(async (req) => {
         const endDate = new Date(event.end_datetime);
         const createdAt = new Date(event.created_at);
         const updatedAt = new Date(event.updated_at || event.created_at);
+        const sequence = getSequence(event.updated_at, event.created_at);
 
         icalContent.push(
           'BEGIN:VEVENT',
           `UID:${generateUID(event.id, domain)}`,
           `DTSTAMP:${formatICalDate(new Date())}`,
+          `SEQUENCE:${sequence}`,
           event.all_day 
             ? `DTSTART;VALUE=DATE:${formatICalDate(startDate, true)}`
             : `DTSTART;TZID=Europe/Madrid:${formatICalDate(startDate)}`,
