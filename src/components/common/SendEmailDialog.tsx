@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -24,7 +24,6 @@ import { Mail, Send, Eye, FileText, Paperclip } from "lucide-react";
 import { useSendEmail, useEmailTemplates, useEmailSettings } from "@/hooks/useEmailSettings";
 import { useCompanySettings } from "@/hooks/useCompanySettings";
 import { toast } from "sonner";
-import { cn } from "@/lib/utils";
 
 interface SendEmailDialogProps {
   open: boolean;
@@ -37,7 +36,7 @@ interface SendEmailDialogProps {
   contactEmail?: string;
   total?: number;
   dueDate?: string;
-  pdfPreviewHtml?: string;
+  pdfHtml?: string;
 }
 
 const TEMPLATE_TYPE_MAP: Record<string, string> = {
@@ -69,7 +68,7 @@ export function SendEmailDialog({
   contactEmail,
   total,
   dueDate,
-  pdfPreviewHtml,
+  pdfHtml,
 }: SendEmailDialogProps) {
   const { data: emailSettings } = useEmailSettings();
   const { data: templates } = useEmailTemplates();
@@ -77,7 +76,7 @@ export function SendEmailDialog({
   const sendEmail = useSendEmail();
 
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
-  const [activeTab, setActiveTab] = useState<"compose" | "preview">("compose");
+  const [activeTab, setActiveTab] = useState<"compose" | "preview" | "document">("compose");
   
   const template = templates?.find(t => t.template_type === TEMPLATE_TYPE_MAP[entityType]);
   
@@ -118,6 +117,7 @@ export function SendEmailDialog({
         subject: defaultSubject,
         html: defaultBody,
       });
+      setActiveTab("compose");
     }
   }, [open, clientEmail, contactEmail, defaultSubject, defaultBody]);
 
@@ -129,13 +129,19 @@ export function SendEmailDialog({
     setShowConfirmDialog(true);
   };
 
+  const documentNumber = `${ENTITY_PREFIX_MAP[entityType]}-${String(entityNumber).padStart(4, "0")}`;
+
   const handleConfirmSend = () => {
     sendEmail.mutate({
       to: formData.to,
+      cc: formData.cc || undefined,
       subject: formData.subject,
       html: formData.html,
       entityType,
       entityId,
+      attachPdf: !!pdfHtml,
+      pdfHtml: pdfHtml,
+      pdfFilename: `${documentNumber}.pdf`,
     }, {
       onSuccess: () => {
         setShowConfirmDialog(false);
@@ -172,12 +178,10 @@ export function SendEmailDialog({
     );
   }
 
-  const documentNumber = `${ENTITY_PREFIX_MAP[entityType]}-${String(entityNumber).padStart(4, "0")}`;
-
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="max-w-3xl max-h-[90vh] overflow-hidden flex flex-col">
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Mail className="h-5 w-5" />
@@ -185,8 +189,8 @@ export function SendEmailDialog({
             </DialogTitle>
           </DialogHeader>
           
-          <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "compose" | "preview")} className="flex-1 flex flex-col overflow-hidden">
-            <TabsList className="grid w-full grid-cols-2">
+          <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "compose" | "preview" | "document")} className="flex-1 flex flex-col overflow-hidden">
+            <TabsList className="grid w-full grid-cols-3">
               <TabsTrigger value="compose" className="gap-2">
                 <FileText className="h-4 w-4" />
                 Redactar
@@ -194,6 +198,10 @@ export function SendEmailDialog({
               <TabsTrigger value="preview" className="gap-2">
                 <Eye className="h-4 w-4" />
                 Vista Previa
+              </TabsTrigger>
+              <TabsTrigger value="document" className="gap-2">
+                <Paperclip className="h-4 w-4" />
+                Documento
               </TabsTrigger>
             </TabsList>
 
@@ -210,17 +218,16 @@ export function SendEmailDialog({
                   />
                 </div>
 
-                {formData.cc && (
-                  <div className="space-y-2">
-                    <Label htmlFor="email-cc">CC (Contacto)</Label>
-                    <Input
-                      id="email-cc"
-                      type="email"
-                      value={formData.cc}
-                      onChange={(e) => setFormData({ ...formData, cc: e.target.value })}
-                    />
-                  </div>
-                )}
+                <div className="space-y-2">
+                  <Label htmlFor="email-cc">CC (opcional)</Label>
+                  <Input
+                    id="email-cc"
+                    type="email"
+                    value={formData.cc}
+                    onChange={(e) => setFormData({ ...formData, cc: e.target.value })}
+                    placeholder="contacto@email.com"
+                  />
+                </div>
                 
                 <div className="space-y-2">
                   <Label htmlFor="email-subject">Asunto</Label>
@@ -244,7 +251,8 @@ export function SendEmailDialog({
                 <div className="flex items-center gap-2 p-3 bg-muted/50 rounded-lg border">
                   <Paperclip className="h-4 w-4 text-muted-foreground" />
                   <span className="text-sm text-muted-foreground">
-                    Documento adjunto: <span className="font-medium text-foreground">{documentNumber}.pdf</span>
+                    Documento adjunto: <span className="font-medium text-foreground">{documentNumber}.html</span>
+                    <span className="text-xs ml-2">(imprimible como PDF)</span>
                   </span>
                 </div>
               </div>
@@ -272,13 +280,33 @@ export function SendEmailDialog({
                 <div className="flex items-center gap-2 p-3 bg-primary/5 rounded-lg border border-primary/20">
                   <FileText className="h-5 w-5 text-primary" />
                   <div>
-                    <p className="text-sm font-medium">{documentNumber}.pdf</p>
+                    <p className="text-sm font-medium">{documentNumber}.html</p>
                     <p className="text-xs text-muted-foreground">
                       El documento se adjuntará automáticamente al email
                     </p>
                   </div>
                 </div>
               </div>
+            </TabsContent>
+
+            <TabsContent value="document" className="flex-1 overflow-auto mt-4">
+              {pdfHtml ? (
+                <div className="border rounded-lg overflow-hidden h-[500px]">
+                  <iframe
+                    srcDoc={pdfHtml}
+                    className="w-full h-full bg-white"
+                    title="Vista previa del documento"
+                  />
+                </div>
+              ) : (
+                <div className="flex items-center justify-center h-[300px] border rounded-lg bg-muted/20">
+                  <div className="text-center">
+                    <FileText className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                    <p className="text-muted-foreground">No hay vista previa disponible</p>
+                    <p className="text-sm text-muted-foreground">El documento se generará al enviar</p>
+                  </div>
+                </div>
+              )}
             </TabsContent>
           </Tabs>
           
@@ -308,7 +336,7 @@ export function SendEmailDialog({
                 <p><span className="text-muted-foreground">Para:</span> {formData.to}</p>
                 {formData.cc && <p><span className="text-muted-foreground">CC:</span> {formData.cc}</p>}
                 <p><span className="text-muted-foreground">Asunto:</span> {formData.subject}</p>
-                <p><span className="text-muted-foreground">Documento:</span> {documentNumber}.pdf</p>
+                <p><span className="text-muted-foreground">Documento:</span> {documentNumber}.html</p>
               </div>
             </AlertDialogDescription>
           </AlertDialogHeader>

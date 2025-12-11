@@ -11,7 +11,7 @@ import { RevenueExpensesChart } from "@/components/dashboard/RevenueExpensesChar
 import { SalesPipelineChart } from "@/components/dashboard/SalesPipelineChart";
 import { DynamicTableWidget } from "@/components/dashboard/DynamicTableWidget";
 import { useDashboardStats } from "@/hooks/useDashboardWidgets";
-import type { DashboardWidget } from "@/hooks/useDashboardWidgets";
+import type { DashboardWidget, WidgetHeight } from "@/hooks/useDashboardWidgets";
 import {
   Users,
   Building2,
@@ -28,15 +28,24 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
 const defaultWidgets: DashboardWidget[] = [
-  { id: "stat-contacts", type: "stat", title: "Contactos", entity: "contacts", config: { field: "count" }, size: "small", order: 0 },
-  { id: "stat-clients", type: "stat", title: "Clientes Activos", entity: "clients", config: { field: "count" }, size: "small", order: 1 },
-  { id: "stat-quotes", type: "stat", title: "Presupuestos Pendientes", entity: "quotes", config: { field: "count" }, size: "small", order: 2 },
-  { id: "stat-invoices", type: "stat", title: "Facturación Mensual", entity: "invoices", config: { field: "sum" }, size: "small", order: 3 },
-  { id: "widget-activity", type: "activity", title: "Actividad Reciente", config: {}, size: "large", order: 4 },
-  { id: "widget-tasks", type: "table", title: "Próximas Tareas", config: { isTaskWidget: true }, size: "medium", order: 5 },
-  { id: "widget-revenue", type: "chart", title: "Ingresos vs Gastos", entity: "invoices", config: { chartType: "area" }, size: "large", order: 6 },
-  { id: "widget-pipeline", type: "chart", title: "Pipeline de Ventas", entity: "quotes", config: { chartType: "bar" }, size: "large", order: 7 },
+  { id: "stat-contacts", type: "stat", title: "Contactos", entity: "contacts", config: { field: "count" }, size: "small", height: "auto", order: 0 },
+  { id: "stat-clients", type: "stat", title: "Clientes Activos", entity: "clients", config: { field: "count" }, size: "small", height: "auto", order: 1 },
+  { id: "stat-quotes", type: "stat", title: "Presupuestos Pendientes", entity: "quotes", config: { field: "count" }, size: "small", height: "auto", order: 2 },
+  { id: "stat-invoices", type: "stat", title: "Facturación Mensual", entity: "invoices", config: { field: "sum" }, size: "small", height: "auto", order: 3 },
+  { id: "widget-activity", type: "activity", title: "Actividad Reciente", config: {}, size: "large", height: "medium", order: 4 },
+  { id: "widget-tasks", type: "table", title: "Próximas Tareas", config: { isTaskWidget: true }, size: "medium", height: "medium", order: 5 },
+  { id: "widget-revenue", type: "chart", title: "Ingresos vs Gastos", entity: "invoices", config: { chartType: "area" }, size: "large", height: "medium", order: 6 },
+  { id: "widget-pipeline", type: "chart", title: "Pipeline de Ventas", entity: "quotes", config: { chartType: "bar" }, size: "large", height: "medium", order: 7 },
 ];
+
+const getHeightClass = (height?: WidgetHeight): string => {
+  switch (height) {
+    case "small": return "h-[200px]";
+    case "medium": return "h-[300px]";
+    case "large": return "h-[450px]";
+    default: return "";
+  }
+};
 
 export default function Dashboard() {
   const { data: stats, isLoading } = useDashboardStats();
@@ -148,33 +157,39 @@ export default function Dashboard() {
   const otherWidgets = widgets.filter((w) => w.type !== "stat").sort((a, b) => a.order - b.order);
 
   const renderWidget = (widget: DashboardWidget) => {
-    switch (widget.type) {
-      case "activity":
-        return <RecentActivityWidget key={widget.id} />;
-      case "table":
-        // Check if it's the special tasks widget
-        if (widget.config?.isTaskWidget || widget.title.includes("Tarea")) {
-          return <UpcomingTasksWidget key={widget.id} />;
-        }
-        // Otherwise render dynamic table with entity data
-        return <DynamicTableWidget key={widget.id} title={widget.title} entity={widget.entity} />;
-      case "chart":
-        if (widget.config.chartType === "area" || widget.title.includes("Ingresos")) {
-          return <RevenueExpensesChart key={widget.id} />;
-        }
-        if (widget.config.chartType === "bar" || widget.title.includes("Pipeline")) {
-          return <SalesPipelineChart key={widget.id} />;
-        }
-        return null;
-      default:
-        return null;
-    }
+    const heightClass = getHeightClass(widget.height);
+    const wrapperClass = heightClass ? `${heightClass} overflow-hidden` : "";
+    
+    const content = (() => {
+      switch (widget.type) {
+        case "activity":
+          return <RecentActivityWidget key={widget.id} />;
+        case "table":
+          if (widget.config?.isTaskWidget || widget.title.includes("Tarea")) {
+            return <UpcomingTasksWidget key={widget.id} />;
+          }
+          return <DynamicTableWidget key={widget.id} title={widget.title} entity={widget.entity} />;
+        case "chart":
+          if (widget.config.chartType === "area" || widget.title.includes("Ingresos")) {
+            return <RevenueExpensesChart key={widget.id} />;
+          }
+          if (widget.config.chartType === "bar" || widget.title.includes("Pipeline")) {
+            return <SalesPipelineChart key={widget.id} />;
+          }
+          return null;
+        default:
+          return null;
+      }
+    })();
+
+    return wrapperClass ? (
+      <div className={wrapperClass}>{content}</div>
+    ) : content;
   };
 
   const getWidgetGridClass = (widget: DashboardWidget) => {
-    if (widget.type === "activity") return "lg:col-span-2";
-    if (widget.type === "chart") return "";
-    return "";
+    const colSpan = widget.size === "large" ? "lg:col-span-2" : widget.size === "medium" ? "lg:col-span-1" : "";
+    return colSpan;
   };
 
   return (

@@ -245,21 +245,30 @@ export function useSendEmail() {
   return useMutation({
     mutationFn: async ({ 
       to, 
+      cc,
       subject, 
       html, 
       entityType, 
-      entityId 
+      entityId,
+      attachPdf,
+      pdfHtml,
+      pdfFilename
     }: { 
       to: string; 
+      cc?: string;
       subject: string; 
       html: string;
       entityType?: string;
       entityId?: string;
+      attachPdf?: boolean;
+      pdfHtml?: string;
+      pdfFilename?: string;
     }) => {
       const { data, error } = await supabase.functions.invoke('send-email', {
-        body: { to, subject, html, entityType, entityId }
+        body: { to, cc, subject, html, entityType, entityId, attachPdf, pdfHtml, pdfFilename }
       });
       if (error) throw error;
+      if (data?.error) throw new Error(data.error);
       return data;
     },
     onSuccess: () => {
@@ -279,6 +288,7 @@ export function useTestEmailConnection() {
         body: { test: true }
       });
       if (error) throw error;
+      if (data?.error) throw new Error(data.error);
       return data;
     },
     onSuccess: () => {
@@ -286,6 +296,34 @@ export function useTestEmailConnection() {
     },
     onError: (error) => {
       toast.error("Error de conexión: " + error.message);
+    },
+  });
+}
+
+// Notification history
+export interface NotificationLog {
+  id: string;
+  rule_type: string;
+  entity_type: string;
+  entity_id: string;
+  client_id: string | null;
+  status: string;
+  error_message: string | null;
+  sent_at: string | null;
+  created_at: string;
+}
+
+export function useNotificationHistory() {
+  return useQuery({
+    queryKey: ["notification-history"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("notification_queue")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(100);
+      if (error) throw error;
+      return data as NotificationLog[];
     },
   });
 }

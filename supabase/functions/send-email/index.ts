@@ -9,10 +9,14 @@ const corsHeaders = {
 
 interface EmailRequest {
   to: string;
+  cc?: string;
   subject: string;
   html: string;
   entityType?: string;
   entityId?: string;
+  attachPdf?: boolean;
+  pdfHtml?: string;
+  pdfFilename?: string;
   test?: boolean;
 }
 
@@ -47,7 +51,14 @@ serve(async (req) => {
     }
 
     const body: EmailRequest = await req.json();
-    console.log("Email request:", { to: body.to, subject: body.subject, test: body.test });
+    console.log("Email request:", { 
+      to: body.to, 
+      cc: body.cc,
+      subject: body.subject, 
+      test: body.test,
+      attachPdf: body.attachPdf,
+      pdfFilename: body.pdfFilename
+    });
 
     // Initialize SMTP client
     const client = new SMTPClient({
@@ -90,17 +101,40 @@ serve(async (req) => {
       throw new Error("Faltan campos requeridos: to, subject, html");
     }
 
+    // Prepare email options
+    const emailOptions: any = {
+      from: settings.from_name 
+        ? `${settings.from_name} <${settings.from_email}>`
+        : settings.from_email,
+      to: body.to,
+      subject: body.subject,
+      content: "auto",
+      html: body.html,
+    };
+
+    // Add CC if provided
+    if (body.cc) {
+      emailOptions.cc = body.cc;
+    }
+
+    // If PDF attachment requested
+    if (body.attachPdf && body.pdfHtml && body.pdfFilename) {
+      console.log("Attaching document:", body.pdfFilename);
+      const pdfBase64 = btoa(unescape(encodeURIComponent(body.pdfHtml)));
+      
+      emailOptions.attachments = [
+        {
+          filename: body.pdfFilename.replace('.pdf', '.html'),
+          content: pdfBase64,
+          encoding: "base64",
+          contentType: "text/html",
+        }
+      ];
+    }
+
     // Send email
     try {
-      await client.send({
-        from: settings.from_name 
-          ? `${settings.from_name} <${settings.from_email}>`
-          : settings.from_email,
-        to: body.to,
-        subject: body.subject,
-        content: "auto",
-        html: body.html,
-      });
+      await client.send(emailOptions);
       await client.close();
       console.log("Email sent successfully to:", body.to);
     } catch (sendError: unknown) {
