@@ -12,22 +12,23 @@ RUN npm ci
 # Copiar código fuente
 COPY . .
 
-# Capturar build-args de Easypanel
+# --- Build-time config for Vite (Easypanel passes these as --build-arg) ---
 ARG VITE_SUPABASE_URL
 ARG VITE_SUPABASE_ANON_KEY
 
-# Convertir a ENV para que Vite las vea
+# Make them available as env vars inside build container
 ENV VITE_SUPABASE_URL=${VITE_SUPABASE_URL}
 ENV VITE_SUPABASE_ANON_KEY=${VITE_SUPABASE_ANON_KEY}
 
-# Generar .env para Vite (build-time)
+# Create .env so Vite can read them reliably at build-time
 RUN echo "VITE_SUPABASE_URL=${VITE_SUPABASE_URL}" > .env && \
     echo "VITE_SUPABASE_ANON_KEY=${VITE_SUPABASE_ANON_KEY}" >> .env
 
-# Validar que no estén vacías
-RUN test -n "$VITE_SUPABASE_URL" || (echo "❌ Missing VITE_SUPABASE_URL" && cat .env && exit 1)
-RUN test -n "$VITE_SUPABASE_ANON_KEY" || (echo "❌ Missing VITE_SUPABASE_ANON_KEY" && cat .env && exit 1)
-RUN echo "✅ Variables OK: $(head -1 .env)"
+# Safe debug + fail fast (do NOT print the key, only its length)
+RUN echo "DEBUG_VITE_SUPABASE_URL=${VITE_SUPABASE_URL}" && \
+    echo "DEBUG_VITE_SUPABASE_ANON_KEY_LEN=$(echo -n ${VITE_SUPABASE_ANON_KEY} | wc -c)" && \
+    test -n "${VITE_SUPABASE_URL}" || (echo "❌ Missing VITE_SUPABASE_URL" && exit 1) && \
+    test -n "${VITE_SUPABASE_ANON_KEY}" || (echo "❌ Missing VITE_SUPABASE_ANON_KEY" && exit 1)
 
 # Build
 RUN npm run build
