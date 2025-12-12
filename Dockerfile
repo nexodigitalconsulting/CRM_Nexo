@@ -12,13 +12,14 @@ RUN npm ci
 # Copiar código fuente
 COPY . .
 
-# Variables de build (se sobreescriben en Easypanel)
+# Variables para Vite (build-time)
 ARG VITE_SUPABASE_URL
 ARG VITE_SUPABASE_ANON_KEY
+
+# Fallback: si no vienen como build-args, cogerlas del entorno del build
 ENV VITE_SUPABASE_URL=${VITE_SUPABASE_URL}
 ENV VITE_SUPABASE_ANON_KEY=${VITE_SUPABASE_ANON_KEY}
 
-# Validación (fallar el build si falta algo)
 RUN test -n "$VITE_SUPABASE_URL" || (echo "Missing VITE_SUPABASE_URL" && exit 1)
 RUN test -n "$VITE_SUPABASE_ANON_KEY" || (echo "Missing VITE_SUPABASE_ANON_KEY" && exit 1)
 
