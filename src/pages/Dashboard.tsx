@@ -32,13 +32,23 @@ const defaultWidgets: DashboardWidget[] = [
   { id: "stat-clients", type: "stat", title: "Clientes Activos", entity: "clients", config: { field: "count" }, size: "small", height: "auto", order: 1 },
   { id: "stat-quotes", type: "stat", title: "Presupuestos Pendientes", entity: "quotes", config: { field: "count" }, size: "small", height: "auto", order: 2 },
   { id: "stat-invoices", type: "stat", title: "Facturación Mensual", entity: "invoices", config: { field: "sum" }, size: "small", height: "auto", order: 3 },
-  { id: "widget-activity", type: "activity", title: "Actividad Reciente", config: {}, size: "large", height: "medium", order: 4 },
-  { id: "widget-tasks", type: "table", title: "Próximas Tareas", config: { isTaskWidget: true }, size: "medium", height: "medium", order: 5 },
-  { id: "widget-revenue", type: "chart", title: "Ingresos vs Gastos", entity: "invoices", config: { chartType: "area" }, size: "large", height: "medium", order: 6 },
-  { id: "widget-pipeline", type: "chart", title: "Pipeline de Ventas", entity: "quotes", config: { chartType: "bar" }, size: "large", height: "medium", order: 7 },
+  { id: "widget-activity", type: "activity", title: "Actividad Reciente", config: {}, size: "large", height: "auto", order: 4 },
+  { id: "widget-tasks", type: "table", title: "Próximas Tareas", config: { isTaskWidget: true }, size: "medium", height: "auto", order: 5 },
+  { id: "widget-revenue", type: "chart", title: "Ingresos vs Gastos", entity: "invoices", config: { chartType: "area" }, size: "large", height: "auto", order: 6 },
+  { id: "widget-pipeline", type: "chart", title: "Pipeline de Ventas", entity: "quotes", config: { chartType: "bar" }, size: "large", height: "auto", order: 7 },
 ];
 
-const getHeightClass = (height?: WidgetHeight): string => {
+const getMinHeightClass = (type: string, height?: WidgetHeight): string => {
+  // Auto height = dynamic, otherwise use fixed heights
+  if (height === "auto" || !height) {
+    switch (type) {
+      case "stat": return "min-h-[120px]";
+      case "activity": return "min-h-[350px]";
+      case "table": return "min-h-[300px]";
+      case "chart": return "min-h-[350px]";
+      default: return "min-h-[200px]";
+    }
+  }
   switch (height) {
     case "small": return "h-[200px]";
     case "medium": return "h-[300px]";
@@ -157,8 +167,7 @@ export default function Dashboard() {
   const otherWidgets = widgets.filter((w) => w.type !== "stat").sort((a, b) => a.order - b.order);
 
   const renderWidget = (widget: DashboardWidget) => {
-    const heightClass = getHeightClass(widget.height);
-    const wrapperClass = heightClass ? `${heightClass} overflow-hidden` : "";
+    const heightClass = getMinHeightClass(widget.type, widget.height);
     
     const content = (() => {
       switch (widget.type) {
@@ -182,9 +191,11 @@ export default function Dashboard() {
       }
     })();
 
-    return wrapperClass ? (
-      <div className={wrapperClass}>{content}</div>
-    ) : content;
+    return (
+      <div className={cn(heightClass, "w-full")}>
+        {content}
+      </div>
+    );
   };
 
   const getWidgetGridClass = (widget: DashboardWidget) => {

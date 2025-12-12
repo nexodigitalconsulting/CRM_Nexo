@@ -158,6 +158,29 @@ export function useNotificationRules() {
   });
 }
 
+export function useCreateNotificationRule() {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: async (rule: Omit<NotificationRule, "id" | "created_at" | "updated_at">) => {
+      const { data, error } = await supabase
+        .from("notification_rules")
+        .insert(rule)
+        .select()
+        .single();
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["notification-rules"] });
+      toast.success("Regla creada correctamente");
+    },
+    onError: (error) => {
+      toast.error("Error al crear regla: " + error.message);
+    },
+  });
+}
+
 export function useUpdateNotificationRule() {
   const queryClient = useQueryClient();
   
@@ -178,6 +201,27 @@ export function useUpdateNotificationRule() {
     },
     onError: (error) => {
       toast.error("Error al actualizar: " + error.message);
+    },
+  });
+}
+
+export function useDeleteNotificationRule() {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase
+        .from("notification_rules")
+        .delete()
+        .eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["notification-rules"] });
+      toast.success("Regla eliminada");
+    },
+    onError: (error) => {
+      toast.error("Error al eliminar: " + error.message);
     },
   });
 }

@@ -66,7 +66,7 @@ serve(async (req) => {
       });
     }
 
-    // Fetch calendar events for this user - include all non-cancelled events
+    // Fetch ALL calendar events for this user - no date filter, get everything
     const { data: calendarEvents, error: eventsError } = await supabase
       .from('calendar_events')
       .select(`
@@ -84,7 +84,8 @@ serve(async (req) => {
         calendar_categories(name, color)
       `)
       .eq('user_id', userId)
-      .neq('status', 'cancelled');
+      .neq('status', 'cancelled')
+      .order('start_datetime', { ascending: true });
 
     if (eventsError) {
       console.error('Error fetching events:', eventsError);
@@ -94,7 +95,9 @@ serve(async (req) => {
       });
     }
 
-    // Fetch contracts for billing/renewal events (filtered by user)
+    console.log(`Found ${calendarEvents?.length || 0} calendar events for user ${userId}`);
+
+    // Fetch ALL active contracts for billing/renewal events
     const { data: contracts, error: contractsError } = await supabase
       .from('contracts')
       .select(`
@@ -109,10 +112,11 @@ serve(async (req) => {
         created_by,
         clients(name)
       `)
-      .eq('created_by', userId)
       .eq('status', 'active');
 
-    // Fetch invoices for due dates (filtered by user)
+    console.log(`Found ${contracts?.length || 0} active contracts`);
+
+    // Fetch ALL issued invoices for due dates
     const { data: invoices, error: invoicesError } = await supabase
       .from('invoices')
       .select(`
@@ -124,8 +128,9 @@ serve(async (req) => {
         created_by,
         clients(name)
       `)
-      .eq('created_by', userId)
       .eq('status', 'issued');
+
+    console.log(`Found ${invoices?.length || 0} issued invoices`);
 
     // Build iCal content
     const domain = 'crm.lovable.app';

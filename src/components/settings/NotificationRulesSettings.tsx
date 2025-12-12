@@ -21,10 +21,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Bell, FileText, Clock, Edit2, History, CheckCircle, XCircle, Mail, ChevronLeft, ChevronRight, User } from "lucide-react";
+import { Bell, FileText, Clock, Edit2, History, CheckCircle, XCircle, Mail, ChevronLeft, ChevronRight, User, Plus, Trash2 } from "lucide-react";
 import { 
   useNotificationRules, 
   useUpdateNotificationRule,
+  useCreateNotificationRule,
+  useDeleteNotificationRule,
   useEmailTemplates,
   useUpdateEmailTemplate,
   useNotificationHistory,
@@ -34,6 +36,7 @@ import {
 } from "@/hooks/useEmailSettings";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
+import { toast } from "sonner";
 
 const RULE_LABELS: Record<string, { name: string; icon: string; entity: string }> = {
   invoice_due_3days: { name: "Facturas por vencer", icon: "📄", entity: "invoice" },
@@ -47,10 +50,18 @@ const TEMPLATE_LABELS: Record<string, string> = {
   invoice_send: "Envío de Factura",
   invoice_due_reminder: "Recordatorio Vencimiento",
   invoice_overdue: "Factura Vencida",
+  contract_send: "Envío de Contrato",
   contract_pending: "Contrato Pendiente",
   contract_expiring: "Renovación Contrato",
+  quote_send: "Envío de Presupuesto",
   quote_followup: "Seguimiento Presupuesto",
 };
+
+const ENTITY_OPTIONS = [
+  { value: "invoice", label: "Facturas" },
+  { value: "contract", label: "Contratos" },
+  { value: "quote", label: "Presupuestos" },
+];
 
 const STATUS_LABELS: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
   sent: { label: "Enviado", variant: "default" },
@@ -69,10 +80,21 @@ export function NotificationRulesSettings() {
   const { data: historyData, isLoading: loadingHistory } = useNotificationHistory(historyYear, historyPage, pageSize);
   const { data: availableYears } = useNotificationHistoryYears();
   const updateRule = useUpdateNotificationRule();
+  const createRule = useCreateNotificationRule();
+  const deleteRule = useDeleteNotificationRule();
   const updateTemplate = useUpdateEmailTemplate();
   
   const [editingTemplate, setEditingTemplate] = useState<EmailTemplate | null>(null);
+  const [showRuleDialog, setShowRuleDialog] = useState(false);
   const [editingRule, setEditingRule] = useState<NotificationRule | null>(null);
+  const [ruleForm, setRuleForm] = useState({
+    name: "",
+    rule_type: "",
+    description: "",
+    days_threshold: 3,
+    is_active: true,
+    template_id: "",
+  });
   const [templateForm, setTemplateForm] = useState({
     subject: "",
     body_html: "",
@@ -110,6 +132,70 @@ export function NotificationRulesSettings() {
     }
   };
 
+  const handleOpenNewRule = () => {
+    setEditingRule(null);
+    setRuleForm({
+      name: "",
+      rule_type: "",
+      description: "",
+      days_threshold: 3,
+      is_active: true,
+      template_id: "",
+    });
+    setShowRuleDialog(true);
+  };
+
+  const handleEditRule = (rule: NotificationRule) => {
+    setEditingRule(rule);
+    setRuleForm({
+      name: rule.name,
+      rule_type: rule.rule_type,
+      description: rule.description || "",
+      days_threshold: rule.days_threshold,
+      is_active: rule.is_active,
+      template_id: rule.template_id || "",
+    });
+    setShowRuleDialog(true);
+  };
+
+  const handleSaveRule = () => {
+    if (!ruleForm.name || !ruleForm.rule_type) {
+      toast.error("Nombre y tipo de regla son requeridos");
+      return;
+    }
+
+    if (editingRule) {
+      updateRule.mutate({
+        id: editingRule.id,
+        name: ruleForm.name,
+        rule_type: ruleForm.rule_type,
+        description: ruleForm.description || null,
+        days_threshold: ruleForm.days_threshold,
+        is_active: ruleForm.is_active,
+        template_id: ruleForm.template_id || null,
+      }, {
+        onSuccess: () => setShowRuleDialog(false),
+      });
+    } else {
+      createRule.mutate({
+        name: ruleForm.name,
+        rule_type: ruleForm.rule_type,
+        description: ruleForm.description || null,
+        days_threshold: ruleForm.days_threshold,
+        is_active: ruleForm.is_active,
+        template_id: ruleForm.template_id || null,
+      }, {
+        onSuccess: () => setShowRuleDialog(false),
+      });
+    }
+  };
+
+  const handleDeleteRule = (id: string) => {
+    if (confirm("¿Estás seguro de eliminar esta regla?")) {
+      deleteRule.mutate(id);
+    }
+  };
+
   // Get templates for a specific entity type
   const getTemplatesForEntity = (entityType: string) => {
     return templates?.filter(t => {
@@ -118,6 +204,13 @@ export function NotificationRulesSettings() {
       if (entityType === "quote") return t.template_type.includes("quote");
       return false;
     }) || [];
+  };
+
+  const getEntityFromRuleType = (ruleType: string): string => {
+    if (ruleType.includes("invoice")) return "invoice";
+    if (ruleType.includes("contract")) return "contract";
+    if (ruleType.includes("quote")) return "quote";
+    return "invoice";
   };
 
   if (loadingRules || loadingTemplates) {
@@ -133,10 +226,16 @@ export function NotificationRulesSettings() {
     <div className="space-y-6">
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Bell className="h-5 w-5" />
-            Reglas de Notificación Automática
-          </CardTitle>
+          <div className="flex items-center justify-between">
+            <CardTitle className="flex items-center gap-2">
+              <Bell className="h-5 w-5" />
+              Reglas de Notificación Automática
+            </CardTitle>
+            <Button size="sm" onClick={handleOpenNewRule}>
+              <Plus className="h-4 w-4 mr-1" />
+              Nueva Regla
+            </Button>
+          </div>
         </CardHeader>
         <CardContent className="space-y-4">
           <p className="text-sm text-muted-foreground mb-4">
@@ -161,10 +260,27 @@ export function NotificationRulesSettings() {
                       <p className="text-sm text-muted-foreground">{rule.description}</p>
                     </div>
                   </div>
-                  <Switch
-                    checked={rule.is_active}
-                    onCheckedChange={() => handleToggleRule(rule)}
-                  />
+                  <div className="flex items-center gap-2">
+                    <Switch
+                      checked={rule.is_active}
+                      onCheckedChange={() => handleToggleRule(rule)}
+                    />
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => handleEditRule(rule)}
+                    >
+                      <Edit2 className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="text-destructive hover:text-destructive"
+                      onClick={() => handleDeleteRule(rule.id)}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
                 </div>
                 
                 <div className="flex items-center gap-4 pl-11">
@@ -385,6 +501,7 @@ export function NotificationRulesSettings() {
         )}
       </Card>
 
+      {/* Dialog para editar plantilla */}
       <Dialog open={!!editingTemplate} onOpenChange={() => setEditingTemplate(null)}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
@@ -420,6 +537,98 @@ export function NotificationRulesSettings() {
               </Button>
               <Button onClick={handleSaveTemplate} disabled={updateTemplate.isPending}>
                 {updateTemplate.isPending ? "Guardando..." : "Guardar"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog para crear/editar regla */}
+      <Dialog open={showRuleDialog} onOpenChange={setShowRuleDialog}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>
+              {editingRule ? "Editar Regla" : "Nueva Regla de Notificación"}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label>Nombre de la regla</Label>
+              <Input
+                value={ruleForm.name}
+                onChange={(e) => setRuleForm({ ...ruleForm, name: e.target.value })}
+                placeholder="Ej: Recordatorio de factura"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label>Tipo de regla (identificador)</Label>
+              <Input
+                value={ruleForm.rule_type}
+                onChange={(e) => setRuleForm({ ...ruleForm, rule_type: e.target.value.toLowerCase().replace(/\s+/g, "_") })}
+                placeholder="Ej: invoice_reminder_7days"
+              />
+              <p className="text-xs text-muted-foreground">
+                Usar formato: entidad_accion (ej: invoice_due_3days, contract_expiring)
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Descripción</Label>
+              <Textarea
+                rows={2}
+                value={ruleForm.description}
+                onChange={(e) => setRuleForm({ ...ruleForm, description: e.target.value })}
+                placeholder="Descripción de cuándo se activa esta regla"
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Días de umbral</Label>
+                <Input
+                  type="number"
+                  min={1}
+                  value={ruleForm.days_threshold}
+                  onChange={(e) => setRuleForm({ ...ruleForm, days_threshold: parseInt(e.target.value) || 1 })}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label>Plantilla asociada</Label>
+                <Select
+                  value={ruleForm.template_id || "none"}
+                  onValueChange={(v) => setRuleForm({ ...ruleForm, template_id: v === "none" ? "" : v })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Sin plantilla" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">Sin plantilla</SelectItem>
+                    {templates?.map((t) => (
+                      <SelectItem key={t.id} value={t.id}>
+                        {TEMPLATE_LABELS[t.template_type] || t.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <Switch
+                checked={ruleForm.is_active}
+                onCheckedChange={(checked) => setRuleForm({ ...ruleForm, is_active: checked })}
+              />
+              <Label>Regla activa</Label>
+            </div>
+
+            <div className="flex justify-end gap-2 pt-4">
+              <Button variant="outline" onClick={() => setShowRuleDialog(false)}>
+                Cancelar
+              </Button>
+              <Button onClick={handleSaveRule} disabled={createRule.isPending || updateRule.isPending}>
+                {(createRule.isPending || updateRule.isPending) ? "Guardando..." : (editingRule ? "Actualizar" : "Crear Regla")}
               </Button>
             </div>
           </div>

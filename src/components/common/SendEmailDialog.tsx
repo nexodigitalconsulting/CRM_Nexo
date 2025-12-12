@@ -19,9 +19,16 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Mail, Send, Eye, FileText, Paperclip } from "lucide-react";
-import { useSendEmail, useEmailTemplates, useEmailSettings } from "@/hooks/useEmailSettings";
+import { useSendEmail, useEmailTemplates, useEmailSettings, EmailTemplate } from "@/hooks/useEmailSettings";
 import { useCompanySettings } from "@/hooks/useCompanySettings";
 import { toast } from "sonner";
 
@@ -39,10 +46,10 @@ interface SendEmailDialogProps {
   pdfHtml?: string;
 }
 
-const TEMPLATE_TYPE_MAP: Record<string, string> = {
-  invoice: "invoice_send",
-  contract: "contract_pending",
-  quote: "quote_followup",
+const TEMPLATE_TYPES_BY_ENTITY: Record<string, string[]> = {
+  invoice: ["invoice_send", "invoice_due_reminder", "invoice_overdue"],
+  contract: ["contract_send", "contract_pending", "contract_expiring"],
+  quote: ["quote_send", "quote_followup"],
 };
 
 const ENTITY_NAME_MAP: Record<string, string> = {
@@ -55,6 +62,17 @@ const ENTITY_PREFIX_MAP: Record<string, string> = {
   invoice: "FF",
   contract: "CN",
   quote: "PP",
+};
+
+const TEMPLATE_LABELS: Record<string, string> = {
+  invoice_send: "Envío de Factura",
+  invoice_due_reminder: "Recordatorio Vencimiento",
+  invoice_overdue: "Factura Vencida",
+  contract_send: "Envío de Contrato",
+  contract_pending: "Contrato Pendiente",
+  contract_expiring: "Renovación Contrato",
+  quote_send: "Envío de Presupuesto",
+  quote_followup: "Seguimiento Presupuesto",
 };
 
 export function SendEmailDialog({
@@ -77,8 +95,16 @@ export function SendEmailDialog({
 
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [activeTab, setActiveTab] = useState<"compose" | "preview" | "document">("compose");
+  const [selectedTemplateId, setSelectedTemplateId] = useState<string>("");
   
-  const template = templates?.find(t => t.template_type === TEMPLATE_TYPE_MAP[entityType]);
+  // Get available templates for this entity type
+  const availableTemplates = templates?.filter(t => 
+    TEMPLATE_TYPES_BY_ENTITY[entityType]?.includes(t.template_type)
+  ) || [];
+  
+  // Get the selected template or default to the first one
+  const selectedTemplate = templates?.find(t => t.id === selectedTemplateId) || 
+    availableTemplates[0];
   
   const replaceVariables = (text: string) => {
     return text
@@ -90,36 +116,54 @@ export function SendEmailDialog({
       .replace(/{{total}}/g, total ? `${total.toLocaleString("es-ES", { style: "currency", currency: "EUR" })}` : "")
       .replace(/{{due_date}}/g, dueDate || "")
       .replace(/{{end_date}}/g, dueDate || "")
+      .replace(/{{valid_until}}/g, dueDate || "")
+      .replace(/{{start_date}}/g, dueDate || "")
       .replace(/{{days}}/g, "");
   };
 
-  const defaultSubject = template 
-    ? replaceVariables(template.subject) 
-    : `${ENTITY_NAME_MAP[entityType]} ${ENTITY_PREFIX_MAP[entityType]}-${String(entityNumber).padStart(4, "0")}`;
-  
-  const defaultBody = template 
-    ? replaceVariables(template.body_html)
-    : `Estimado/a ${clientName},\n\nAdjunto encontrará el documento ${ENTITY_NAME_MAP[entityType]} ${ENTITY_PREFIX_MAP[entityType]}-${String(entityNumber).padStart(4, "0")}.\n\nSaludos cordiales,\n${companySettings?.name || "La Empresa"}`;
+  const getDefaultContent = (template?: EmailTemplate) => {
+    if (template) {
+      return {
+        subject: replaceVariables(template.subject),
+        html: replaceVariables(template.body_html),
+      };
+    }
+    return {
+      subject: `${ENTITY_NAME_MAP[entityType]} ${ENTITY_PREFIX_MAP[entityType]}-${String(entityNumber).padStart(4, "0")}`,
+      html: `Estimado/a ${clientName},\n\nAdjunto encontrará el documento ${ENTITY_NAME_MAP[entityType]} ${ENTITY_PREFIX_MAP[entityType]}-${String(entityNumber).padStart(4, "0")}.\n\nSaludos cordiales,\n${companySettings?.name || "La Empresa"}`,
+    };
+  };
 
   const [formData, setFormData] = useState({
     to: clientEmail || contactEmail || "",
     cc: contactEmail && clientEmail && contactEmail !== clientEmail ? contactEmail : "",
-    subject: defaultSubject,
-    html: defaultBody,
+    subject: "",
+    html: "",
   });
 
-  // Update form when template loads or dialog opens
+  // Update form when template changes
   useEffect(() => {
-    if (open) {
-      setFormData({
+    if (open && selectedTemplate) {
+      const content = getDefaultContent(selectedTemplate);
+      setFormData(prev => ({
+        ...prev,
         to: clientEmail || contactEmail || "",
         cc: contactEmail && clientEmail && contactEmail !== clientEmail ? contactEmail : "",
-        subject: defaultSubject,
-        html: defaultBody,
-      });
+        subject: content.subject,
+        html: content.html,
+      }));
+    }
+  }, [open, selectedTemplate, clientEmail, contactEmail]);
+
+  // Set default template when dialog opens
+  useEffect(() => {
+    if (open && availableTemplates.length > 0 && !selectedTemplateId) {
+      setSelectedTemplateId(availableTemplates[0].id);
+    }
+    if (open) {
       setActiveTab("compose");
     }
-  }, [open, clientEmail, contactEmail, defaultSubject, defaultBody]);
+  }, [open, availableTemplates]);
 
   const handleSendClick = () => {
     if (!formData.to) {
@@ -207,6 +251,28 @@ export function SendEmailDialog({
 
             <TabsContent value="compose" className="flex-1 overflow-auto space-y-4 mt-4">
               <div className="space-y-4">
+                {/* Template Selector */}
+                {availableTemplates.length > 0 && (
+                  <div className="space-y-2">
+                    <Label>Plantilla de Email</Label>
+                    <Select 
+                      value={selectedTemplateId} 
+                      onValueChange={(id) => setSelectedTemplateId(id)}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Seleccionar plantilla" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {availableTemplates.map((t) => (
+                          <SelectItem key={t.id} value={t.id}>
+                            {TEMPLATE_LABELS[t.template_type] || t.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+                
                 <div className="space-y-2">
                   <Label htmlFor="email-to">Destinatario</Label>
                   <Input
