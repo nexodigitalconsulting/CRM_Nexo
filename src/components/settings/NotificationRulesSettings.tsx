@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -21,13 +21,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Bell, FileText, Clock, Edit2, History, CheckCircle, XCircle } from "lucide-react";
+import { Bell, FileText, Clock, Edit2, History, CheckCircle, XCircle, Mail, ChevronLeft, ChevronRight, User } from "lucide-react";
 import { 
   useNotificationRules, 
   useUpdateNotificationRule,
   useEmailTemplates,
   useUpdateEmailTemplate,
   useNotificationHistory,
+  useNotificationHistoryYears,
   NotificationRule,
   EmailTemplate
 } from "@/hooks/useEmailSettings";
@@ -59,9 +60,14 @@ const STATUS_LABELS: Record<string, { label: string; variant: "default" | "secon
 };
 
 export function NotificationRulesSettings() {
+  const [historyYear, setHistoryYear] = useState<number | undefined>(undefined);
+  const [historyPage, setHistoryPage] = useState(1);
+  const pageSize = 15;
+  
   const { data: rules, isLoading: loadingRules } = useNotificationRules();
   const { data: templates, isLoading: loadingTemplates } = useEmailTemplates();
-  const { data: history, isLoading: loadingHistory } = useNotificationHistory();
+  const { data: historyData, isLoading: loadingHistory } = useNotificationHistory(historyYear, historyPage, pageSize);
+  const { data: availableYears } = useNotificationHistoryYears();
   const updateRule = useUpdateNotificationRule();
   const updateTemplate = useUpdateEmailTemplate();
   
@@ -254,44 +260,85 @@ export function NotificationRulesSettings() {
 
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <History className="h-5 w-5" />
-            Historial de Notificaciones
-          </CardTitle>
+          <div className="flex items-center justify-between">
+            <CardTitle className="flex items-center gap-2">
+              <History className="h-5 w-5" />
+              Historial de Notificaciones
+            </CardTitle>
+            <div className="flex items-center gap-2">
+              <Select 
+                value={historyYear?.toString() || "all"} 
+                onValueChange={(v) => {
+                  setHistoryYear(v === "all" ? undefined : parseInt(v));
+                  setHistoryPage(1);
+                }}
+              >
+                <SelectTrigger className="w-32">
+                  <SelectValue placeholder="Todos los años" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos</SelectItem>
+                  {availableYears?.map((year) => (
+                    <SelectItem key={year} value={year.toString()}>
+                      {year}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
         </CardHeader>
         <CardContent>
           {loadingHistory ? (
-            <Skeleton className="h-[200px] w-full" />
-          ) : history && history.length > 0 ? (
-            <ScrollArea className="h-[300px]">
+            <Skeleton className="h-[300px] w-full" />
+          ) : historyData?.data && historyData.data.length > 0 ? (
+            <ScrollArea className="h-[350px]">
               <div className="space-y-2">
-                {history.map((log) => (
+                {historyData.data.map((log) => (
                   <div
                     key={log.id}
-                    className="flex items-center justify-between p-3 border rounded-lg text-sm"
+                    className="flex items-center justify-between p-3 border rounded-lg text-sm hover:bg-muted/50 transition-colors"
                   >
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-3 flex-1 min-w-0">
                       {log.status === "sent" ? (
-                        <CheckCircle className="h-4 w-4 text-success" />
+                        <CheckCircle className="h-4 w-4 text-green-600 flex-shrink-0" />
                       ) : log.status === "failed" ? (
-                        <XCircle className="h-4 w-4 text-destructive" />
+                        <XCircle className="h-4 w-4 text-destructive flex-shrink-0" />
                       ) : (
-                        <Clock className="h-4 w-4 text-muted-foreground" />
+                        <Clock className="h-4 w-4 text-muted-foreground flex-shrink-0" />
                       )}
-                      <div>
-                        <p className="font-medium capitalize">
-                          {log.entity_type} - {log.rule_type.replace(/_/g, " ")}
+                      <div className="min-w-0 flex-1">
+                        <p className="font-medium capitalize truncate">
+                          {RULE_LABELS[log.rule_type]?.name || log.rule_type.replace(/_/g, " ")}
                         </p>
+                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                          <span className="capitalize">{log.entity_type}</span>
+                          {log.client && (
+                            <>
+                              <span>•</span>
+                              <span className="flex items-center gap-1 truncate">
+                                <User className="h-3 w-3" />
+                                {log.client.name}
+                                {log.client.email && (
+                                  <span className="flex items-center gap-0.5">
+                                    <Mail className="h-3 w-3" />
+                                    {log.client.email}
+                                  </span>
+                                )}
+                              </span>
+                            </>
+                          )}
+                        </div>
                         {log.error_message && (
-                          <p className="text-xs text-destructive">{log.error_message}</p>
+                          <p className="text-xs text-destructive mt-1">{log.error_message}</p>
                         )}
                       </div>
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-shrink-0">
                       <Badge variant={STATUS_LABELS[log.status]?.variant || "secondary"}>
                         {STATUS_LABELS[log.status]?.label || log.status}
                       </Badge>
-                      <span className="text-xs text-muted-foreground">
+                      <span className="text-xs text-muted-foreground whitespace-nowrap">
                         {log.sent_at 
                           ? format(new Date(log.sent_at), "dd MMM yyyy HH:mm", { locale: es })
                           : format(new Date(log.created_at), "dd MMM yyyy HH:mm", { locale: es })
@@ -305,10 +352,37 @@ export function NotificationRulesSettings() {
           ) : (
             <div className="text-center py-8 text-muted-foreground">
               <History className="h-8 w-8 mx-auto mb-2 opacity-50" />
-              <p>No hay notificaciones enviadas</p>
+              <p>No hay notificaciones {historyYear ? `en ${historyYear}` : ""}</p>
             </div>
           )}
         </CardContent>
+        {historyData && historyData.totalPages > 1 && (
+          <CardFooter className="flex items-center justify-between border-t pt-4">
+            <span className="text-sm text-muted-foreground">
+              Página {historyPage} de {historyData.totalPages} ({historyData.totalCount} registros)
+            </span>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setHistoryPage(p => Math.max(1, p - 1))}
+                disabled={historyPage <= 1}
+              >
+                <ChevronLeft className="h-4 w-4" />
+                Anterior
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setHistoryPage(p => Math.min(historyData.totalPages, p + 1))}
+                disabled={historyPage >= historyData.totalPages}
+              >
+                Siguiente
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            </div>
+          </CardFooter>
+        )}
       </Card>
 
       <Dialog open={!!editingTemplate} onOpenChange={() => setEditingTemplate(null)}>
