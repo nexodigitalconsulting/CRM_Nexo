@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -7,48 +7,52 @@ import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { 
-  CheckCircle2, Database, Loader2, UserPlus, AlertCircle, Rocket, 
-  Server, Cloud, Download, Eye, EyeOff 
+  CheckCircle2, Loader2, UserPlus, AlertCircle, Rocket, 
+  Database, Cloud, Eye, EyeOff, Download, ExternalLink
 } from "lucide-react";
-import { Textarea } from "@/components/ui/textarea";
 
-type SetupStep = "postgres" | "supabase" | "schema" | "admin" | "complete";
+type SetupStep = "supabase" | "schema" | "admin" | "complete";
 
 interface StepStatus {
-  postgres: "pending" | "running" | "success" | "error";
   supabase: "pending" | "running" | "success" | "error";
   schema: "pending" | "running" | "success" | "error";
   admin: "pending" | "running" | "success" | "error";
 }
 
-interface PostgresConfig {
-  host: string;
-  port: string;
-  database: string;
-  user: string;
-  password: string;
-}
+// Tablas que deben existir en Supabase
+const REQUIRED_TABLES = [
+  "profiles",
+  "user_roles", 
+  "company_settings",
+  "contacts",
+  "clients",
+  "services",
+  "quotes",
+  "quote_services",
+  "contracts",
+  "contract_services",
+  "invoices",
+  "invoice_services",
+  "expenses",
+  "remittances",
+  "campaigns",
+  "calendar_categories",
+  "calendar_events",
+  "user_availability",
+  "email_settings",
+  "email_templates",
+  "notification_rules",
+  "notification_queue",
+];
 
 export default function Setup() {
   const navigate = useNavigate();
-  const [currentStep, setCurrentStep] = useState<SetupStep>("postgres");
+  const [currentStep, setCurrentStep] = useState<SetupStep>("supabase");
   const [stepStatus, setStepStatus] = useState<StepStatus>({
-    postgres: "pending",
     supabase: "pending",
     schema: "pending",
     admin: "pending",
   });
-
-  // Postgres config
-  const [postgresConfig, setPostgresConfig] = useState<PostgresConfig>({
-    host: "",
-    port: "5432",
-    database: "crm",
-    user: "postgres",
-    password: "",
-  });
-  const [showPostgresPassword, setShowPostgresPassword] = useState(false);
-  const [setupProxyUrl, setSetupProxyUrl] = useState("");
 
   // Admin
   const [adminEmail, setAdminEmail] = useState("");
@@ -60,10 +64,10 @@ export default function Setup() {
   const [isLoading, setIsLoading] = useState(false);
   const [logs, setLogs] = useState<string[]>([]);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [missingTables, setMissingTables] = useState<string[]>([]);
 
   const addLog = (msg: string) => setLogs(prev => [...prev, `[${new Date().toLocaleTimeString()}] ${msg}`]);
 
-  // Exportar logs
   const exportLogs = () => {
     const content = logs.join("\n");
     const blob = new Blob([content], { type: "text/plain" });
@@ -75,64 +79,6 @@ export default function Setup() {
     URL.revokeObjectURL(url);
   };
 
-  // Helper para llamar al backend de setup
-  const callSetupBackend = async (payload: any) => {
-    // Si se ha configurado un proxy HTTP local, lo usamos
-    if (setupProxyUrl.trim()) {
-      const response = await fetch(setupProxyUrl.trim(), {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-
-      if (!response.ok) {
-        const text = await response.text();
-        throw new Error(text || `Error HTTP ${response.status}`);
-      }
-
-      return await response.json();
-    }
-
-    // Fallback: usar Edge Function existente de Supabase
-    const { data, error } = await supabase.functions.invoke("setup-database", {
-      body: payload,
-    });
-
-    if (error) throw new Error(error.message);
-    return data;
-  };
-
-  // Test Postgres connection
-  const testPostgres = async () => {
-    setIsLoading(true);
-    setStepStatus(prev => ({ ...prev, postgres: "running" }));
-    setErrorMessage(null);
-    addLog("Probando conexión a PostgreSQL...");
-
-    try {
-      const data = await callSetupBackend({
-        action: "test-postgres",
-        postgres: postgresConfig,
-      });
-
-      if (data?.success) {
-        data.logs?.forEach((l: string) => addLog(l));
-        setStepStatus(prev => ({ ...prev, postgres: "success" }));
-        toast.success("Conexión a PostgreSQL exitosa");
-        setCurrentStep("supabase");
-      } else {
-        throw new Error(data?.error || "Error de conexión");
-      }
-    } catch (error: any) {
-      addLog(`❌ Error: ${error.message}`);
-      setStepStatus(prev => ({ ...prev, postgres: "error" }));
-      setErrorMessage(error.message);
-      toast.error("Error conectando a PostgreSQL");
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
   // Test Supabase connection
   const testSupabase = async () => {
     setIsLoading(true);
@@ -141,16 +87,17 @@ export default function Setup() {
     addLog("Verificando conexión a Supabase...");
 
     try {
-      addLog("Realizando consulta de prueba a Supabase (tabla company_settings)...");
-
+      // Simple query to check connectivity
       const { error } = await supabase
         .from("company_settings")
         .select("id")
         .limit(1);
 
-      if (error) throw error;
+      if (error && !error.message.includes("does not exist")) {
+        throw error;
+      }
 
-      addLog("✓ Supabase responde correctamente a las consultas.");
+      addLog("✓ Supabase responde correctamente.");
       setStepStatus(prev => ({ ...prev, supabase: "success" }));
       toast.success("Conexión a Supabase exitosa");
       setCurrentStep("schema");
@@ -164,32 +111,77 @@ export default function Setup() {
     }
   };
 
-  // Create schema
-  const createSchema = async () => {
+  // Verify schema exists
+  const verifySchema = async () => {
     setIsLoading(true);
     setStepStatus(prev => ({ ...prev, schema: "running" }));
     setErrorMessage(null);
-    addLog("Creando tablas del CRM...");
+    setMissingTables([]);
+    addLog("Verificando tablas en Supabase...");
 
     try {
-      const data = await callSetupBackend({
-        action: "create-schema",
-        postgres: postgresConfig,
-      });
+      const missing: string[] = [];
 
-      if (data?.success) {
-        data.logs?.forEach((l: string) => addLog(l));
-        setStepStatus(prev => ({ ...prev, schema: "success" }));
-        toast.success("Schema creado correctamente");
-        setCurrentStep("admin");
-      } else {
-        throw new Error(data?.error || "Error creando schema");
+      // Check each table by trying to query it
+      for (const table of REQUIRED_TABLES) {
+        try {
+          const { error } = await supabase
+            .from(table as any)
+            .select("*")
+            .limit(1);
+
+          if (error) {
+            if (error.message.includes("does not exist") || error.code === "42P01") {
+              missing.push(table);
+              addLog(`❌ Tabla faltante: ${table}`);
+            }
+          } else {
+            addLog(`✓ Tabla verificada: ${table}`);
+          }
+        } catch {
+          missing.push(table);
+          addLog(`❌ Tabla faltante: ${table}`);
+        }
       }
+
+      if (missing.length > 0) {
+        setMissingTables(missing);
+        throw new Error(`Faltan ${missing.length} tablas. Ejecuta las migraciones primero.`);
+      }
+
+      // Verify there's at least company_settings or create default
+      const { data: companyData } = await supabase
+        .from("company_settings")
+        .select("id")
+        .limit(1);
+
+      if (!companyData || companyData.length === 0) {
+        addLog("Creando configuración de empresa por defecto...");
+        const { error: insertError } = await supabase
+          .from("company_settings")
+          .insert({
+            name: "Mi Empresa",
+            currency: "EUR",
+            language: "es",
+            timezone: "Europe/Madrid",
+          });
+
+        if (insertError) {
+          addLog(`⚠️ No se pudo crear empresa por defecto: ${insertError.message}`);
+        } else {
+          addLog("✓ Configuración de empresa creada.");
+        }
+      }
+
+      addLog("✓ Todas las tablas verificadas correctamente.");
+      setStepStatus(prev => ({ ...prev, schema: "success" }));
+      toast.success("Schema verificado correctamente");
+      setCurrentStep("admin");
     } catch (error: any) {
       addLog(`❌ Error: ${error.message}`);
       setStepStatus(prev => ({ ...prev, schema: "error" }));
       setErrorMessage(error.message);
-      toast.error("Error creando schema");
+      toast.error("Error verificando schema");
     } finally {
       setIsLoading(false);
     }
@@ -212,7 +204,7 @@ export default function Setup() {
     addLog("Creando usuario administrador...");
 
     try {
-      // Registrar en Supabase Auth
+      // Register in Supabase Auth
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email: adminEmail,
         password: adminPassword,
@@ -224,18 +216,54 @@ export default function Setup() {
 
       addLog(`✓ Usuario creado en Supabase Auth: ${authData.user.id.slice(0, 8)}...`);
 
-      // Crear profile y role en Postgres externo mediante proxy o Edge Function
-      const data = await callSetupBackend({
-        action: "create-admin",
-        userId: authData.user.id,
-        email: adminEmail,
-        fullName: adminName || "Administrador",
-        postgres: postgresConfig,
-      });
+      // The trigger handle_new_user should create profile and role automatically
+      // Wait a moment for trigger to execute
+      await new Promise(resolve => setTimeout(resolve, 1000));
 
-      if (!data?.success) throw new Error(data?.error || "Error configurando admin");
+      // Verify profile was created
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("id")
+        .eq("user_id", authData.user.id)
+        .single();
 
-      data.logs?.forEach((l: string) => addLog(l));
+      if (profile) {
+        addLog("✓ Perfil creado automáticamente por trigger.");
+      } else {
+        addLog("⚠️ Perfil no encontrado, creando manualmente...");
+        await supabase.from("profiles").insert({
+          user_id: authData.user.id,
+          email: adminEmail,
+          full_name: adminName || "Administrador",
+        });
+      }
+
+      // Verify role was created, if not create admin role
+      const { data: roleData } = await supabase
+        .from("user_roles")
+        .select("id, role")
+        .eq("user_id", authData.user.id)
+        .single();
+
+      if (roleData) {
+        if (roleData.role !== "admin") {
+          // Update to admin
+          await supabase
+            .from("user_roles")
+            .update({ role: "admin" })
+            .eq("user_id", authData.user.id);
+          addLog("✓ Rol actualizado a admin.");
+        } else {
+          addLog("✓ Rol admin verificado.");
+        }
+      } else {
+        await supabase.from("user_roles").insert({
+          user_id: authData.user.id,
+          role: "admin",
+        });
+        addLog("✓ Rol admin creado manualmente.");
+      }
+
       setStepStatus(prev => ({ ...prev, admin: "success" }));
       toast.success("¡Administrador creado correctamente!");
       setCurrentStep("complete");
@@ -259,7 +287,6 @@ export default function Setup() {
   };
 
   const steps = [
-    { key: "postgres", label: "PostgreSQL" },
     { key: "supabase", label: "Supabase" },
     { key: "schema", label: "Tablas" },
     { key: "admin", label: "Admin" },
@@ -274,7 +301,7 @@ export default function Setup() {
           </div>
           <CardTitle className="text-2xl">Instalación del CRM</CardTitle>
           <CardDescription>
-            Configura PostgreSQL, Supabase y crea el administrador
+            Verifica Supabase, el schema y crea el administrador
           </CardDescription>
         </CardHeader>
 
@@ -292,144 +319,29 @@ export default function Setup() {
             ))}
           </div>
 
-          {/* Step: PostgreSQL */}
-          {currentStep === "postgres" && (
-            <div className="space-y-4">
-              <div className="flex items-center gap-3 p-4 bg-muted rounded-lg">
-                <Server className="h-6 w-6 text-primary" />
-                <div>
-                  <p className="font-medium">Conexión a PostgreSQL</p>
-                  <p className="text-sm text-muted-foreground">
-                    Introduce los datos de tu servidor PostgreSQL
-                  </p>
-                </div>
-              </div>
-
-              <div className="grid gap-3 sm:grid-cols-2">
-                <div className="space-y-2">
-                  <Label htmlFor="pg-host">Host *</Label>
-                  <Input
-                    id="pg-host"
-                    placeholder="192.168.1.100 o db.ejemplo.com"
-                    value={postgresConfig.host}
-                    onChange={(e) => setPostgresConfig(p => ({ ...p, host: e.target.value }))}
-                    disabled={isLoading}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="pg-port">Puerto</Label>
-                  <Input
-                    id="pg-port"
-                    placeholder="5432"
-                    value={postgresConfig.port}
-                    onChange={(e) => setPostgresConfig(p => ({ ...p, port: e.target.value }))}
-                    disabled={isLoading}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="pg-database">Base de datos *</Label>
-                  <Input
-                    id="pg-database"
-                    placeholder="crm"
-                    value={postgresConfig.database}
-                    onChange={(e) => setPostgresConfig(p => ({ ...p, database: e.target.value }))}
-                    disabled={isLoading}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="pg-user">Usuario *</Label>
-                  <Input
-                    id="pg-user"
-                    placeholder="postgres"
-                    value={postgresConfig.user}
-                    onChange={(e) => setPostgresConfig(p => ({ ...p, user: e.target.value }))}
-                    disabled={isLoading}
-                  />
-                </div>
-                <div className="space-y-2 sm:col-span-2">
-                  <Label htmlFor="pg-password">Contraseña *</Label>
-                  <div className="relative">
-                    <Input
-                      id="pg-password"
-                      type={showPostgresPassword ? "text" : "password"}
-                      placeholder="••••••••"
-                      value={postgresConfig.password}
-                      onChange={(e) => setPostgresConfig(p => ({ ...p, password: e.target.value }))}
-                      disabled={isLoading}
-                    />
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      className="absolute right-2 top-1/2 -translate-y-1/2 h-7 w-7"
-                      onClick={() => setShowPostgresPassword(!showPostgresPassword)}
-                    >
-                      {showPostgresPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                    </Button>
-                  </div>
-                </div>
-                <div className="space-y-2 sm:col-span-2">
-                  <Label htmlFor="setup-proxy-url">URL API proxy de setup (opcional)</Label>
-                  <Input
-                    id="setup-proxy-url"
-                    placeholder="https://tu-dominio.com/api/crm-setup"
-                    value={setupProxyUrl}
-                    onChange={(e) => setSetupProxyUrl(e.target.value)}
-                    disabled={isLoading}
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    Si se indica, las acciones de setup se enviarán a este endpoint HTTP en lugar de usar Edge
-                    Functions de Supabase.
-                  </p>
-                </div>
-              </div>
-
-              {errorMessage && (
-                <div className="bg-destructive/10 border border-destructive/30 rounded-lg p-3">
-                  <p className="text-sm text-destructive">{errorMessage}</p>
-                </div>
-              )}
-
-              <Button
-                onClick={testPostgres}
-                disabled={isLoading || !postgresConfig.host || !postgresConfig.password}
-                className="w-full"
-              >
-                {isLoading ? (
-                  <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Conectando...</>
-                ) : (
-                  "Probar conexión"
-                )}
-              </Button>
-            </div>
-          )}
-
           {/* Step: Supabase */}
           {currentStep === "supabase" && (
             <div className="space-y-4">
               <div className="flex items-center gap-3 p-4 bg-muted rounded-lg">
                 <Cloud className="h-6 w-6 text-primary" />
                 <div>
-                  <p className="font-medium">Verificar Supabase</p>
+                  <p className="font-medium">Verificar Conexión a Supabase</p>
                   <p className="text-sm text-muted-foreground">
-                    Se verificará la conexión con Supabase Auth
+                    Se verificará que la aplicación puede conectarse a Supabase
                   </p>
                 </div>
               </div>
 
               <div className="bg-muted/50 rounded-lg p-3 text-sm">
-                <p className="font-medium mb-2">Variables detectadas:</p>
+                <p className="font-medium mb-2">Proyecto Supabase:</p>
                 <p className="text-muted-foreground text-xs font-mono">
-                  VITE_SUPABASE_URL: {import.meta.env.VITE_SUPABASE_URL?.substring(0, 40)}...
+                  URL: https://honfwrfkiukckyoelsdm.supabase.co
                 </p>
               </div>
 
               {errorMessage && (
                 <div className="bg-destructive/10 border border-destructive/30 rounded-lg p-3">
                   <p className="text-sm text-destructive">{errorMessage}</p>
-                  <p className="text-xs text-muted-foreground mt-2">
-                    Verifica que SUPABASE_SERVICE_ROLE_KEY está configurado en las Edge Functions.
-                  </p>
                 </div>
               )}
 
@@ -449,24 +361,55 @@ export default function Setup() {
               <div className="flex items-center gap-3 p-4 bg-muted rounded-lg">
                 <Database className="h-6 w-6 text-primary" />
                 <div>
-                  <p className="font-medium">Crear Tablas del CRM</p>
+                  <p className="font-medium">Verificar Tablas del CRM</p>
                   <p className="text-sm text-muted-foreground">
-                    Se crearán todas las tablas, índices y funciones necesarias
+                    Se verificará que todas las tablas necesarias existen
                   </p>
                 </div>
               </div>
 
-              {errorMessage && (
+              <div className="bg-muted/50 rounded-lg p-3 text-sm">
+                <p className="font-medium mb-2">Tablas a verificar: {REQUIRED_TABLES.length}</p>
+                <p className="text-xs text-muted-foreground">
+                  Si faltan tablas, ejecuta las migraciones de Supabase primero.
+                </p>
+              </div>
+
+              {missingTables.length > 0 && (
+                <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-3">
+                  <p className="text-sm font-medium text-amber-700 dark:text-amber-400 mb-2">
+                    Tablas faltantes ({missingTables.length}):
+                  </p>
+                  <div className="flex flex-wrap gap-1">
+                    {missingTables.map(t => (
+                      <span key={t} className="text-xs bg-amber-500/20 px-2 py-0.5 rounded">
+                        {t}
+                      </span>
+                    ))}
+                  </div>
+                  <a
+                    href="https://supabase.com/dashboard/project/honfwrfkiukckyoelsdm/sql/new"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 text-xs text-primary mt-2 hover:underline"
+                  >
+                    <ExternalLink className="h-3 w-3" />
+                    Abrir SQL Editor de Supabase
+                  </a>
+                </div>
+              )}
+
+              {errorMessage && !missingTables.length && (
                 <div className="bg-destructive/10 border border-destructive/30 rounded-lg p-3">
                   <p className="text-sm text-destructive">{errorMessage}</p>
                 </div>
               )}
 
-              <Button onClick={createSchema} disabled={isLoading} className="w-full">
+              <Button onClick={verifySchema} disabled={isLoading} className="w-full">
                 {isLoading ? (
-                  <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Creando tablas...</>
+                  <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Verificando tablas...</>
                 ) : (
-                  "Crear Schema"
+                  "Verificar Schema"
                 )}
               </Button>
             </div>
@@ -480,26 +423,26 @@ export default function Setup() {
                 <div>
                   <p className="font-medium">Crear Administrador</p>
                   <p className="text-sm text-muted-foreground">
-                    Este será el primer usuario con acceso total
+                    Crea el primer usuario con permisos de administrador
                   </p>
                 </div>
               </div>
 
               <div className="space-y-3">
                 <div className="space-y-2">
-                  <Label htmlFor="adminName">Nombre</Label>
+                  <Label htmlFor="admin-name">Nombre completo</Label>
                   <Input
-                    id="adminName"
-                    placeholder="Tu nombre completo"
+                    id="admin-name"
+                    placeholder="Juan Pérez"
                     value={adminName}
                     onChange={(e) => setAdminName(e.target.value)}
                     disabled={isLoading}
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="adminEmail">Email *</Label>
+                  <Label htmlFor="admin-email">Email *</Label>
                   <Input
-                    id="adminEmail"
+                    id="admin-email"
                     type="email"
                     placeholder="admin@empresa.com"
                     value={adminEmail}
@@ -508,10 +451,10 @@ export default function Setup() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="adminPassword">Contraseña *</Label>
+                  <Label htmlFor="admin-password">Contraseña *</Label>
                   <div className="relative">
                     <Input
-                      id="adminPassword"
+                      id="admin-password"
                       type={showAdminPassword ? "text" : "password"}
                       placeholder="Mínimo 6 caracteres"
                       value={adminPassword}
@@ -543,9 +486,9 @@ export default function Setup() {
                 className="w-full"
               >
                 {isLoading ? (
-                  <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Creando administrador...</>
+                  <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Creando...</>
                 ) : (
-                  "Crear administrador"
+                  "Crear Administrador"
                 )}
               </Button>
             </div>
@@ -553,38 +496,38 @@ export default function Setup() {
 
           {/* Step: Complete */}
           {currentStep === "complete" && (
-            <div className="text-center space-y-4">
-              <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-green-100 dark:bg-green-900/30">
-                <CheckCircle2 className="h-8 w-8 text-green-600 dark:text-green-400" />
+            <div className="space-y-4 text-center">
+              <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-green-500/10">
+                <CheckCircle2 className="h-8 w-8 text-green-500" />
               </div>
               <div>
-                <p className="font-medium text-lg">¡Instalación completada!</p>
+                <p className="text-lg font-medium">¡Instalación completada!</p>
                 <p className="text-sm text-muted-foreground mt-1">
-                  Tu CRM está listo. Inicia sesión con las credenciales del administrador.
+                  El CRM está listo. Inicia sesión con tu cuenta de administrador.
                 </p>
               </div>
               <Button onClick={() => navigate("/auth")} className="w-full">
-                Ir a iniciar sesión
+                Ir al Login
               </Button>
             </div>
           )}
 
           {/* Logs Panel */}
-          {logs.length > 0 && (
+          {logs.length > 0 && currentStep !== "complete" && (
             <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <Label className="text-xs text-muted-foreground">Registro de actividad</Label>
+                <Label className="text-xs text-muted-foreground">Log de instalación</Label>
                 <Button variant="ghost" size="sm" onClick={exportLogs} className="h-6 text-xs">
                   <Download className="h-3 w-3 mr-1" />
                   Exportar
                 </Button>
               </div>
               <div className="bg-muted/50 rounded-lg p-3 max-h-32 overflow-y-auto">
-                <pre className="text-xs font-mono whitespace-pre-wrap">
-                  {logs.map((log, i) => (
-                    <div key={i} className="py-0.5">{log}</div>
-                  ))}
-                </pre>
+                {logs.map((log, i) => (
+                  <p key={i} className="text-xs font-mono text-muted-foreground">
+                    {log}
+                  </p>
+                ))}
               </div>
             </div>
           )}
