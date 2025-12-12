@@ -20,3 +20,6 @@ verify_jwt = false
 
 [functions.setup-database]
 verify_jwt = false
+
+[functions.postgres-proxy]
+verify_jwt = true
