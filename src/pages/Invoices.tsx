@@ -33,7 +33,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { useDefaultTemplate } from "@/hooks/useTemplates";
 import { useCompanySettings } from "@/hooks/useCompanySettings";
-import { printDocument, formatInvoiceData } from "@/lib/pdfGenerator";
+import { printDocument, formatInvoiceData, generatePrintableHTML } from "@/lib/pdfGenerator";
 import { SendEmailDialog } from "@/components/common/SendEmailDialog";
 import { toast } from "sonner";
 
@@ -94,6 +94,10 @@ export default function Invoices() {
   // Email dialog state
   const [emailDialogOpen, setEmailDialogOpen] = useState(false);
   const [emailInvoice, setEmailInvoice] = useState<InvoiceWithDetails | null>(null);
+  const [emailPdfHtml, setEmailPdfHtml] = useState<string | undefined>(undefined);
+
+  // Fetch full invoice for email
+  const { data: emailFullInvoice } = useInvoice(emailInvoice?.id);
 
   // Apply default view
   if (defaultView && visibleColumns.length === columnConfigs.filter(c => c.defaultVisible).length) {
@@ -279,6 +283,11 @@ export default function Invoices() {
             variant="ghost"
             size="icon"
             onClick={() => {
+              if (!invoiceTemplate) {
+                toast.error("No hay plantilla de factura configurada");
+                return;
+              }
+              // Generate the HTML for email attachment
               setEmailInvoice(invoice);
               setEmailDialogOpen(true);
             }}
@@ -438,12 +447,15 @@ export default function Invoices() {
         </AlertDialogContent>
       </AlertDialog>
 
-      {emailInvoice && (
+      {emailInvoice && invoiceTemplate && (
         <SendEmailDialog
           open={emailDialogOpen}
           onOpenChange={(open) => {
             setEmailDialogOpen(open);
-            if (!open) setEmailInvoice(null);
+            if (!open) {
+              setEmailInvoice(null);
+              setEmailPdfHtml(undefined);
+            }
           }}
           entityType="invoice"
           entityId={emailInvoice.id}
@@ -452,6 +464,14 @@ export default function Invoices() {
           clientEmail={emailInvoice.client?.email || ""}
           total={emailInvoice.total || 0}
           dueDate={emailInvoice.due_date || undefined}
+          pdfHtml={emailFullInvoice ? generatePrintableHTML({
+            template: invoiceTemplate.content,
+            data: formatInvoiceData(
+              emailFullInvoice as unknown as Record<string, unknown>,
+              companySettings as unknown as Record<string, unknown>
+            ),
+            logoUrl: companySettings?.logo_url || undefined,
+          }) : undefined}
         />
       )}
     </div>

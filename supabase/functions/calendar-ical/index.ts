@@ -112,9 +112,9 @@ serve(async (req) => {
         created_by,
         clients(name)
       `)
-      .eq('status', 'active');
+      .in('status', ['active', 'pending_activation']);
 
-    console.log(`Found ${contracts?.length || 0} active contracts`);
+    console.log(`Found ${contracts?.length || 0} contracts`);
 
     // Fetch ALL issued invoices for due dates
     const { data: invoices, error: invoicesError } = await supabase
@@ -131,6 +131,24 @@ serve(async (req) => {
       .eq('status', 'issued');
 
     console.log(`Found ${invoices?.length || 0} issued invoices`);
+
+    // Fetch ALL pending quotes for valid_until dates
+    const { data: quotes, error: quotesError } = await supabase
+      .from('quotes')
+      .select(`
+        id,
+        quote_number,
+        name,
+        valid_until,
+        status,
+        total,
+        created_by,
+        clients(name),
+        contacts(name)
+      `)
+      .in('status', ['draft', 'sent']);
+
+    console.log(`Found ${quotes?.length || 0} pending quotes`);
 
     // Build iCal content
     const domain = 'crm.lovable.app';
@@ -302,6 +320,34 @@ serve(async (req) => {
             `SUMMARY:📄 Vence: FF-${String(invoice.invoice_number).padStart(4, '0')}`,
             `DESCRIPTION:Cliente: ${escapeICalText(clientName)}`,
             'CATEGORIES:Facturas',
+            'PRIORITY:5',
+            'END:VEVENT'
+          );
+        }
+      }
+    }
+
+    // Add quote valid_until dates
+    if (quotes) {
+      for (const quote of quotes) {
+        if (quote.valid_until) {
+          const validUntil = new Date(quote.valid_until);
+          const quoteClient = (quote.clients as unknown as { name: string }) || null;
+          const quoteContact = (quote.contacts as unknown as { name: string }) || null;
+          const clientName = quoteClient?.name || quoteContact?.name || '';
+          const quoteName = quote.name || `PP-${String(quote.quote_number).padStart(4, '0')}`;
+          const totalFormatted = quote.total 
+            ? new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR' }).format(Number(quote.total))
+            : '';
+          icalContent.push(
+            'BEGIN:VEVENT',
+            `UID:${generateUID(`quote-valid-${quote.id}`, domain)}`,
+            `DTSTAMP:${formatICalDate(new Date())}`,
+            `DTSTART;VALUE=DATE:${formatICalDate(validUntil, true)}`,
+            `DTEND;VALUE=DATE:${formatICalDate(new Date(validUntil.getTime() + 86400000), true)}`,
+            `SUMMARY:📝 Vence: ${escapeICalText(quoteName)}`,
+            `DESCRIPTION:Cliente: ${escapeICalText(clientName)}\\nImporte: ${totalFormatted}`,
+            'CATEGORIES:Presupuestos',
             'PRIORITY:5',
             'END:VEVENT'
           );
