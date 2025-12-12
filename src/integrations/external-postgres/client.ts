@@ -39,13 +39,16 @@ class ExternalPostgresClient {
       });
 
       if (error) {
+        const details = (error as any)?.context?.body
+          ? ` | Details: ${(error as any).context.body}`
+          : '';
         console.error('[ExternalPG] Proxy error:', error);
-        return { data: null, error: new Error(error.message) };
+        return { data: null, error: new Error(`${error.message}${details}`) };
       }
 
       if (data?.error) {
         console.error('[ExternalPG] Query error:', data.error);
-        return { data: null, error: new Error(data.error) };
+        return { data: null, error: new Error(String(data.error)) };
       }
 
       return { data: data?.data || [], error: null, count: data?.count };
