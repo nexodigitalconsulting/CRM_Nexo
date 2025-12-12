@@ -31,6 +31,12 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { useDefaultTemplate } from "@/hooks/useTemplates";
 import { useCompanySettings } from "@/hooks/useCompanySettings";
 import { printDocument, formatInvoiceData, generatePrintableHTML } from "@/lib/pdfGenerator";
@@ -93,11 +99,10 @@ export default function Invoices() {
   
   // Email dialog state
   const [emailDialogOpen, setEmailDialogOpen] = useState(false);
-  const [emailInvoice, setEmailInvoice] = useState<InvoiceWithDetails | null>(null);
-  const [emailPdfHtml, setEmailPdfHtml] = useState<string | undefined>(undefined);
+  const [emailInvoiceId, setEmailInvoiceId] = useState<string | null>(null);
 
-  // Fetch full invoice for email
-  const { data: emailFullInvoice } = useInvoice(emailInvoice?.id);
+  // Fetch full invoice for email - this triggers when emailInvoiceId is set
+  const { data: emailFullInvoice, isLoading: isLoadingEmailInvoice } = useInvoice(emailInvoiceId || undefined);
 
   // Apply default view
   if (defaultView && visibleColumns.length === columnConfigs.filter(c => c.defaultVisible).length) {
@@ -287,8 +292,8 @@ export default function Invoices() {
                 toast.error("No hay plantilla de factura configurada");
                 return;
               }
-              // Generate the HTML for email attachment
-              setEmailInvoice(invoice);
+              // Set the invoice ID to fetch full details
+              setEmailInvoiceId(invoice.id);
               setEmailDialogOpen(true);
             }}
             title="Enviar por email"
@@ -447,32 +452,53 @@ export default function Invoices() {
         </AlertDialogContent>
       </AlertDialog>
 
-      {emailInvoice && invoiceTemplate && (
+      {emailDialogOpen && invoiceTemplate && emailFullInvoice && (
         <SendEmailDialog
           open={emailDialogOpen}
           onOpenChange={(open) => {
             setEmailDialogOpen(open);
             if (!open) {
-              setEmailInvoice(null);
-              setEmailPdfHtml(undefined);
+              setEmailInvoiceId(null);
             }
           }}
           entityType="invoice"
-          entityId={emailInvoice.id}
-          entityNumber={emailInvoice.invoice_number}
-          clientName={emailInvoice.client?.name || ""}
-          clientEmail={emailInvoice.client?.email || ""}
-          total={emailInvoice.total || 0}
-          dueDate={emailInvoice.due_date || undefined}
-          pdfHtml={emailFullInvoice ? generatePrintableHTML({
+          entityId={emailFullInvoice.id}
+          entityNumber={emailFullInvoice.invoice_number}
+          clientName={emailFullInvoice.client?.name || ""}
+          clientEmail={emailFullInvoice.client?.email || ""}
+          total={emailFullInvoice.total || 0}
+          dueDate={emailFullInvoice.due_date || undefined}
+          isLoadingDocument={isLoadingEmailInvoice}
+          pdfHtml={generatePrintableHTML({
             template: invoiceTemplate.content,
             data: formatInvoiceData(
               emailFullInvoice as unknown as Record<string, unknown>,
               companySettings as unknown as Record<string, unknown>
             ),
             logoUrl: companySettings?.logo_url || undefined,
-          }) : undefined}
+          })}
         />
+      )}
+      
+      {/* Loading state for email dialog */}
+      {emailDialogOpen && (!emailFullInvoice || isLoadingEmailInvoice) && (
+        <Dialog open={emailDialogOpen} onOpenChange={(open) => {
+          setEmailDialogOpen(open);
+          if (!open) setEmailInvoiceId(null);
+        }}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Mail className="h-5 w-5" />
+                Preparando envío...
+              </DialogTitle>
+            </DialogHeader>
+            <div className="py-8 flex flex-col items-center">
+              <div className="h-8 w-8 border-4 border-primary border-t-transparent rounded-full animate-spin mb-4" />
+              <p className="text-muted-foreground">Cargando datos de la factura...</p>
+            </div>
+          </DialogContent>
+        </Dialog>
       )}
     </div>
   );
