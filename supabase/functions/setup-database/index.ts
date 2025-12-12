@@ -7,54 +7,110 @@ const corsHeaders = {
 };
 
 serve(async (req) => {
+  console.log("setup-database: Request received", { method: req.method });
+
   // Handle CORS preflight
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    const { action, userId, email, fullName } = await req.json();
+    const body = await req.json();
+    const { action, userId, email, fullName } = body;
+    console.log("setup-database: Action:", action, "userId:", userId);
+
+    // Verificar variables de entorno
+    const supabaseUrl = Deno.env.get("SUPABASE_URL");
+    const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+
+    if (!supabaseUrl || !serviceRoleKey) {
+      console.error("setup-database: Missing environment variables");
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: "Configuración del servidor incompleta (faltan variables de entorno)",
+          logs: ["❌ Error: SUPABASE_URL o SUPABASE_SERVICE_ROLE_KEY no configuradas"],
+        }),
+        {
+          status: 500,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        }
+      );
+    }
 
     // Crear cliente con service_role para operaciones admin
-    const supabaseAdmin = createClient(
-      Deno.env.get("SUPABASE_URL") ?? "",
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
-      { auth: { persistSession: false } }
-    );
+    const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey, {
+      auth: { persistSession: false },
+    });
 
     const logs: string[] = [];
 
     if (action === "init") {
       logs.push("Verificando conexión a base de datos...");
+      console.log("setup-database: Checking database connection");
 
-      // Verificar si ya existen las tablas
-      const { data: existingTables } = await supabaseAdmin
-        .from("profiles")
-        .select("id")
-        .limit(1);
+      try {
+        // Verificar si ya existen las tablas
+        const { data: existingTables, error: tablesError } = await supabaseAdmin
+          .from("profiles")
+          .select("id")
+          .limit(1);
 
-      if (existingTables !== null) {
-        logs.push("Las tablas ya existen en la base de datos");
+        console.log("setup-database: Profiles check result:", { existingTables, error: tablesError });
+
+        if (tablesError) {
+          logs.push(`⚠️ No se pudo acceder a la tabla profiles: ${tablesError.message}`);
+          logs.push("Las tablas pueden no existir aún.");
+          logs.push("");
+          logs.push("Para crear las tablas:");
+          logs.push("1. Ve a Supabase Studio → SQL Editor");
+          logs.push("2. Ejecuta el archivo: easypanel/init-scripts/full-schema.sql");
+          
+          return new Response(
+            JSON.stringify({
+              success: false,
+              logs,
+              error: "Tablas no encontradas. Ejecuta el schema SQL en Supabase Studio.",
+              needsManualSetup: true,
+            }),
+            { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+
+        // Las tablas existen
+        logs.push("✅ Las tablas ya existen en la base de datos");
+        
+        // Verificar company_settings
+        const { data: company } = await supabaseAdmin
+          .from("company_settings")
+          .select("id")
+          .limit(1);
+        
+        if (company && company.length > 0) {
+          logs.push("✅ Configuración de empresa existe");
+        } else {
+          logs.push("⚠️ No hay configuración de empresa (se creará con el admin)");
+        }
+
         return new Response(
           JSON.stringify({ success: true, logs, message: "Schema ya existe" }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
+      } catch (dbError: any) {
+        console.error("setup-database: Database error:", dbError);
+        logs.push(`❌ Error de base de datos: ${dbError.message}`);
+        return new Response(
+          JSON.stringify({
+            success: false,
+            logs,
+            error: dbError.message,
+          }),
+          {
+            status: 500,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          }
+        );
       }
-
-      // Si no existen, retornar instrucciones
-      logs.push("⚠️ Las tablas no existen.");
-      logs.push("Por favor ejecuta el archivo SQL manualmente:");
-      logs.push("1. Ve a Supabase Studio → SQL Editor");
-      logs.push("2. Ejecuta: easypanel/init-scripts/full-schema.sql");
-
-      return new Response(
-        JSON.stringify({
-          success: false,
-          logs,
-          error: "Ejecuta el schema SQL manualmente en Supabase Studio",
-        }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
     }
 
     if (action === "create-admin") {
@@ -63,13 +119,16 @@ serve(async (req) => {
       }
 
       logs.push(`Configurando admin para usuario ${userId}...`);
+      console.log("setup-database: Creating admin for", userId);
 
       // Verificar si ya existe el perfil
-      const { data: existingProfile } = await supabaseAdmin
+      const { data: existingProfile, error: profileCheckError } = await supabaseAdmin
         .from("profiles")
         .select("id")
         .eq("user_id", userId)
-        .single();
+        .maybeSingle();
+
+      console.log("setup-database: Profile check:", { existingProfile, profileCheckError });
 
       if (!existingProfile) {
         // Crear perfil
@@ -82,12 +141,13 @@ serve(async (req) => {
           });
 
         if (profileError) {
-          logs.push(`Error creando perfil: ${profileError.message}`);
+          console.error("setup-database: Profile creation error:", profileError);
+          logs.push(`❌ Error creando perfil: ${profileError.message}`);
           throw profileError;
         }
-        logs.push("Perfil creado");
+        logs.push("✅ Perfil creado");
       } else {
-        logs.push("Perfil ya existe");
+        logs.push("ℹ️ Perfil ya existe");
       }
 
       // Verificar si ya tiene rol admin
@@ -96,7 +156,7 @@ serve(async (req) => {
         .select("id")
         .eq("user_id", userId)
         .eq("role", "admin")
-        .single();
+        .maybeSingle();
 
       if (!existingRole) {
         // Eliminar roles anteriores del usuario
@@ -114,12 +174,13 @@ serve(async (req) => {
           });
 
         if (roleError) {
-          logs.push(`Error asignando rol: ${roleError.message}`);
+          console.error("setup-database: Role assignment error:", roleError);
+          logs.push(`❌ Error asignando rol: ${roleError.message}`);
           throw roleError;
         }
-        logs.push("Rol admin asignado");
+        logs.push("✅ Rol admin asignado");
       } else {
-        logs.push("Usuario ya es admin");
+        logs.push("ℹ️ Usuario ya es admin");
       }
 
       // Crear configuración de empresa si no existe
@@ -139,27 +200,30 @@ serve(async (req) => {
           });
 
         if (companyError) {
-          logs.push(`Aviso: ${companyError.message}`);
+          logs.push(`⚠️ Aviso (empresa): ${companyError.message}`);
         } else {
-          logs.push("Configuración de empresa creada");
+          logs.push("✅ Configuración de empresa creada");
         }
+      } else {
+        logs.push("ℹ️ Configuración de empresa ya existe");
       }
 
+      console.log("setup-database: Admin setup complete");
       return new Response(
         JSON.stringify({ success: true, logs }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    throw new Error("Acción no válida");
+    throw new Error(`Acción no válida: ${action}`);
   } catch (error: unknown) {
     const errorMessage = error instanceof Error ? error.message : "Error desconocido";
-    console.error("Error en setup-database:", error);
+    console.error("setup-database: Error:", error);
     return new Response(
       JSON.stringify({
         success: false,
         error: errorMessage,
-        logs: [`Error: ${errorMessage}`],
+        logs: [`❌ Error: ${errorMessage}`],
       }),
       {
         status: 400,

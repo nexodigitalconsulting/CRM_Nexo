@@ -9,6 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
 import { Loader2, Mail, Lock, User } from 'lucide-react';
 import { z } from 'zod';
+import { supabase } from '@/integrations/supabase/client';
 
 const emailSchema = z.string().email('Email inválido');
 const passwordSchema = z.string().min(6, 'La contraseña debe tener al menos 6 caracteres');
@@ -21,13 +22,47 @@ export default function Auth() {
   const [password, setPassword] = useState('');
   const [fullName, setFullName] = useState('');
   const [loading, setLoading] = useState(false);
+  const [checkingSetup, setCheckingSetup] = useState(true);
   const [activeTab, setActiveTab] = useState('login');
 
+  // Verificar si hay admin configurado al cargar
   useEffect(() => {
-    if (user) {
+    const checkAdminExists = async () => {
+      try {
+        const { data: admins, error } = await supabase
+          .from('user_roles')
+          .select('id')
+          .eq('role', 'admin')
+          .limit(1);
+
+        if (error) {
+          console.log('Error verificando admin:', error);
+          // Si hay error, probablemente las tablas no existen
+          navigate('/setup');
+          return;
+        }
+
+        if (!admins || admins.length === 0) {
+          toast.info('No hay administrador. Redirigiendo a configuración...');
+          navigate('/setup');
+          return;
+        }
+
+        setCheckingSetup(false);
+      } catch (error) {
+        console.error('Error en checkAdminExists:', error);
+        navigate('/setup');
+      }
+    };
+
+    checkAdminExists();
+  }, [navigate]);
+
+  useEffect(() => {
+    if (user && !authLoading && !checkingSetup) {
       navigate('/');
     }
-  }, [user, navigate]);
+  }, [user, authLoading, checkingSetup, navigate]);
 
   const validateForm = (includePassword = true) => {
     try {
@@ -99,10 +134,15 @@ export default function Auth() {
     }
   };
 
-  if (authLoading) {
+  if (authLoading || checkingSetup) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <div className="flex flex-col items-center gap-3">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          <p className="text-sm text-muted-foreground">
+            {checkingSetup ? 'Verificando configuración...' : 'Cargando...'}
+          </p>
+        </div>
       </div>
     );
   }
