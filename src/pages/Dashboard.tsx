@@ -32,30 +32,11 @@ const defaultWidgets: DashboardWidget[] = [
   { id: "stat-clients", type: "stat", title: "Clientes Activos", entity: "clients", config: { field: "count" }, size: "small", height: "auto", order: 1 },
   { id: "stat-quotes", type: "stat", title: "Presupuestos Pendientes", entity: "quotes", config: { field: "count" }, size: "small", height: "auto", order: 2 },
   { id: "stat-invoices", type: "stat", title: "Facturación Mensual", entity: "invoices", config: { field: "sum" }, size: "small", height: "auto", order: 3 },
-  { id: "widget-activity", type: "activity", title: "Actividad Reciente", config: {}, size: "large", height: "auto", order: 4 },
-  { id: "widget-tasks", type: "table", title: "Próximas Tareas", config: { isTaskWidget: true }, size: "medium", height: "auto", order: 5 },
-  { id: "widget-revenue", type: "chart", title: "Ingresos vs Gastos", entity: "invoices", config: { chartType: "area" }, size: "large", height: "auto", order: 6 },
-  { id: "widget-pipeline", type: "chart", title: "Pipeline de Ventas", entity: "quotes", config: { chartType: "bar" }, size: "large", height: "auto", order: 7 },
+  { id: "widget-tasks", type: "table", title: "Próximas Tareas", config: { isTaskWidget: true }, size: "medium", height: "auto", order: 4 },
+  { id: "widget-activity", type: "activity", title: "Actividad Reciente", config: {}, size: "large", height: "auto", order: 5 },
+  { id: "widget-pipeline", type: "chart", title: "Pipeline de Ventas", entity: "quotes", config: { chartType: "bar" }, size: "large", height: "auto", order: 6 },
+  { id: "widget-revenue", type: "chart", title: "Ingresos vs Gastos", entity: "invoices", config: { chartType: "area" }, size: "large", height: "auto", order: 7 },
 ];
-
-const getMinHeightClass = (type: string, height?: WidgetHeight): string => {
-  // Auto height = dynamic, otherwise use fixed heights
-  if (height === "auto" || !height) {
-    switch (type) {
-      case "stat": return "min-h-[120px]";
-      case "activity": return "min-h-[350px]";
-      case "table": return "min-h-[300px]";
-      case "chart": return "min-h-[350px]";
-      default: return "min-h-[200px]";
-    }
-  }
-  switch (height) {
-    case "small": return "h-[200px]";
-    case "medium": return "h-[300px]";
-    case "large": return "h-[450px]";
-    default: return "";
-  }
-};
 
 export default function Dashboard() {
   const { data: stats, isLoading } = useDashboardStats();
@@ -164,38 +145,30 @@ export default function Dashboard() {
   };
 
   const statWidgets = widgets.filter((w) => w.type === "stat").sort((a, b) => a.order - b.order);
-  const otherWidgets = widgets.filter((w) => w.type !== "stat").sort((a, b) => a.order - b.order);
+  const tableWidgets = widgets.filter((w) => w.type === "table").sort((a, b) => a.order - b.order);
+  const activityWidgets = widgets.filter((w) => w.type === "activity").sort((a, b) => a.order - b.order);
+  const chartWidgets = widgets.filter((w) => w.type === "chart").sort((a, b) => a.order - b.order);
 
   const renderWidget = (widget: DashboardWidget) => {
-    const heightClass = getMinHeightClass(widget.type, widget.height);
-    
-    const content = (() => {
-      switch (widget.type) {
-        case "activity":
-          return <RecentActivityWidget key={widget.id} />;
-        case "table":
-          if (widget.config?.isTaskWidget || widget.title.includes("Tarea")) {
-            return <UpcomingTasksWidget key={widget.id} />;
-          }
-          return <DynamicTableWidget key={widget.id} title={widget.title} entity={widget.entity} />;
-        case "chart":
-          if (widget.config.chartType === "area" || widget.title.includes("Ingresos")) {
-            return <RevenueExpensesChart key={widget.id} />;
-          }
-          if (widget.config.chartType === "bar" || widget.title.includes("Pipeline")) {
-            return <SalesPipelineChart key={widget.id} />;
-          }
-          return null;
-        default:
-          return null;
-      }
-    })();
-
-    return (
-      <div className={cn(heightClass, "w-full")}>
-        {content}
-      </div>
-    );
+    switch (widget.type) {
+      case "activity":
+        return <RecentActivityWidget key={widget.id} />;
+      case "table":
+        if (widget.config?.isTaskWidget || widget.title.includes("Tarea")) {
+          return <UpcomingTasksWidget key={widget.id} />;
+        }
+        return <DynamicTableWidget key={widget.id} title={widget.title} entity={widget.entity} />;
+      case "chart":
+        if (widget.config.chartType === "area" || widget.title.includes("Ingresos")) {
+          return <RevenueExpensesChart key={widget.id} />;
+        }
+        if (widget.config.chartType === "bar" || widget.title.includes("Pipeline")) {
+          return <SalesPipelineChart key={widget.id} />;
+        }
+        return null;
+      default:
+        return null;
+    }
   };
 
   const getWidgetGridClass = (widget: DashboardWidget) => {
@@ -327,9 +300,10 @@ export default function Dashboard() {
           </div>
         )}
 
-        {/* Activity and Tasks Row - Draggable */}
+        {/* Tasks and Activity Row */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {otherWidgets.filter(w => w.type === "activity" || w.type === "table").map((widget) => (
+          {/* Tasks Widget (1 column) */}
+          {tableWidgets.map((widget) => (
             <div
               key={widget.id}
               draggable={isEditing}
@@ -339,7 +313,51 @@ export default function Dashboard() {
               onDoubleClick={() => handleEditWidget(widget)}
               className={cn(
                 "relative transition-all",
-                getWidgetGridClass(widget),
+                isEditing && "cursor-grab active:cursor-grabbing",
+                draggedWidget === widget.id && "opacity-50",
+                dragOverWidget === widget.id && "ring-2 ring-primary ring-offset-2 rounded-lg",
+                "hover:ring-1 hover:ring-primary/30"
+              )}
+              title="Doble clic para editar"
+            >
+              {isEditing && (
+                <>
+                  <div className="absolute -top-2 left-1/2 -translate-x-1/2 z-10">
+                    <GripVertical className="h-4 w-4 text-muted-foreground" />
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    className="absolute -top-2 -left-2 h-6 w-6 rounded-full shadow-md z-10 bg-background"
+                    onClick={() => handleEditWidget(widget)}
+                  >
+                    <Pencil className="h-3 w-3" />
+                  </Button>
+                  <Button
+                    variant="destructive"
+                    size="icon"
+                    className="absolute -top-2 -right-2 h-6 w-6 rounded-full shadow-md z-10"
+                    onClick={() => handleRemoveWidget(widget.id)}
+                  >
+                    <X className="h-3 w-3" />
+                  </Button>
+                </>
+              )}
+              {renderWidget(widget)}
+            </div>
+          ))}
+          
+          {/* Activity Widget (2 columns) */}
+          {activityWidgets.map((widget) => (
+            <div
+              key={widget.id}
+              draggable={isEditing}
+              onDragStart={(e) => handleDragStart(e, widget.id)}
+              onDragOver={(e) => handleDragOver(e, widget.id)}
+              onDragEnd={handleDragEnd}
+              onDoubleClick={() => handleEditWidget(widget)}
+              className={cn(
+                "relative transition-all lg:col-span-2",
                 isEditing && "cursor-grab active:cursor-grabbing",
                 draggedWidget === widget.id && "opacity-50",
                 dragOverWidget === widget.id && "ring-2 ring-primary ring-offset-2 rounded-lg",
@@ -375,9 +393,9 @@ export default function Dashboard() {
           ))}
         </div>
 
-        {/* Charts Row - Draggable */}
+        {/* Charts Row */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {otherWidgets.filter(w => w.type === "chart").map((widget) => (
+          {chartWidgets.map((widget) => (
             <div
               key={widget.id}
               draggable={isEditing}
