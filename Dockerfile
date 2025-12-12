@@ -12,9 +12,13 @@ RUN npm ci
 # Copiar código fuente
 COPY . .
 
-# Variables para Vite (desde EASYPANEL ENV)
-ENV VITE_SUPABASE_URL=$VITE_SUPABASE_URL
-ENV VITE_SUPABASE_ANON_KEY=$VITE_SUPABASE_ANON_KEY
+# Capturar build-args de Easypanel
+ARG VITE_SUPABASE_URL
+ARG VITE_SUPABASE_ANON_KEY
+
+# Convertir a ENV para que Vite las vea
+ENV VITE_SUPABASE_URL=${VITE_SUPABASE_URL}
+ENV VITE_SUPABASE_ANON_KEY=${VITE_SUPABASE_ANON_KEY}
 
 # Generar .env para Vite (build-time)
 RUN echo "VITE_SUPABASE_URL=${VITE_SUPABASE_URL}" > .env && \
