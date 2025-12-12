@@ -21,6 +21,7 @@ import Calendar from "./pages/Calendar";
 import Settings from "./pages/Settings";
 import ProductAnalysis from "./pages/ProductAnalysis";
 import Auth from "./pages/Auth";
+import Setup from "./pages/Setup";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -34,6 +35,7 @@ const App = () => (
         <AuthProvider>
           <Routes>
             <Route path="/auth" element={<Auth />} />
+            <Route path="/setup" element={<Setup />} />
             <Route
               path="/*"
               element={
