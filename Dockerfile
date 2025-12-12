@@ -12,16 +12,18 @@ RUN npm ci
 # Copiar código fuente
 COPY . .
 
-# Variables para Vite (build-time)
-ARG VITE_SUPABASE_URL
-ARG VITE_SUPABASE_ANON_KEY
+# Variables para Vite (desde EASYPANEL ENV)
+ENV VITE_SUPABASE_URL=$VITE_SUPABASE_URL
+ENV VITE_SUPABASE_ANON_KEY=$VITE_SUPABASE_ANON_KEY
 
-# Fallback: si no vienen como build-args, cogerlas del entorno del build
-ENV VITE_SUPABASE_URL=${VITE_SUPABASE_URL}
-ENV VITE_SUPABASE_ANON_KEY=${VITE_SUPABASE_ANON_KEY}
+# Generar .env para Vite (build-time)
+RUN echo "VITE_SUPABASE_URL=${VITE_SUPABASE_URL}" > .env && \
+    echo "VITE_SUPABASE_ANON_KEY=${VITE_SUPABASE_ANON_KEY}" >> .env
 
-RUN test -n "$VITE_SUPABASE_URL" || (echo "Missing VITE_SUPABASE_URL" && exit 1)
-RUN test -n "$VITE_SUPABASE_ANON_KEY" || (echo "Missing VITE_SUPABASE_ANON_KEY" && exit 1)
+# Validar que no estén vacías
+RUN test -n "$VITE_SUPABASE_URL" || (echo "❌ Missing VITE_SUPABASE_URL" && cat .env && exit 1)
+RUN test -n "$VITE_SUPABASE_ANON_KEY" || (echo "❌ Missing VITE_SUPABASE_ANON_KEY" && cat .env && exit 1)
+RUN echo "✅ Variables OK: $(head -1 .env)"
 
 # Build
 RUN npm run build
