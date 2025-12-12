@@ -48,6 +48,7 @@ export default function Setup() {
     password: "",
   });
   const [showPostgresPassword, setShowPostgresPassword] = useState(false);
+  const [setupProxyUrl, setSetupProxyUrl] = useState("");
 
   // Admin
   const [adminEmail, setAdminEmail] = useState("");
@@ -74,6 +75,33 @@ export default function Setup() {
     URL.revokeObjectURL(url);
   };
 
+  // Helper para llamar al backend de setup
+  const callSetupBackend = async (payload: any) => {
+    // Si se ha configurado un proxy HTTP local, lo usamos
+    if (setupProxyUrl.trim()) {
+      const response = await fetch(setupProxyUrl.trim(), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      if (!response.ok) {
+        const text = await response.text();
+        throw new Error(text || `Error HTTP ${response.status}`);
+      }
+
+      return await response.json();
+    }
+
+    // Fallback: usar Edge Function existente de Supabase
+    const { data, error } = await supabase.functions.invoke("setup-database", {
+      body: payload,
+    });
+
+    if (error) throw new Error(error.message);
+    return data;
+  };
+
   // Test Postgres connection
   const testPostgres = async () => {
     setIsLoading(true);
@@ -82,12 +110,11 @@ export default function Setup() {
     addLog("Probando conexión a PostgreSQL...");
 
     try {
-      const { data, error } = await supabase.functions.invoke("setup-database", {
-        body: { action: "test-postgres", postgres: postgresConfig },
+      const data = await callSetupBackend({
+        action: "test-postgres",
+        postgres: postgresConfig,
       });
 
-      if (error) throw new Error(error.message);
-      
       if (data?.success) {
         data.logs?.forEach((l: string) => addLog(l));
         setStepStatus(prev => ({ ...prev, postgres: "success" }));
@@ -114,20 +141,19 @@ export default function Setup() {
     addLog("Verificando conexión a Supabase...");
 
     try {
-      const { data, error } = await supabase.functions.invoke("setup-database", {
-        body: { action: "test-supabase" },
-      });
+      addLog("Realizando consulta de prueba a Supabase (tabla company_settings)...");
 
-      if (error) throw new Error(error.message);
-      
-      if (data?.success) {
-        data.logs?.forEach((l: string) => addLog(l));
-        setStepStatus(prev => ({ ...prev, supabase: "success" }));
-        toast.success("Conexión a Supabase exitosa");
-        setCurrentStep("schema");
-      } else {
-        throw new Error(data?.error || "Error de conexión");
-      }
+      const { error } = await supabase
+        .from("company_settings")
+        .select("id")
+        .limit(1);
+
+      if (error) throw error;
+
+      addLog("✓ Supabase responde correctamente a las consultas.");
+      setStepStatus(prev => ({ ...prev, supabase: "success" }));
+      toast.success("Conexión a Supabase exitosa");
+      setCurrentStep("schema");
     } catch (error: any) {
       addLog(`❌ Error: ${error.message}`);
       setStepStatus(prev => ({ ...prev, supabase: "error" }));
@@ -146,12 +172,11 @@ export default function Setup() {
     addLog("Creando tablas del CRM...");
 
     try {
-      const { data, error } = await supabase.functions.invoke("setup-database", {
-        body: { action: "create-schema", postgres: postgresConfig },
+      const data = await callSetupBackend({
+        action: "create-schema",
+        postgres: postgresConfig,
       });
 
-      if (error) throw new Error(error.message);
-      
       if (data?.success) {
         data.logs?.forEach((l: string) => addLog(l));
         setStepStatus(prev => ({ ...prev, schema: "success" }));
@@ -199,18 +224,15 @@ export default function Setup() {
 
       addLog(`✓ Usuario creado en Supabase Auth: ${authData.user.id.slice(0, 8)}...`);
 
-      // Crear profile y role en Postgres externo
-      const { data, error } = await supabase.functions.invoke("setup-database", {
-        body: {
-          action: "create-admin",
-          userId: authData.user.id,
-          email: adminEmail,
-          fullName: adminName || "Administrador",
-          postgres: postgresConfig,
-        },
+      // Crear profile y role en Postgres externo mediante proxy o Edge Function
+      const data = await callSetupBackend({
+        action: "create-admin",
+        userId: authData.user.id,
+        email: adminEmail,
+        fullName: adminName || "Administrador",
+        postgres: postgresConfig,
       });
 
-      if (error) throw new Error(error.message);
       if (!data?.success) throw new Error(data?.error || "Error configurando admin");
 
       data.logs?.forEach((l: string) => addLog(l));
@@ -345,6 +367,20 @@ export default function Setup() {
                       {showPostgresPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                     </Button>
                   </div>
+                </div>
+                <div className="space-y-2 sm:col-span-2">
+                  <Label htmlFor="setup-proxy-url">URL API proxy de setup (opcional)</Label>
+                  <Input
+                    id="setup-proxy-url"
+                    placeholder="https://tu-dominio.com/api/crm-setup"
+                    value={setupProxyUrl}
+                    onChange={(e) => setSetupProxyUrl(e.target.value)}
+                    disabled={isLoading}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Si se indica, las acciones de setup se enviarán a este endpoint HTTP en lugar de usar Edge
+                    Functions de Supabase.
+                  </p>
                 </div>
               </div>
 
