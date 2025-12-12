@@ -42,6 +42,12 @@
    - **Output Directory**: `dist`
    - **Install Command**: `npm install`
 
+> ⚠️ **IMPORTANTE - Puerto de Producción**:
+> El Dockerfile usa **nginx en puerto 80** (no vite preview).
+> - En Easypanel → CRM → **Domains** → **Internal Port**: `80`
+> - El dominio debe enrutar a `http://<service>:80/`
+> - NO usar puertos 3000 o 4173 en producción
+
 ### Paso 2: Configurar Variables de Entorno (1 min)
 
 En el servicio CRM recién creado, ve a **"Environment"** y añade:
