@@ -99,6 +99,12 @@ export function SendEmailDialog({
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [activeTab, setActiveTab] = useState<TabType>("compose");
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>("");
+  const [formData, setFormData] = useState({
+    to: "",
+    cc: "",
+    subject: "",
+    html: "",
+  });
   
   // Get available templates for this entity type
   const availableTemplates = templates?.filter(t => 
@@ -137,36 +143,41 @@ export function SendEmailDialog({
     };
   };
 
-  const [formData, setFormData] = useState({
-    to: clientEmail || contactEmail || "",
-    cc: contactEmail && clientEmail && contactEmail !== clientEmail ? contactEmail : "",
-    subject: "",
-    html: "",
-  });
-
-  // Update form when template changes
+  // Initialize form data when dialog opens
   useEffect(() => {
-    if (open && selectedTemplate) {
-      const content = getDefaultContent(selectedTemplate);
-      setFormData(prev => ({
-        ...prev,
+    if (open) {
+      setActiveTab("compose");
+      
+      // Set default template if available and not already selected
+      const defaultTemplate = availableTemplates[0];
+      if (defaultTemplate && !selectedTemplateId) {
+        setSelectedTemplateId(defaultTemplate.id);
+      }
+      
+      // Set initial form data
+      const template = templates?.find(t => t.id === selectedTemplateId) || defaultTemplate;
+      const content = getDefaultContent(template);
+      
+      setFormData({
         to: clientEmail || contactEmail || "",
         cc: contactEmail && clientEmail && contactEmail !== clientEmail ? contactEmail : "",
         subject: content.subject,
         html: content.html,
+      });
+    }
+  }, [open]); // Only run when dialog opens
+
+  // Update form content when template selection changes
+  useEffect(() => {
+    if (open && selectedTemplateId && selectedTemplate) {
+      const content = getDefaultContent(selectedTemplate);
+      setFormData(prev => ({
+        ...prev,
+        subject: content.subject,
+        html: content.html,
       }));
     }
-  }, [open, selectedTemplate, clientEmail, contactEmail]);
-
-  // Set default template when dialog opens
-  useEffect(() => {
-    if (open && availableTemplates.length > 0 && !selectedTemplateId) {
-      setSelectedTemplateId(availableTemplates[0].id);
-    }
-    if (open) {
-      setActiveTab("compose");
-    }
-  }, [open, availableTemplates]);
+  }, [selectedTemplateId]); // Only run when template selection changes
 
   const handleSendClick = () => {
     if (!formData.to) {
@@ -448,13 +459,15 @@ export function SendEmailDialog({
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Confirmar envío</AlertDialogTitle>
-            <AlertDialogDescription className="space-y-2">
-              <p>¿Estás seguro de que deseas enviar este email?</p>
-              <div className="bg-muted rounded-lg p-3 mt-2 text-sm">
-                <p><span className="text-muted-foreground">Para:</span> {formData.to}</p>
-                {formData.cc && <p><span className="text-muted-foreground">CC:</span> {formData.cc}</p>}
-                <p><span className="text-muted-foreground">Asunto:</span> {formData.subject}</p>
-                <p><span className="text-muted-foreground">Documento:</span> {documentNumber}.html</p>
+            <AlertDialogDescription asChild>
+              <div className="space-y-2">
+                <p>¿Estás seguro de que deseas enviar este email?</p>
+                <div className="bg-muted rounded-lg p-3 mt-2 text-sm">
+                  <p><span className="text-muted-foreground">Para:</span> {formData.to}</p>
+                  {formData.cc && <p><span className="text-muted-foreground">CC:</span> {formData.cc}</p>}
+                  <p><span className="text-muted-foreground">Asunto:</span> {formData.subject}</p>
+                  <p><span className="text-muted-foreground">Documento:</span> {documentNumber}.html</p>
+                </div>
               </div>
             </AlertDialogDescription>
           </AlertDialogHeader>
