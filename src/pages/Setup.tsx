@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -8,7 +8,7 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { CheckCircle2, Database, Loader2, UserPlus, AlertCircle, Rocket } from "lucide-react";
 
-type SetupStep = "check" | "schema" | "admin" | "complete";
+type SetupStep = "loading" | "schema" | "admin" | "complete";
 
 interface StepStatus {
   schema: "pending" | "running" | "success" | "error";
@@ -17,7 +17,7 @@ interface StepStatus {
 
 export default function Setup() {
   const navigate = useNavigate();
-  const [currentStep, setCurrentStep] = useState<SetupStep>("check");
+  const [currentStep, setCurrentStep] = useState<SetupStep>("loading");
   const [stepStatus, setStepStatus] = useState<StepStatus>({
     schema: "pending",
     admin: "pending",
@@ -27,69 +27,121 @@ export default function Setup() {
   const [adminName, setAdminName] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [schemaLog, setSchemaLog] = useState<string[]>([]);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  // Verificar estado automáticamente al cargar
+  useEffect(() => {
+    checkSetupStatus();
+  }, []);
 
   // Verificar si ya está configurado
   const checkSetupStatus = async () => {
     setIsLoading(true);
+    setSchemaLog(["Verificando estado del sistema..."]);
+    
     try {
+      // Primero verificar si Supabase está accesible
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+      
+      if (!supabaseUrl || !supabaseKey) {
+        setSchemaLog(prev => [...prev, "❌ Variables de entorno no configuradas"]);
+        setErrorMessage("Faltan las variables VITE_SUPABASE_URL o VITE_SUPABASE_ANON_KEY");
+        setCurrentStep("schema");
+        setStepStatus(prev => ({ ...prev, schema: "error" }));
+        setIsLoading(false);
+        return;
+      }
+
+      setSchemaLog(prev => [...prev, `✓ Supabase URL: ${supabaseUrl.substring(0, 30)}...`]);
+
       // Verificar si existen las tablas principales
-      const { data: profiles, error } = await supabase
+      const { data: profiles, error: profilesError } = await supabase
         .from("profiles")
         .select("id")
         .limit(1);
 
-      if (!error && profiles) {
-        // Ya está configurado, verificar si hay admin
-        const { data: admins } = await supabase
-          .from("user_roles")
-          .select("id")
-          .eq("role", "admin")
-          .limit(1);
-
-        if (admins && admins.length > 0) {
-          toast.info("CRM ya configurado. Redirigiendo...");
-          navigate("/auth");
-          return;
-        }
-        // Tablas existen pero no hay admin
-        setStepStatus((prev) => ({ ...prev, schema: "success" }));
-        setCurrentStep("admin");
-      } else {
-        // No hay tablas, empezar desde schema
+      if (profilesError) {
+        console.log("Error verificando profiles:", profilesError);
+        setSchemaLog(prev => [...prev, "⚠️ Tablas no encontradas o sin acceso"]);
+        // Las tablas no existen, ir a schema
         setCurrentStep("schema");
+        setIsLoading(false);
+        return;
       }
-    } catch (error) {
+
+      setSchemaLog(prev => [...prev, "✓ Tablas base de datos OK"]);
+      setStepStatus(prev => ({ ...prev, schema: "success" }));
+
+      // Verificar si hay algún usuario admin
+      const { data: admins, error: adminsError } = await supabase
+        .from("user_roles")
+        .select("id, user_id")
+        .eq("role", "admin")
+        .limit(1);
+
+      if (adminsError) {
+        console.log("Error verificando admins:", adminsError);
+      }
+
+      if (admins && admins.length > 0) {
+        setSchemaLog(prev => [...prev, "✓ Admin ya configurado"]);
+        toast.info("CRM ya configurado. Redirigiendo al login...");
+        setTimeout(() => navigate("/auth"), 1500);
+        return;
+      }
+
+      // Tablas existen pero no hay admin
+      setSchemaLog(prev => [...prev, "⚠️ No hay administrador configurado"]);
+      setCurrentStep("admin");
+    } catch (error: any) {
+      console.error("Error en checkSetupStatus:", error);
+      setSchemaLog(prev => [...prev, `❌ Error: ${error.message}`]);
       setCurrentStep("schema");
     } finally {
       setIsLoading(false);
     }
   };
 
-  // Ejecutar schema
+  // Ejecutar verificación de schema via edge function
   const executeSchema = async () => {
     setIsLoading(true);
-    setStepStatus((prev) => ({ ...prev, schema: "running" }));
+    setStepStatus(prev => ({ ...prev, schema: "running" }));
     setSchemaLog(["Iniciando configuración de base de datos..."]);
+    setErrorMessage(null);
 
     try {
       const { data, error } = await supabase.functions.invoke("setup-database", {
         body: { action: "init" },
       });
 
-      if (error) throw error;
+      console.log("Setup response:", { data, error });
+
+      if (error) {
+        throw new Error(error.message || "Error llamando a la función de setup");
+      }
 
       if (data?.success) {
-        setSchemaLog((prev) => [...prev, ...data.logs, "✅ Schema ejecutado correctamente"]);
-        setStepStatus((prev) => ({ ...prev, schema: "success" }));
-        toast.success("Base de datos configurada correctamente");
+        setSchemaLog(prev => [...prev, ...(data.logs || []), "✅ Schema verificado correctamente"]);
+        setStepStatus(prev => ({ ...prev, schema: "success" }));
+        toast.success("Base de datos lista");
         setCurrentStep("admin");
       } else {
-        throw new Error(data?.error || "Error desconocido");
+        // Puede ser que las tablas ya existan
+        if (data?.message === "Schema ya existe") {
+          setSchemaLog(prev => [...prev, ...(data.logs || []), "✅ Las tablas ya existen"]);
+          setStepStatus(prev => ({ ...prev, schema: "success" }));
+          setCurrentStep("admin");
+        } else {
+          throw new Error(data?.error || "Error desconocido en la configuración");
+        }
       }
     } catch (error: any) {
       console.error("Error ejecutando schema:", error);
-      setSchemaLog((prev) => [...prev, `❌ Error: ${error.message}`]);
-      setStepStatus((prev) => ({ ...prev, schema: "error" }));
+      const msg = error.message || "Error configurando base de datos";
+      setSchemaLog(prev => [...prev, `❌ Error: ${msg}`]);
+      setStepStatus(prev => ({ ...prev, schema: "error" }));
+      setErrorMessage(msg);
       toast.error("Error configurando base de datos");
     } finally {
       setIsLoading(false);
@@ -109,7 +161,8 @@ export default function Setup() {
     }
 
     setIsLoading(true);
-    setStepStatus((prev) => ({ ...prev, admin: "running" }));
+    setStepStatus(prev => ({ ...prev, admin: "running" }));
+    setErrorMessage(null);
 
     try {
       // Registrar usuario
@@ -123,13 +176,17 @@ export default function Setup() {
         },
       });
 
-      if (authError) throw authError;
+      if (authError) {
+        throw authError;
+      }
 
       if (!authData.user) {
         throw new Error("No se pudo crear el usuario");
       }
 
-      // Asignar rol admin (la edge function lo hace con service_role)
+      console.log("Usuario creado:", authData.user.id);
+
+      // Asignar rol admin via edge function (usa service_role)
       const { data, error } = await supabase.functions.invoke("setup-database", {
         body: {
           action: "create-admin",
@@ -139,14 +196,21 @@ export default function Setup() {
         },
       });
 
-      if (error) throw error;
+      if (error) {
+        throw new Error(error.message || "Error asignando rol de administrador");
+      }
 
-      setStepStatus((prev) => ({ ...prev, admin: "success" }));
-      toast.success("Administrador creado correctamente");
+      if (!data?.success) {
+        throw new Error(data?.error || "Error configurando administrador");
+      }
+
+      setStepStatus(prev => ({ ...prev, admin: "success" }));
+      toast.success("¡Administrador creado correctamente!");
       setCurrentStep("complete");
     } catch (error: any) {
       console.error("Error creando admin:", error);
-      setStepStatus((prev) => ({ ...prev, admin: "error" }));
+      setStepStatus(prev => ({ ...prev, admin: "error" }));
+      setErrorMessage(error.message || "Error creando administrador");
       toast.error(error.message || "Error creando administrador");
     } finally {
       setIsLoading(false);
@@ -193,22 +257,20 @@ export default function Setup() {
             </div>
           </div>
 
-          {/* Check Step */}
-          {currentStep === "check" && (
-            <div className="text-center space-y-4">
-              <p className="text-muted-foreground">
-                Verificaremos el estado de tu instalación
-              </p>
-              <Button onClick={checkSetupStatus} disabled={isLoading} className="w-full">
-                {isLoading ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Verificando...
-                  </>
-                ) : (
-                  "Comenzar configuración"
-                )}
-              </Button>
+          {/* Loading Step */}
+          {currentStep === "loading" && (
+            <div className="text-center space-y-4 py-8">
+              <Loader2 className="h-8 w-8 animate-spin mx-auto text-primary" />
+              <p className="text-muted-foreground">Verificando estado del sistema...</p>
+              {schemaLog.length > 0 && (
+                <div className="bg-muted/50 rounded-lg p-3 text-left max-h-40 overflow-y-auto">
+                  <pre className="text-xs font-mono">
+                    {schemaLog.map((log, i) => (
+                      <div key={i} className="py-0.5">{log}</div>
+                    ))}
+                  </pre>
+                </div>
+              )}
             </div>
           )}
 
@@ -218,9 +280,9 @@ export default function Setup() {
               <div className="flex items-center gap-3 p-4 bg-muted rounded-lg">
                 <Database className="h-6 w-6 text-primary" />
                 <div>
-                  <p className="font-medium">Inicializar Base de Datos</p>
+                  <p className="font-medium">Verificar Base de Datos</p>
                   <p className="text-sm text-muted-foreground">
-                    Se crearán todas las tablas, funciones y políticas RLS
+                    Se verificará que las tablas estén configuradas
                   </p>
                 </div>
               </div>
@@ -229,11 +291,18 @@ export default function Setup() {
                 <div className="bg-muted/50 rounded-lg p-3 max-h-40 overflow-y-auto">
                   <pre className="text-xs font-mono">
                     {schemaLog.map((log, i) => (
-                      <div key={i} className="py-0.5">
-                        {log}
-                      </div>
+                      <div key={i} className="py-0.5">{log}</div>
                     ))}
                   </pre>
+                </div>
+              )}
+
+              {errorMessage && (
+                <div className="bg-destructive/10 border border-destructive/30 rounded-lg p-3">
+                  <p className="text-sm text-destructive">{errorMessage}</p>
+                  <p className="text-xs text-muted-foreground mt-2">
+                    Asegúrate de que las tablas se hayan creado ejecutando el SQL en Supabase Studio.
+                  </p>
                 </div>
               )}
 
@@ -245,7 +314,7 @@ export default function Setup() {
                 {isLoading ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Configurando...
+                    Verificando...
                   </>
                 ) : stepStatus.schema === "success" ? (
                   <>
@@ -255,7 +324,7 @@ export default function Setup() {
                 ) : stepStatus.schema === "error" ? (
                   "Reintentar"
                 ) : (
-                  "Ejecutar configuración"
+                  "Verificar configuración"
                 )}
               </Button>
             </div>
@@ -274,14 +343,21 @@ export default function Setup() {
                 </div>
               </div>
 
+              {errorMessage && (
+                <div className="bg-destructive/10 border border-destructive/30 rounded-lg p-3">
+                  <p className="text-sm text-destructive">{errorMessage}</p>
+                </div>
+              )}
+
               <div className="space-y-3">
                 <div className="space-y-2">
                   <Label htmlFor="adminName">Nombre</Label>
                   <Input
                     id="adminName"
-                    placeholder="Tu nombre"
+                    placeholder="Tu nombre completo"
                     value={adminName}
                     onChange={(e) => setAdminName(e.target.value)}
+                    disabled={isLoading}
                   />
                 </div>
                 <div className="space-y-2">
@@ -292,6 +368,7 @@ export default function Setup() {
                     placeholder="admin@empresa.com"
                     value={adminEmail}
                     onChange={(e) => setAdminEmail(e.target.value)}
+                    disabled={isLoading}
                   />
                 </div>
                 <div className="space-y-2">
@@ -302,6 +379,7 @@ export default function Setup() {
                     placeholder="Mínimo 6 caracteres"
                     value={adminPassword}
                     onChange={(e) => setAdminPassword(e.target.value)}
+                    disabled={isLoading}
                   />
                 </div>
               </div>
@@ -314,7 +392,7 @@ export default function Setup() {
                 {isLoading ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Creando...
+                    Creando administrador...
                   </>
                 ) : (
                   "Crear administrador"
