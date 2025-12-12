@@ -311,19 +311,63 @@ export interface NotificationLog {
   error_message: string | null;
   sent_at: string | null;
   created_at: string;
+  client?: {
+    name: string;
+    email: string | null;
+  } | null;
 }
 
-export function useNotificationHistory() {
+export function useNotificationHistory(year?: number, page: number = 1, pageSize: number = 20) {
   return useQuery({
-    queryKey: ["notification-history"],
+    queryKey: ["notification-history", year, page, pageSize],
+    queryFn: async () => {
+      let query = supabase
+        .from("notification_queue")
+        .select("*, client:clients(name, email)", { count: "exact" })
+        .order("created_at", { ascending: false });
+      
+      // Filtrar por año si se especifica
+      if (year) {
+        const startDate = `${year}-01-01`;
+        const endDate = `${year}-12-31T23:59:59`;
+        query = query.gte("created_at", startDate).lte("created_at", endDate);
+      }
+      
+      // Paginación
+      const from = (page - 1) * pageSize;
+      const to = from + pageSize - 1;
+      query = query.range(from, to);
+      
+      const { data, error, count } = await query;
+      if (error) throw error;
+      return { 
+        data: data as NotificationLog[], 
+        totalCount: count || 0,
+        totalPages: Math.ceil((count || 0) / pageSize)
+      };
+    },
+  });
+}
+
+// Obtener años disponibles en el historial
+export function useNotificationHistoryYears() {
+  return useQuery({
+    queryKey: ["notification-history-years"],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("notification_queue")
-        .select("*")
-        .order("created_at", { ascending: false })
-        .limit(100);
+        .select("created_at")
+        .order("created_at", { ascending: false });
+      
       if (error) throw error;
-      return data as NotificationLog[];
+      
+      const years = new Set<number>();
+      data?.forEach(item => {
+        const year = new Date(item.created_at).getFullYear();
+        years.add(year);
+      });
+      
+      return Array.from(years).sort((a, b) => b - a);
     },
   });
 }
