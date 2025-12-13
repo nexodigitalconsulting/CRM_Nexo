@@ -1,4 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
+import { FunctionsHttpError } from "@supabase/supabase-js";
 
 type FilterOperator = {
   eq?: unknown;
@@ -39,9 +40,26 @@ class ExternalPostgresClient {
       });
 
       if (error) {
-        const details = (error as any)?.context?.body
-          ? ` | Details: ${(error as any).context.body}`
-          : '';
+        let details = '';
+        try {
+          const anyError = error as any;
+
+          // Try to read the error body from the Edge Function for better diagnostics
+          if (anyError instanceof FunctionsHttpError && anyError.context) {
+            const text = await anyError.context.text();
+            if (text) {
+              details = ` | Details: ${text}`;
+            }
+          } else if (anyError?.context?.body) {
+            const maybeBody = anyError.context.body;
+            if (typeof maybeBody === 'string') {
+              details = ` | Details: ${maybeBody}`;
+            }
+          }
+        } catch (parseErr) {
+          console.error('[ExternalPG] Failed to read error context:', parseErr);
+        }
+
         console.error('[ExternalPG] Proxy error:', error);
         return { data: null, error: new Error(`${error.message}${details}`) };
       }
