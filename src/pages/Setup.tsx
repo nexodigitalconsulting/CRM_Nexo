@@ -203,8 +203,14 @@ export default function Setup() {
         options: { data: { full_name: adminName || "Administrador" } },
       });
 
-      if (authError) throw authError;
-      if (!authData.user) throw new Error("No se pudo crear el usuario");
+      // En algunos proyectos de Supabase, aunque el usuario se crea correctamente,
+      // se devuelve el error "Error sending confirmation email" si no hay SMTP configurado.
+      if (authError && !authError.message.includes("Error sending confirmation email")) {
+        throw authError;
+      }
+      if (!authData?.user) {
+        throw authError || new Error("No se pudo crear el usuario");
+      }
 
       addLog(`✓ Usuario creado en Supabase Auth: ${authData.user.id.slice(0, 8)}...`);
 
