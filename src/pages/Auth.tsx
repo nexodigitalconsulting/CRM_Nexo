@@ -22,41 +22,16 @@ export default function Auth() {
   const [password, setPassword] = useState('');
   const [fullName, setFullName] = useState('');
   const [loading, setLoading] = useState(false);
-  const [checkingSetup, setCheckingSetup] = useState(true);
+  const [checkingSetup, setCheckingSetup] = useState(false);
   const [activeTab, setActiveTab] = useState('login');
 
-  // Verificar si hay admin configurado al cargar
+  // Antes se redirigía automáticamente a /setup si no había admin.
+  // Esto impedía acceder a /auth en instalaciones nuevas.
+  // Ahora simplemente permitimos usar /auth siempre y dejamos que /setup
+  // se encargue de crear el primer administrador.
   useEffect(() => {
-    const checkAdminExists = async () => {
-      try {
-        const { data: admins, error } = await supabase
-          .from('user_roles')
-          .select('id')
-          .eq('role', 'admin')
-          .limit(1);
-
-        if (error) {
-          console.log('Error verificando admin:', error);
-          // Si hay error, probablemente las tablas no existen
-          navigate('/setup');
-          return;
-        }
-
-        if (!admins || admins.length === 0) {
-          toast.info('No hay administrador. Redirigiendo a configuración...');
-          navigate('/setup');
-          return;
-        }
-
-        setCheckingSetup(false);
-      } catch (error) {
-        console.error('Error en checkAdminExists:', error);
-        navigate('/setup');
-      }
-    };
-
-    checkAdminExists();
-  }, [navigate]);
+    setCheckingSetup(false);
+  }, []);
 
   useEffect(() => {
     if (user && !authLoading && !checkingSetup) {
