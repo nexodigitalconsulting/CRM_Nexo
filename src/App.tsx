@@ -20,7 +20,6 @@ import Flows from "./pages/Flows";
 import Calendar from "./pages/Calendar";
 import Settings from "./pages/Settings";
 import ProductAnalysis from "./pages/ProductAnalysis";
-import TestPostgres from "./pages/TestPostgres";
 import Auth from "./pages/Auth";
 import Setup from "./pages/Setup";
 import NotFound from "./pages/NotFound";
@@ -37,7 +36,6 @@ const App = () => (
           <Routes>
             <Route path="/auth" element={<Auth />} />
             <Route path="/setup" element={<Setup />} />
-            <Route path="/test-postgres" element={<TestPostgres />} />
             <Route
               path="/*"
               element={
