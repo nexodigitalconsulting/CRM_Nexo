@@ -196,27 +196,50 @@ export default function Setup() {
     addLog("Creando usuario administrador...");
 
     try {
-      const redirectUrl = `${window.location.origin}/auth`;
-
-      const { data: authData, error: authError } = await supabase.auth.signUp({
-        email: adminEmail,
-        password: adminPassword,
-        options: {
-          data: { full_name: adminName || "Administrador" },
-          emailRedirectTo: redirectUrl,
-        },
-      });
-
-      // En algunos proyectos de Supabase, aunque el usuario se crea correctamente,
-      // se devuelve el error "Error sending confirmation email" si no hay SMTP configurado.
-      if (authError && !authError.message.includes("Error sending confirmation email")) {
-        throw authError;
-      }
-      if (!authData?.user) {
-        throw authError || new Error("No se pudo crear el usuario");
+      // 1) Intentar usar el usuario ya autenticado en Supabase
+      const { data: currentUserData, error: currentUserError } = await supabase.auth.getUser();
+      if (currentUserError) {
+        addLog(`⚠️ No se pudo obtener el usuario actual: ${currentUserError.message}`);
       }
 
-      addLog(`✓ Usuario creado en Supabase Auth: ${authData.user.id.slice(0, 8)}...`);
+      let user = currentUserData?.user ?? null;
+
+      // 2) Si no hay usuario autenticado, registramos uno nuevo
+      if (!user) {
+        addLog("No hay usuario autenticado, registrando nuevo usuario en Supabase Auth...");
+
+        const redirectUrl = `${window.location.origin}/auth`;
+
+        const { data: authData, error: authError } = await supabase.auth.signUp({
+          email: adminEmail,
+          password: adminPassword,
+          options: {
+            data: { full_name: adminName || "Administrador" },
+            emailRedirectTo: redirectUrl,
+          },
+        });
+
+        // En algunos proyectos de Supabase, aunque el usuario se crea correctamente,
+        // se devuelve el error "Error sending confirmation email" si no hay SMTP configurado.
+        if (authError && !authError.message.includes("Error sending confirmation email")) {
+          throw authError;
+        }
+
+        if (!authData?.user) {
+          throw authError || new Error("No se pudo crear el usuario");
+        }
+
+        user = authData.user;
+        addLog(`✓ Usuario creado en Supabase Auth: ${user.id.slice(0, 8)}...`);
+      } else {
+        addLog(`✓ Usando usuario autenticado actual: ${user.id.slice(0, 8)}...`);
+      }
+
+      if (!user) {
+        throw new Error("No se pudo obtener un usuario válido para asignar como administrador");
+      }
+
+      // 3) A partir de aquí trabajamos con el usuario (ya existente o recién creado)
 
       // The trigger handle_new_user should create profile and role automatically
       // Wait a moment for trigger to execute
@@ -226,7 +249,7 @@ export default function Setup() {
       const { data: profile } = await supabase
         .from("profiles")
         .select("id")
-        .eq("user_id", authData.user.id)
+        .eq("user_id", user.id)
         .single();
 
       if (profile) {
@@ -234,7 +257,7 @@ export default function Setup() {
       } else {
         addLog("⚠️ Perfil no encontrado, creando manualmente...");
         await supabase.from("profiles").insert({
-          user_id: authData.user.id,
+          user_id: user.id,
           email: adminEmail,
           full_name: adminName || "Administrador",
         });
@@ -244,7 +267,7 @@ export default function Setup() {
       const { data: roleData } = await supabase
         .from("user_roles")
         .select("id, role")
-        .eq("user_id", authData.user.id)
+        .eq("user_id", user.id)
         .single();
 
       if (roleData) {
@@ -253,14 +276,14 @@ export default function Setup() {
           await supabase
             .from("user_roles")
             .update({ role: "admin" })
-            .eq("user_id", authData.user.id);
+            .eq("user_id", user.id);
           addLog("✓ Rol actualizado a admin.");
         } else {
           addLog("✓ Rol admin verificado.");
         }
       } else {
         await supabase.from("user_roles").insert({
-          user_id: authData.user.id,
+          user_id: user.id,
           role: "admin",
         });
         addLog("✓ Rol admin creado manualmente.");
