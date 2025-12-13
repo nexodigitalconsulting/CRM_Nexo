@@ -196,11 +196,15 @@ export default function Setup() {
     addLog("Creando usuario administrador...");
 
     try {
-      // Register in Supabase Auth
+      const redirectUrl = `${window.location.origin}/auth`;
+
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email: adminEmail,
         password: adminPassword,
-        options: { data: { full_name: adminName || "Administrador" } },
+        options: {
+          data: { full_name: adminName || "Administrador" },
+          emailRedirectTo: redirectUrl,
+        },
       });
 
       // En algunos proyectos de Supabase, aunque el usuario se crea correctamente,
@@ -266,10 +270,15 @@ export default function Setup() {
       toast.success("¡Administrador creado correctamente!");
       setCurrentStep("complete");
     } catch (error: any) {
-      addLog(`❌ Error: ${error.message}`);
+      const message = error?.message || "Error desconocido al crear el administrador. Revisa los logs.";
+      try {
+        addLog(`❌ Error: ${message} | Detalles: ${JSON.stringify(error)}`);
+      } catch {
+        addLog(`❌ Error: ${message}`);
+      }
       setStepStatus(prev => ({ ...prev, admin: "error" }));
-      setErrorMessage(error.message);
-      toast.error(error.message);
+      setErrorMessage(message);
+      toast.error(message);
     } finally {
       setIsLoading(false);
     }
