@@ -86,9 +86,9 @@ export default function Calendar() {
   
   const isLoading = contractsLoading || invoicesLoading || eventsLoading;
 
-  // iCal subscription URL
+  // iCal subscription URL (usamos la URL de Supabase del entorno)
   const iCalUrl = session?.user?.id 
-    ? `https://honfwrfkiukckyoelsdm.supabase.co/functions/v1/calendar-ical?user_id=${session.user.id}`
+    ? `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/calendar-ical?user_id=${session.user.id}`
     : null;
 
   const copyICalUrl = () => {
