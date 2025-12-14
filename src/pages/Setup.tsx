@@ -363,9 +363,9 @@ export default function Setup() {
               </div>
 
               <div className="bg-muted/50 rounded-lg p-3 text-sm">
-                <p className="font-medium mb-2">Proyecto Supabase:</p>
-                <p className="text-muted-foreground text-xs font-mono">
-                  URL: https://honfwrfkiukckyoelsdm.supabase.co
+                <p className="font-medium mb-2">Proyecto Supabase detectado:</p>
+                <p className="text-muted-foreground text-xs font-mono break-all">
+                  URL: {import.meta.env.VITE_SUPABASE_URL}
                 </p>
               </div>
 
@@ -417,15 +417,17 @@ export default function Setup() {
                       </span>
                     ))}
                   </div>
-                  <a
-                    href="https://supabase.com/dashboard/project/honfwrfkiukckyoelsdm/sql/new"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1 text-xs text-primary mt-2 hover:underline"
-                  >
-                    <ExternalLink className="h-3 w-3" />
-                    Abrir SQL Editor de Supabase
-                  </a>
+                  {String(import.meta.env.VITE_SUPABASE_URL).includes("supabase.co") && (
+                    <a
+                      href={`https://supabase.com/dashboard/project/${import.meta.env.VITE_SUPABASE_PROJECT_ID}/sql/new`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 text-xs text-primary mt-2 hover:underline"
+                    >
+                      <ExternalLink className="h-3 w-3" />
+                      Abrir SQL Editor de Supabase (cloud)
+                    </a>
+                  )}
                 </div>
               )}
 
