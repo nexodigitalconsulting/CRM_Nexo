@@ -1,10 +1,4 @@
 # Dockerfile para CRM Web - Despliegue en Easypanel
-# Usando mirrors públicos para evitar rate limiting de Docker Hub
-
-# Opción 1: Usar registro público de Google (gcr.io) - sin rate limits
-FROM gcr.io/distroless/nodejs20-debian12 AS node-base
-
-# Builder stage usando imagen oficial con fully qualified name
 FROM docker.io/library/node:20-alpine AS builder
 
 WORKDIR /app
@@ -12,8 +6,8 @@ WORKDIR /app
 # Copiar package files
 COPY package*.json ./
 
-# Instalar dependencias con retry para mayor resiliencia
-RUN npm ci --prefer-offline --no-audit || npm ci --prefer-offline --no-audit || npm ci
+# Instalar dependencias
+RUN npm ci
 
 # Copiar código fuente
 COPY . .
@@ -39,18 +33,15 @@ RUN echo "DEBUG_VITE_SUPABASE_URL=${VITE_SUPABASE_URL}" && \
 # Build
 RUN npm run build
 
-# Producción con Nginx - usando Quay.io mirror (Red Hat, sin rate limits)
-FROM quay.io/nginx/nginx-unprivileged:alpine AS production
-
-# Cambiar a root temporalmente para configurar
-USER root
+# Producción con Nginx
+FROM docker.io/library/nginx:alpine
 
 # Copiar build
 COPY --from=builder /app/dist /usr/share/nginx/html
 
 # Configuración Nginx para SPA
 RUN echo 'server { \
-    listen 8080; \
+    listen 80; \
     root /usr/share/nginx/html; \
     index index.html; \
     location / { \
@@ -62,13 +53,6 @@ RUN echo 'server { \
     } \
 }' > /etc/nginx/conf.d/default.conf
 
-# Asegurar permisos correctos
-RUN chown -R nginx:nginx /usr/share/nginx/html && \
-    chmod -R 755 /usr/share/nginx/html
-
-# Volver a usuario no privilegiado
-USER nginx
-
-EXPOSE 8080
+EXPOSE 80
 
 CMD ["nginx", "-g", "daemon off;"]
