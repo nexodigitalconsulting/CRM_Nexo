@@ -41,7 +41,9 @@ export default function Setup() {
   const [adminEmail, setAdminEmail] = useState("");
   const [adminPassword, setAdminPassword] = useState("");
   const [adminName, setAdminName] = useState("");
+  const [bootstrapToken, setBootstrapToken] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [showToken, setShowToken] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
 
   // Auto-run checks on mount
@@ -140,89 +142,31 @@ export default function Setup() {
       toast.error("La contraseña debe tener al menos 6 caracteres");
       return;
     }
+    if (!bootstrapToken) {
+      toast.error("El token de bootstrap es obligatorio");
+      return;
+    }
 
     setIsCreating(true);
     setErrorMessage(null);
 
     try {
-      // 1) Si el usuario ya existe, preferimos iniciar sesión (evita errores por email duplicado)
-      const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
-        email: adminEmail,
-        password: adminPassword,
-      });
-
-      let user = signInData?.user ?? null;
-
-      // Si no pudo iniciar sesión, intentamos registrar
-      if (!user) {
-        const { data: authData, error: authError } = await supabase.auth.signUp({
+      // Call the bootstrap-admin edge function
+      const { data, error } = await supabase.functions.invoke("bootstrap-admin", {
+        body: {
           email: adminEmail,
           password: adminPassword,
-          options: {
-            data: { full_name: adminName || "Administrador" },
-            emailRedirectTo: `${window.location.origin}/auth`,
-          },
-        });
+          fullName: adminName || "Administrador",
+          bootstrapToken: bootstrapToken,
+        },
+      });
 
-        // Caso típico: el email ya existe pero la contraseña no coincide
-        if (authError?.message?.toLowerCase().includes("already") || authError?.message?.toLowerCase().includes("registered")) {
-          throw new Error("El email ya existe pero la contraseña no coincide. Ve a /auth → '¿Olvidaste tu contraseña?' o usa la contraseña correcta.");
-        }
-
-        // Si Supabase exige confirmación y falla el envío, lo indicamos claramente
-        if (authError?.message?.toLowerCase().includes("confirmation") || authError?.message?.toLowerCase().includes("confirm")) {
-          throw new Error(`El registro requiere confirmación de email: ${authError.message}. Activa AUTOCONFIRM o configura SMTP en Supabase.`);
-        }
-
-        if (authError && !authError.message.includes("Error sending confirmation email")) {
-          throw new Error(`Error creando usuario: ${authError.message}`);
-        }
-
-        if (!authData?.user) {
-          const extra = signInError?.message ? ` (login previo: ${signInError.message})` : "";
-          throw new Error(`No se pudo crear el usuario${extra}`);
-        }
-
-        user = authData.user;
+      if (error) {
+        throw new Error(error.message || "Error llamando a la función bootstrap-admin");
       }
 
-      // Espera breve para que el trigger (profiles/roles) se ejecute
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-
-      // Verify/create profile
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("id")
-        .eq("user_id", user.id)
-        .maybeSingle();
-
-      if (!profile) {
-        await supabase.from("profiles").insert({
-          user_id: user.id,
-          email: adminEmail,
-          full_name: adminName || "Administrador",
-        });
-      }
-
-      // Verify/create admin role
-      const { data: roleData } = await supabase
-        .from("user_roles")
-        .select("id, role")
-        .eq("user_id", user.id)
-        .maybeSingle();
-
-      if (roleData) {
-        if (roleData.role !== "admin") {
-          await supabase
-            .from("user_roles")
-            .update({ role: "admin" })
-            .eq("user_id", user.id);
-        }
-      } else {
-        await supabase.from("user_roles").insert({
-          user_id: user.id,
-          role: "admin",
-        });
+      if (data?.error) {
+        throw new Error(data.error);
       }
 
       toast.success("¡Administrador creado correctamente!");
@@ -394,7 +338,35 @@ export default function Setup() {
                 </p>
               </div>
 
+              <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-3">
+                <p className="text-xs text-amber-700 dark:text-amber-400">
+                  <strong>Token de Bootstrap:</strong> Introduce el token que configuraste en los secrets de Supabase (BOOTSTRAP_ADMIN_TOKEN).
+                </p>
+              </div>
+
               <div className="space-y-3">
+                <div className="space-y-2">
+                  <Label htmlFor="bootstrap-token">Token de Bootstrap *</Label>
+                  <div className="relative">
+                    <Input
+                      id="bootstrap-token"
+                      type={showToken ? "text" : "password"}
+                      placeholder="Token configurado en Supabase"
+                      value={bootstrapToken}
+                      onChange={(e) => setBootstrapToken(e.target.value)}
+                      disabled={isCreating}
+                    />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="absolute right-2 top-1/2 -translate-y-1/2 h-7 w-7"
+                      onClick={() => setShowToken(!showToken)}
+                    >
+                      {showToken ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </Button>
+                  </div>
+                </div>
                 <div className="space-y-2">
                   <Label htmlFor="admin-name">Nombre completo</Label>
                   <Input
@@ -448,7 +420,7 @@ export default function Setup() {
 
               <Button
                 onClick={createAdmin}
-                disabled={isCreating || !adminEmail || !adminPassword}
+                disabled={isCreating || !adminEmail || !adminPassword || !bootstrapToken}
                 className="w-full"
               >
                 {isCreating ? (
