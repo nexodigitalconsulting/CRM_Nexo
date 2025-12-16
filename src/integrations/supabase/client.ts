@@ -2,14 +2,9 @@
 import { createClient } from '@supabase/supabase-js';
 import type { Database } from './types';
 
-// Get Supabase configuration from environment variables
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || '';
-const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
-
-// Validate configuration
-if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
-  console.error('⚠️ Supabase configuration missing. Please set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY environment variables.');
-}
+// Supabase configuration
+const SUPABASE_URL = 'https://honfwrfkiukckyoelsdm.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhvbmZ3cmZraXVrY2t5b2Vsc2RtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjIyNTYyOTEsImV4cCI6MjA3NzgzMjI5MX0.GaCzMajZURM2eJn41qRk-Z1RA6uAlk4SPIbsOtwxx6A';
 
 // Create and export the Supabase client
 export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_ANON_KEY, {
@@ -24,5 +19,5 @@ export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_ANON_KEY, 
 export const getSupabaseConfig = () => ({
   url: SUPABASE_URL,
   hasKey: !!SUPABASE_ANON_KEY,
-  isConfigured: !!(SUPABASE_URL && SUPABASE_ANON_KEY),
+  isConfigured: true,
 });
