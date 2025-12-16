@@ -254,41 +254,76 @@ Para clonar el CRM a otro servidor:
 
 Para conectar herramientas externas como **n8n**, **DBeaver**, o cualquier cliente PostgreSQL a la base de datos de Supabase en Easypanel:
 
-### A.1 Exponer el puerto de PostgreSQL
+### A.1 Obtener el nombre correcto de la red Docker
 
-En Easypanel, ve a la configuración del servicio **Supabase DB** (PostgreSQL):
+Ejecuta este comando para ver las redes disponibles:
 
-1. **Settings** → **Ports**
-2. Añade un nuevo puerto:
-   - **Host Port**: `5432` (o el que prefieras, ej: `54320`)
-   - **Container Port**: `5432`
-   - **Protocol**: TCP
-3. Guarda y redeploy
+```bash
+docker network ls
+```
 
-### A.2 Datos de conexión
+Luego, para saber a qué red está conectado tu contenedor `nexo_n8n_supabase-db-1`, ejecuta:
+
+```bash
+docker inspect -f '{{range $k,$v := .NetworkSettings.Networks}}{{$k}}{{end}}' nexo_n8n_supabase-db-1
+```
+
+El resultado será el nombre de la red que debes usar en lugar de `NETWORK`.
+
+### A.2 Crear el contenedor socat
+
+Si el comando anterior te devuelve, por ejemplo, `bridge`, entonces el comando correcto será:
+
+```bash
+docker run -d --name nexo_supabase_crm --network bridge -p 5460:5460 alpine/socat TCP-LISTEN:5460,fork,reuseaddr TCP:nexo_n8n_supabase-db-1:5432
+```
+
+### A.3 Abrir el puerto en el VPS
+
+Dependiendo de tu firewall:
+
+**UFW (Ubuntu/Debian):**
+```bash
+sudo ufw allow 5460/tcp
+sudo ufw reload
+```
+
+**firewalld (CentOS/RHEL):**
+```bash
+sudo firewall-cmd --permanent --add-port=5460/tcp
+sudo firewall-cmd --reload
+```
+
+**iptables:**
+```bash
+sudo iptables -A INPUT -p tcp --dport 5460 -j ACCEPT
+sudo iptables-save
+```
+
+### A.4 Datos de conexión
 
 | Parámetro | Valor |
 |-----------|-------|
 | **Host** | `tu-servidor.com` o IP del VPS |
-| **Port** | `5432` (o el puerto expuesto) |
+| **Port** | `5460` (el puerto expuesto por socat) |
 | **Database** | `postgres` |
 | **User** | `postgres` |
 | **Password** | La contraseña configurada en Supabase |
 
-### A.3 Ejemplo conexión n8n
+### A.5 Ejemplo conexión n8n
 
 En n8n, crea una credencial **Postgres**:
 
 ```
 Host: tu-servidor.com
-Port: 5432
+Port: 5460
 Database: postgres
 User: postgres
 Password: tu_password_de_supabase
 SSL: Disable (si es red interna) o Require (si es externa)
 ```
 
-### A.4 Seguridad
+### A.6 Seguridad
 
 > ⚠️ **IMPORTANTE**: Exponer PostgreSQL a internet tiene riesgos de seguridad.
 
@@ -296,18 +331,7 @@ Recomendaciones:
 - Usa contraseñas fuertes
 - Configura firewall para permitir solo IPs conocidas
 - Considera usar túnel SSH o VPN
-- No uses el puerto estándar 5432 (usa uno diferente como 54320)
-
-### A.5 Conexión desde red interna (Docker)
-
-Si n8n está en el mismo Easypanel/servidor, puedes usar la red interna de Docker:
-
-```
-Host: supabase-db  (nombre del servicio en Docker)
-Port: 5432
-```
-
-Esto es más seguro ya que no expone el puerto externamente.
+- No uses el puerto estándar 5432 (usa uno diferente como 5460)
 
 ---
 
