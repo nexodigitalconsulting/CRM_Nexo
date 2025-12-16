@@ -160,14 +160,24 @@ export default function Setup() {
           },
         });
 
-        if (authError && !authError.message.includes("Error sending confirmation email")) {
-          throw authError;
+        // Caso típico en instalaciones ya tocadas: el email ya existe
+        if (authError?.message?.toLowerCase().includes("already") || authError?.message?.toLowerCase().includes("registered")) {
+          const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
+            email: adminEmail,
+            password: adminPassword,
+          });
+          if (signInError) throw signInError;
+          user = signInData.user;
+        } else {
+          // En self-hosted es común que falle el SMTP de confirmación. Si pasa, podemos continuar si Supabase devolvió user.
+          if (authError && !authError.message.includes("Error sending confirmation email")) {
+            throw authError;
+          }
+          if (!authData?.user) {
+            throw new Error("No se pudo crear el usuario. Si el email ya existe, inicia sesión en /auth o usa '¿Olvidaste tu contraseña?'.");
+          }
+          user = authData.user;
         }
-
-        if (!authData?.user) {
-          throw new Error("No se pudo crear el usuario");
-        }
-        user = authData.user;
       }
 
       // Wait for trigger to execute
