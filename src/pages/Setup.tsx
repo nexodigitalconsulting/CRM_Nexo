@@ -145,11 +145,15 @@ export default function Setup() {
     setErrorMessage(null);
 
     try {
-      // Check if user is already authenticated
-      const { data: currentUserData } = await supabase.auth.getUser();
-      let user = currentUserData?.user ?? null;
+      // 1) Si el usuario ya existe, preferimos iniciar sesión (evita errores por email duplicado)
+      const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
+        email: adminEmail,
+        password: adminPassword,
+      });
 
-      // If not authenticated, sign up
+      let user = signInData?.user ?? null;
+
+      // Si no pudo iniciar sesión, intentamos registrar
       if (!user) {
         const { data: authData, error: authError } = await supabase.auth.signUp({
           email: adminEmail,
@@ -160,28 +164,30 @@ export default function Setup() {
           },
         });
 
-        // Caso típico en instalaciones ya tocadas: el email ya existe
+        // Caso típico: el email ya existe pero la contraseña no coincide
         if (authError?.message?.toLowerCase().includes("already") || authError?.message?.toLowerCase().includes("registered")) {
-          const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
-            email: adminEmail,
-            password: adminPassword,
-          });
-          if (signInError) throw signInError;
-          user = signInData.user;
-        } else {
-          // En self-hosted es común que falle el SMTP de confirmación. Si pasa, podemos continuar si Supabase devolvió user.
-          if (authError && !authError.message.includes("Error sending confirmation email")) {
-            throw authError;
-          }
-          if (!authData?.user) {
-            throw new Error("No se pudo crear el usuario. Si el email ya existe, inicia sesión en /auth o usa '¿Olvidaste tu contraseña?'.");
-          }
-          user = authData.user;
+          throw new Error("El email ya existe pero la contraseña no coincide. Ve a /auth → '¿Olvidaste tu contraseña?' o usa la contraseña correcta.");
         }
+
+        // Si Supabase exige confirmación y falla el envío, lo indicamos claramente
+        if (authError?.message?.toLowerCase().includes("confirmation") || authError?.message?.toLowerCase().includes("confirm")) {
+          throw new Error(`El registro requiere confirmación de email: ${authError.message}. Activa AUTOCONFIRM o configura SMTP en Supabase.`);
+        }
+
+        if (authError && !authError.message.includes("Error sending confirmation email")) {
+          throw new Error(`Error creando usuario: ${authError.message}`);
+        }
+
+        if (!authData?.user) {
+          const extra = signInError?.message ? ` (login previo: ${signInError.message})` : "";
+          throw new Error(`No se pudo crear el usuario${extra}`);
+        }
+
+        user = authData.user;
       }
 
-      // Wait for trigger to execute
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      // Espera breve para que el trigger (profiles/roles) se ejecute
+      await new Promise((resolve) => setTimeout(resolve, 1000));
 
       // Verify/create profile
       const { data: profile } = await supabase
