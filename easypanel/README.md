@@ -67,12 +67,25 @@ Necesitas tener en Easypanel:
 
 En Easypanel → CRM → **Environment** → **Build Args**:
 
-| Variable | Valor | Dónde encontrarlo |
-|----------|-------|-------------------|
-| `VITE_SUPABASE_URL` | `https://tu-supabase.dominio.com` | URL de Supabase en Easypanel |
-| `VITE_SUPABASE_ANON_KEY` | `eyJhbGc...` | Supabase → Settings → API → anon key |
+| Variable | Valor | Requerido |
+|----------|-------|-----------|
+| `VITE_SUPABASE_URL` | `https://tu-supabase.dominio.com` | ✅ Sí |
+| `VITE_SUPABASE_ANON_KEY` | `eyJhbGc...` | ✅ Sí |
+| `VITE_SUPABASE_BASIC_AUTH_USER` | `supabase` | ⚠️ Si hay proxy con auth |
+| `VITE_SUPABASE_BASIC_AUTH_PASSWORD` | `tu_password` | ⚠️ Si hay proxy con auth |
 
 > ⚠️ **Importante**: Estas variables se inyectan en BUILD TIME, no en runtime
+
+### Variables de Autenticación Básica (Self-hosted)
+
+Si tu Supabase está detrás de Kong/proxy con autenticación HTTP básica:
+
+```
+VITE_SUPABASE_BASIC_AUTH_USER=supabase
+VITE_SUPABASE_BASIC_AUTH_PASSWORD=this_password_is_insecure_and_should_be_updated
+```
+
+Estas credenciales están en la configuración del servicio Supabase en Easypanel.
 
 ### Encontrar la Anon Key
 
