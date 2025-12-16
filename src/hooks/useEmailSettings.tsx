@@ -295,6 +295,7 @@ export function useSendEmail() {
       entityType, 
       entityId,
       attachPdf,
+      pdfBase64,
       pdfHtml,
       pdfFilename
     }: { 
@@ -305,11 +306,12 @@ export function useSendEmail() {
       entityType?: string;
       entityId?: string;
       attachPdf?: boolean;
+      pdfBase64?: string;
       pdfHtml?: string;
       pdfFilename?: string;
     }) => {
       const { data, error } = await supabase.functions.invoke('send-email', {
-        body: { to, cc, subject, html, entityType, entityId, attachPdf, pdfHtml, pdfFilename }
+        body: { to, cc, subject, html, entityType, entityId, attachPdf, pdfBase64, pdfHtml, pdfFilename }
       });
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
