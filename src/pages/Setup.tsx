@@ -155,7 +155,25 @@ export default function Setup() {
       });
 
       if (error) {
-        throw new Error(error.message || "Error llamando a la función bootstrap-admin");
+        // Supabase returns a FunctionsHttpError for non-2xx responses.
+        // It contains a `context: Response` we can read to show the real cause.
+        const anyErr = error as unknown as { message?: string; context?: Response };
+        let detail = anyErr.message || "Error llamando a la función bootstrap-admin";
+
+        if (anyErr.context instanceof Response) {
+          const status = anyErr.context.status;
+          const statusText = anyErr.context.statusText;
+          let bodyText = "";
+          try {
+            bodyText = await anyErr.context.text();
+          } catch {
+            // ignore
+          }
+          detail = `Edge Function error ${status} ${statusText}${bodyText ? `: ${bodyText}` : ""}`;
+        }
+
+        console.error("bootstrap-admin invoke error:", error);
+        throw new Error(detail);
       }
 
       if (data?.error) {
@@ -164,10 +182,11 @@ export default function Setup() {
 
       toast.success("¡Administrador creado correctamente!");
       setCurrentStep("complete");
-
     } catch (error: any) {
-      setErrorMessage(error.message);
-      toast.error(error.message);
+      const msg = error?.message || "Error inesperado creando el administrador";
+      setErrorMessage(msg);
+      toast.error(msg);
+      console.error("createAdmin error:", error);
     } finally {
       setIsCreating(false);
     }
