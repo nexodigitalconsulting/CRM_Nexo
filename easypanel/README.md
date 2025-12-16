@@ -26,6 +26,8 @@ Guía completa para desplegar el CRM con Supabase self-hosted en Easypanel.
 └─────────────────────────────────────────────────────┘
 ```
 
+---
+
 ## Paso 1: Crear Schema en Supabase
 
 **IMPORTANTE**: El schema NO se crea automáticamente. Debes ejecutarlo manualmente.
@@ -35,13 +37,57 @@ Guía completa para desplegar el CRM con Supabase self-hosted en Easypanel.
 3. Copia el contenido de `easypanel/init-scripts/full-schema.sql`
 4. Ejecuta el SQL (F5 o botón Run)
 
-## Paso 2: Crear Servicio CRM en Easypanel
+---
+
+## Paso 2: Crear Usuario Administrador
+
+En Supabase self-hosted, la confirmación de email no está disponible por defecto. Debes crear el admin manualmente.
+
+### 2.1 Crear usuario en Supabase Studio
+
+1. Abre **Supabase Studio** → **Authentication** → **Users**
+2. Click en **Add user** → **Create new user**
+3. Introduce:
+   - Email: `admin@tuempresa.com`
+   - Password: `tu_contraseña_segura`
+   - ✅ Marca "Auto Confirm User"
+4. Click **Create user**
+5. **Copia el UUID** del usuario creado (columna `UID`)
+
+### 2.2 Asignar rol de administrador
+
+1. Ve a **SQL Editor** en Supabase Studio
+2. Ejecuta el siguiente SQL (reemplaza el UUID):
+
+```sql
+-- Reemplaza 'TU_UUID_AQUI' con el UUID del usuario creado
+-- Ejemplo: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890'
+
+-- Crear perfil
+INSERT INTO public.profiles (user_id, email, full_name)
+VALUES ('TU_UUID_AQUI', 'admin@tuempresa.com', 'Administrador')
+ON CONFLICT (user_id) DO NOTHING;
+
+-- Asignar rol admin
+INSERT INTO public.user_roles (user_id, role)
+VALUES ('TU_UUID_AQUI', 'admin')
+ON CONFLICT (user_id, role) DO NOTHING;
+```
+
+3. Ejecuta el SQL (F5)
+4. ✅ Ya tienes tu usuario administrador
+
+---
+
+## Paso 3: Crear Servicio CRM en Easypanel
 
 1. En Easypanel, crea un nuevo **App** → **GitHub**
 2. Conecta tu repositorio del CRM
 3. Selecciona la rama principal (main/master)
 
-## Paso 3: Configurar Build Args
+---
+
+## Paso 4: Configurar Build Args
 
 En Easypanel, ve a la configuración del servicio CRM:
 
@@ -59,37 +105,44 @@ En Easypanel, ve a la configuración del servicio CRM:
 
 > ⚠️ **Importante**: Estas variables se inyectan en BUILD TIME, no en runtime. Después de cambiarlas, debes hacer rebuild.
 
-## Paso 4: Configurar Dominio
+---
+
+## Paso 5: Configurar Dominio
 
 1. En la configuración del CRM en Easypanel
 2. Ve a **Domains**
 3. Añade tu dominio (ej: `crm.tudominio.com`)
 4. Puerto interno: `80`
 
-## Paso 5: Deploy
+---
+
+## Paso 6: Deploy
 
 1. Guarda la configuración
 2. Haz click en **Deploy**
 3. Espera a que se complete el build
 
-## Paso 6: Configuración Inicial
+---
 
-1. Accede a `https://tu-crm.dominio.com/setup`
-2. El sistema verificará:
-   - Conexión con Supabase
-   - Schema de base de datos
-3. Crea el usuario administrador
-4. ¡Listo!
+## Paso 7: Acceder al CRM
+
+1. Accede a `https://tu-crm.dominio.com/auth`
+2. Inicia sesión con el usuario admin creado en el Paso 2
+3. ¡Listo!
+
+> 💡 La página `/setup` ya no es necesaria para crear el admin, solo verifica la conexión y el schema.
+
+---
 
 ## Verificación Post-Deploy
 
 ### Checklist
 
 - [ ] CRM accesible en el dominio configurado
-- [ ] Página `/setup` carga correctamente
+- [ ] Página `/auth` carga correctamente
+- [ ] Login con usuario admin funciona
+- [ ] Dashboard se muestra correctamente
 - [ ] Conexión con Supabase funciona
-- [ ] Schema detectado correctamente
-- [ ] Usuario admin creado
 
 ### Tablas que deben existir
 
@@ -100,6 +153,16 @@ invoices, invoice_services, expenses, remittances, campaigns,
 calendar_categories, calendar_events, user_availability,
 email_settings, email_templates, notification_rules, notification_queue
 ```
+
+---
+
+## Configuración de Email (Opcional)
+
+Para habilitar notificaciones por email, configura SMTP en **Settings → Email** dentro del CRM.
+
+> ⚠️ En Supabase self-hosted, la confirmación de email para nuevos usuarios NO está disponible a menos que configures SMTP en Supabase Auth.
+
+---
 
 ## Troubleshooting
 
@@ -116,6 +179,13 @@ email_settings, email_templates, notification_rules, notification_queue
 2. Verifica que no hubo errores en la ejecución
 3. Refresca la página del CRM
 
+### "No puedo crear usuario admin"
+
+En Supabase self-hosted:
+1. Usa **Add user** → **Create new user** en Authentication
+2. Marca **Auto Confirm User**
+3. Ejecuta el SQL para asignar rol admin
+
 ### "Build lento o falla"
 
 1. Verifica que las Build Args están configuradas
@@ -128,6 +198,8 @@ Verifica la configuración de Supabase:
 - API URL debe ser accesible públicamente
 - CORS debe permitir tu dominio del CRM
 
+---
+
 ## Archivos Clave
 
 | Archivo | Descripción |
@@ -135,6 +207,8 @@ Verifica la configuración de Supabase:
 | `easypanel/init-scripts/full-schema.sql` | Schema completo de la base de datos |
 | `Dockerfile` | Configuración del contenedor |
 | `src/integrations/supabase/client.ts` | Cliente de Supabase |
+
+---
 
 ## Replicar a Otro Proyecto
 
@@ -144,8 +218,11 @@ Para clonar el CRM a otro servidor:
 2. En Easypanel del nuevo servidor:
    - Despliega Supabase
    - Ejecuta `full-schema.sql`
+   - Crea usuario admin manualmente (Paso 2)
    - Crea el servicio CRM con Build Args
-3. Accede a `/setup` y crea admin
+3. Accede a `/auth` e inicia sesión
+
+---
 
 ## Resumen Rápido
 
@@ -153,10 +230,111 @@ Para clonar el CRM a otro servidor:
 # 1. En Supabase SQL Editor
 → Ejecutar: easypanel/init-scripts/full-schema.sql
 
-# 2. En Easypanel CRM Service
+# 2. En Supabase Studio → Authentication → Users
+→ Add user → Create new user
+→ Email: admin@tuempresa.com
+→ Password: ****
+→ ✅ Auto Confirm User
+→ Copiar UUID
+
+# 3. En Supabase SQL Editor
+→ Ejecutar SQL para crear perfil y asignar rol admin
+
+# 4. En Easypanel CRM Service
 → Build Args:
    VITE_SUPABASE_URL=https://supabase.tudominio.com
    VITE_SUPABASE_ANON_KEY=eyJhbGciOiJI...
 
-# 3. Deploy y acceder a /setup
+# 5. Deploy y acceder a /auth
 ```
+
+---
+
+## Anexo A: Acceso Externo a PostgreSQL
+
+Para conectar herramientas externas como **n8n**, **DBeaver**, o cualquier cliente PostgreSQL a la base de datos de Supabase en Easypanel:
+
+### A.1 Exponer el puerto de PostgreSQL
+
+En Easypanel, ve a la configuración del servicio **Supabase DB** (PostgreSQL):
+
+1. **Settings** → **Ports**
+2. Añade un nuevo puerto:
+   - **Host Port**: `5432` (o el que prefieras, ej: `54320`)
+   - **Container Port**: `5432`
+   - **Protocol**: TCP
+3. Guarda y redeploy
+
+### A.2 Datos de conexión
+
+| Parámetro | Valor |
+|-----------|-------|
+| **Host** | `tu-servidor.com` o IP del VPS |
+| **Port** | `5432` (o el puerto expuesto) |
+| **Database** | `postgres` |
+| **User** | `postgres` |
+| **Password** | La contraseña configurada en Supabase |
+
+### A.3 Ejemplo conexión n8n
+
+En n8n, crea una credencial **Postgres**:
+
+```
+Host: tu-servidor.com
+Port: 5432
+Database: postgres
+User: postgres
+Password: tu_password_de_supabase
+SSL: Disable (si es red interna) o Require (si es externa)
+```
+
+### A.4 Seguridad
+
+> ⚠️ **IMPORTANTE**: Exponer PostgreSQL a internet tiene riesgos de seguridad.
+
+Recomendaciones:
+- Usa contraseñas fuertes
+- Configura firewall para permitir solo IPs conocidas
+- Considera usar túnel SSH o VPN
+- No uses el puerto estándar 5432 (usa uno diferente como 54320)
+
+### A.5 Conexión desde red interna (Docker)
+
+Si n8n está en el mismo Easypanel/servidor, puedes usar la red interna de Docker:
+
+```
+Host: supabase-db  (nombre del servicio en Docker)
+Port: 5432
+```
+
+Esto es más seguro ya que no expone el puerto externamente.
+
+---
+
+## Anexo B: Variables de Entorno
+
+### Variables del CRM (Build Args)
+
+| Variable | Descripción | Ejemplo |
+|----------|-------------|---------|
+| `VITE_SUPABASE_URL` | URL de la API de Supabase | `https://supabase.tudominio.com` |
+| `VITE_SUPABASE_ANON_KEY` | Clave anónima de Supabase | `eyJhbGciOiJI...` |
+
+### Variables de Supabase (si necesitas personalizarlas)
+
+| Variable | Descripción |
+|----------|-------------|
+| `POSTGRES_PASSWORD` | Contraseña de PostgreSQL |
+| `JWT_SECRET` | Secreto para tokens JWT |
+| `ANON_KEY` | Clave pública anónima |
+| `SERVICE_ROLE_KEY` | Clave de servicio (privilegiada) |
+
+---
+
+## Soporte
+
+Si tienes problemas:
+1. Revisa los logs en Easypanel
+2. Verifica la conexión con Supabase
+3. Comprueba que el schema está correctamente instalado
+4. Asegúrate de que el usuario admin tiene el rol correcto
