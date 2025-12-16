@@ -231,3 +231,31 @@ export function useDeleteContract() {
     },
   });
 }
+
+// Mark contract as sent (for automation control)
+export function useMarkContractAsSent() {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { data, error } = await supabase
+        .from("contracts")
+        .update({ 
+          is_sent: true,
+          sent_at: new Date().toISOString()
+        })
+        .eq("id", id)
+        .select()
+        .single();
+      
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["contracts"] });
+    },
+    onError: (error) => {
+      toast.error("Error al marcar como enviado: " + error.message);
+    },
+  });
+}

@@ -16,7 +16,7 @@ import { ExportDropdown } from "@/components/common/ExportDropdown";
 import { TableViewManager, ColumnConfig } from "@/components/common/TableViewManager";
 import { useDefaultTableView } from "@/hooks/useTableViews";
 import { entityExportConfigs } from "@/lib/exportUtils";
-import { useInvoices, useDeleteInvoice, useInvoice, InvoiceWithDetails } from "@/hooks/useInvoices";
+import { useInvoices, useDeleteInvoice, useInvoice, useMarkInvoiceAsSent, InvoiceWithDetails } from "@/hooks/useInvoices";
 import { InvoiceFormDialog } from "@/components/invoices/InvoiceFormDialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { format } from "date-fns";
@@ -82,6 +82,7 @@ const columnConfigs: ColumnConfig[] = [
 export default function Invoices() {
   const { data: invoices = [], isLoading } = useInvoices();
   const deleteInvoice = useDeleteInvoice();
+  const markAsSent = useMarkInvoiceAsSent();
   const { data: invoiceTemplate } = useDefaultTemplate("invoice");
   const { data: companySettings } = useCompanySettings();
   const { data: defaultView } = useDefaultTableView("invoices");
@@ -452,7 +453,7 @@ export default function Invoices() {
         </AlertDialogContent>
       </AlertDialog>
 
-      {emailDialogOpen && invoiceTemplate && emailFullInvoice && (
+      {emailDialogOpen && emailFullInvoice && (
         <SendEmailDialog
           open={emailDialogOpen}
           onOpenChange={(open) => {
@@ -469,14 +470,19 @@ export default function Invoices() {
           total={emailFullInvoice.total || 0}
           dueDate={emailFullInvoice.due_date || undefined}
           isLoadingDocument={isLoadingEmailInvoice}
-          pdfHtml={generatePrintableHTML({
+          entityData={emailFullInvoice as unknown as Record<string, unknown>}
+          pdfHtml={invoiceTemplate ? generatePrintableHTML({
             template: invoiceTemplate.content,
             data: formatInvoiceData(
               emailFullInvoice as unknown as Record<string, unknown>,
               companySettings as unknown as Record<string, unknown>
             ),
             logoUrl: companySettings?.logo_url || undefined,
-          })}
+          }) : undefined}
+          onSendSuccess={() => {
+            // Mark invoice as sent for automation tracking
+            markAsSent.mutate(emailFullInvoice.id);
+          }}
         />
       )}
       
