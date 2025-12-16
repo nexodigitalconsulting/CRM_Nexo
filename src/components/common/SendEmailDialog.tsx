@@ -26,16 +26,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Mail, Send, Eye, FileText, Paperclip, Loader2 } from "lucide-react";
+import { Mail, Send, Eye, FileText, Paperclip, Loader2, Download } from "lucide-react";
 import { useSendEmail, useEmailTemplates, useEmailSettings, EmailTemplate } from "@/hooks/useEmailSettings";
 import { useCompanySettings } from "@/hooks/useCompanySettings";
 import { toast } from "sonner";
-import { 
-  generateInvoicePdfBlob, 
-  generateQuotePdfBlob, 
-  generateContractPdfBlob,
-  blobToBase64 
-} from "@/lib/pdf";
 
 interface SendEmailDialogProps {
   open: boolean;
@@ -53,6 +47,8 @@ interface SendEmailDialogProps {
   // Legacy props (kept for backwards compatibility)
   pdfHtml?: string;
   isLoadingDocument?: boolean;
+  // Callback after successful send
+  onSendSuccess?: () => void;
 }
 
 const TEMPLATE_TYPES_BY_ENTITY: Record<string, string[]> = {
@@ -86,6 +82,12 @@ const TEMPLATE_LABELS: Record<string, string> = {
 
 type TabType = "compose" | "preview" | "document";
 
+// Lazy load PDF functions to avoid bundle issues
+const loadPdfFunctions = async () => {
+  const { generateInvoicePdfBlob, generateQuotePdfBlob, generateContractPdfBlob, blobToBase64, downloadPdf } = await import("@/lib/pdf");
+  return { generateInvoicePdfBlob, generateQuotePdfBlob, generateContractPdfBlob, blobToBase64, downloadPdf };
+};
+
 export function SendEmailDialog({
   open,
   onOpenChange,
@@ -100,6 +102,7 @@ export function SendEmailDialog({
   entityData,
   pdfHtml,
   isLoadingDocument,
+  onSendSuccess,
 }: SendEmailDialogProps) {
   const { data: emailSettings } = useEmailSettings();
   const { data: templates } = useEmailTemplates();
@@ -110,6 +113,7 @@ export function SendEmailDialog({
   const [activeTab, setActiveTab] = useState<TabType>("compose");
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>("");
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
+  const [isDownloading, setIsDownloading] = useState(false);
   const [formData, setFormData] = useState({
     to: "",
     cc: "",
@@ -205,6 +209,7 @@ export function SendEmailDialog({
     if (!entityData) return null;
     
     try {
+      const { generateInvoicePdfBlob, generateQuotePdfBlob, generateContractPdfBlob, blobToBase64 } = await loadPdfFunctions();
       let blob: Blob;
       const settings = companySettings as unknown as Record<string, unknown> | undefined;
       
@@ -227,6 +232,31 @@ export function SendEmailDialog({
     } catch (error) {
       console.error("Error generating PDF:", error);
       return null;
+    }
+  };
+
+  // Handle PDF download
+  const handleDownloadPdf = async () => {
+    if (!entityData) {
+      toast.error("No hay datos para generar el PDF");
+      return;
+    }
+    
+    setIsDownloading(true);
+    try {
+      const { downloadPdf } = await loadPdfFunctions();
+      const result = await generatePdfForEntity();
+      if (result) {
+        await downloadPdf(result.blob, `${documentNumber}.pdf`);
+        toast.success("PDF descargado correctamente");
+      } else {
+        toast.error("Error al generar el PDF");
+      }
+    } catch (error) {
+      console.error("Download error:", error);
+      toast.error("Error al descargar el PDF");
+    } finally {
+      setIsDownloading(false);
     }
   };
 
@@ -262,6 +292,7 @@ export function SendEmailDialog({
           setIsGeneratingPdf(false);
           onOpenChange(false);
           toast.success(`${ENTITY_NAME_MAP[entityType]} enviado correctamente`);
+          onSendSuccess?.();
         },
         onError: (error) => {
           setShowConfirmDialog(false);
@@ -366,12 +397,31 @@ export function SendEmailDialog({
               />
             </div>
 
-            <div className="flex items-center gap-2 p-3 bg-muted/50 rounded-lg border">
-              <Paperclip className="h-4 w-4 text-muted-foreground" />
-              <span className="text-sm text-muted-foreground">
-                Documento adjunto: <span className="font-medium text-foreground">{documentNumber}.pdf</span>
-                {entityData && <span className="text-xs ml-2 text-green-600">(PDF real)</span>}
-              </span>
+            <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg border">
+              <div className="flex items-center gap-2">
+                <Paperclip className="h-4 w-4 text-muted-foreground" />
+                <span className="text-sm text-muted-foreground">
+                  Documento adjunto: <span className="font-medium text-foreground">{documentNumber}.pdf</span>
+                  {entityData && <span className="text-xs ml-2 text-green-600">(PDF real)</span>}
+                </span>
+              </div>
+              {entityData && (
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={handleDownloadPdf}
+                  disabled={isDownloading}
+                >
+                  {isDownloading ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <>
+                      <Download className="h-4 w-4 mr-1" />
+                      Descargar
+                    </>
+                  )}
+                </Button>
+              )}
             </div>
           </div>
         );
@@ -396,16 +446,35 @@ export function SendEmailDialog({
               />
             </div>
 
-            <div className="flex items-center gap-2 p-3 bg-primary/5 rounded-lg border border-primary/20">
-              <FileText className="h-5 w-5 text-primary" />
-              <div>
-                <p className="text-sm font-medium">{documentNumber}.pdf</p>
-                <p className="text-xs text-muted-foreground">
-                  {entityData 
-                    ? "Se generará un PDF real al enviar" 
-                    : "El documento se adjuntará automáticamente al email"}
-                </p>
+            <div className="flex items-center justify-between p-3 bg-primary/5 rounded-lg border border-primary/20">
+              <div className="flex items-center gap-2">
+                <FileText className="h-5 w-5 text-primary" />
+                <div>
+                  <p className="text-sm font-medium">{documentNumber}.pdf</p>
+                  <p className="text-xs text-muted-foreground">
+                    {entityData 
+                      ? "Se generará un PDF real al enviar" 
+                      : "El documento se adjuntará automáticamente al email"}
+                  </p>
+                </div>
               </div>
+              {entityData && (
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={handleDownloadPdf}
+                  disabled={isDownloading}
+                >
+                  {isDownloading ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <>
+                      <Download className="h-4 w-4 mr-1" />
+                      Ver PDF
+                    </>
+                  )}
+                </Button>
+              )}
             </div>
           </div>
         );
@@ -435,7 +504,7 @@ export function SendEmailDialog({
         }
         
         return (
-          <div className="flex items-center justify-center h-[300px] border rounded-lg bg-muted/20">
+          <div className="flex flex-col items-center justify-center h-[300px] border rounded-lg bg-muted/20 gap-4">
             <div className="text-center">
               <FileText className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
               <p className="text-muted-foreground">
@@ -444,6 +513,25 @@ export function SendEmailDialog({
                   : "No hay vista previa disponible"}
               </p>
             </div>
+            {entityData && (
+              <Button 
+                variant="outline" 
+                onClick={handleDownloadPdf}
+                disabled={isDownloading}
+              >
+                {isDownloading ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                    Generando...
+                  </>
+                ) : (
+                  <>
+                    <Download className="h-4 w-4 mr-2" />
+                    Descargar PDF
+                  </>
+                )}
+              </Button>
+            )}
           </div>
         );
     }
