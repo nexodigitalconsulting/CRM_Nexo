@@ -12,20 +12,11 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { email, password, fullName, bootstrapToken } = await req.json();
-
-    // Validate bootstrap token
-    const expectedToken = Deno.env.get("BOOTSTRAP_ADMIN_TOKEN");
-    if (!expectedToken || bootstrapToken !== expectedToken) {
-      console.error("Invalid or missing bootstrap token");
-      return new Response(
-        JSON.stringify({ error: "Token de bootstrap inválido" }),
-        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
+    const { email, password, fullName } = await req.json();
 
     // Validate required fields
     if (!email || !password) {
+      console.error("Missing email or password");
       return new Response(
         JSON.stringify({ error: "Email y contraseña son requeridos" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -36,6 +27,14 @@ Deno.serve(async (req) => {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     
+    if (!supabaseUrl || !serviceRoleKey) {
+      console.error("Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY");
+      return new Response(
+        JSON.stringify({ error: "Configuración de Supabase incompleta en el servidor" }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey, {
       auth: {
         autoRefreshToken: false,
@@ -45,7 +44,7 @@ Deno.serve(async (req) => {
 
     console.log("Checking if any admin exists...");
 
-    // Check if any admin already exists
+    // SECURITY: Only allow if NO admin exists (first setup only)
     const { data: existingAdmins, error: checkError } = await supabaseAdmin
       .from("user_roles")
       .select("id")
@@ -63,12 +62,12 @@ Deno.serve(async (req) => {
     if (existingAdmins && existingAdmins.length > 0) {
       console.log("Admin already exists, rejecting bootstrap");
       return new Response(
-        JSON.stringify({ error: "Ya existe un administrador. El bootstrap solo funciona para el primer admin." }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        JSON.stringify({ error: "Ya existe un administrador. Inicia sesión en /auth" }),
+        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    console.log("No admin exists, proceeding with bootstrap...");
+    console.log("No admin exists, proceeding with bootstrap for:", email);
 
     // Try to find existing user by email
     const { data: existingUsers } = await supabaseAdmin.auth.admin.listUsers();
@@ -80,13 +79,14 @@ Deno.serve(async (req) => {
       console.log("User already exists, using existing user:", existingUser.id);
       userId = existingUser.id;
       
-      // Optionally update password
+      // Update password and confirm email
       const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(userId, {
         password: password,
         email_confirm: true,
       });
       if (updateError) {
         console.error("Error updating user:", updateError);
+        // Non-fatal, continue
       }
     } else {
       console.log("Creating new user...");
@@ -94,7 +94,7 @@ Deno.serve(async (req) => {
       const { data: newUser, error: createError } = await supabaseAdmin.auth.admin.createUser({
         email,
         password,
-        email_confirm: true, // Auto-confirm email
+        email_confirm: true,
         user_metadata: { full_name: fullName || "Administrador" },
       });
 
@@ -140,7 +140,7 @@ Deno.serve(async (req) => {
       );
     }
 
-    console.log("Admin role assigned successfully to user:", userId);
+    console.log("Admin bootstrap completed successfully for user:", userId);
 
     return new Response(
       JSON.stringify({ 

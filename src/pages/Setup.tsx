@@ -41,9 +41,7 @@ export default function Setup() {
   const [adminEmail, setAdminEmail] = useState("");
   const [adminPassword, setAdminPassword] = useState("");
   const [adminName, setAdminName] = useState("");
-  const [bootstrapToken, setBootstrapToken] = useState("");
   const [showPassword, setShowPassword] = useState(false);
-  const [showToken, setShowToken] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
 
   // Auto-run checks on mount
@@ -142,22 +140,17 @@ export default function Setup() {
       toast.error("La contraseña debe tener al menos 6 caracteres");
       return;
     }
-    if (!bootstrapToken) {
-      toast.error("El token de bootstrap es obligatorio");
-      return;
-    }
 
     setIsCreating(true);
     setErrorMessage(null);
 
     try {
-      // Call the bootstrap-admin edge function
+      // Call the bootstrap-admin edge function (no token required - only works if no admin exists)
       const { data, error } = await supabase.functions.invoke("bootstrap-admin", {
         body: {
           email: adminEmail,
           password: adminPassword,
           fullName: adminName || "Administrador",
-          bootstrapToken: bootstrapToken,
         },
       });
 
@@ -338,35 +331,13 @@ export default function Setup() {
                 </p>
               </div>
 
-              <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-3">
-                <p className="text-xs text-amber-700 dark:text-amber-400">
-                  <strong>Token de Bootstrap:</strong> Introduce el token que configuraste en los secrets de Supabase (BOOTSTRAP_ADMIN_TOKEN).
+              <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-3">
+                <p className="text-xs text-blue-700 dark:text-blue-400">
+                  <strong>Primera instalación:</strong> Crea tu cuenta de administrador. Este paso solo está disponible cuando no existe ningún admin.
                 </p>
               </div>
 
               <div className="space-y-3">
-                <div className="space-y-2">
-                  <Label htmlFor="bootstrap-token">Token de Bootstrap *</Label>
-                  <div className="relative">
-                    <Input
-                      id="bootstrap-token"
-                      type={showToken ? "text" : "password"}
-                      placeholder="Token configurado en Supabase"
-                      value={bootstrapToken}
-                      onChange={(e) => setBootstrapToken(e.target.value)}
-                      disabled={isCreating}
-                    />
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      className="absolute right-2 top-1/2 -translate-y-1/2 h-7 w-7"
-                      onClick={() => setShowToken(!showToken)}
-                    >
-                      {showToken ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                    </Button>
-                  </div>
-                </div>
                 <div className="space-y-2">
                   <Label htmlFor="admin-name">Nombre completo</Label>
                   <Input
