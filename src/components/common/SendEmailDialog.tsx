@@ -30,6 +30,12 @@ import { Mail, Send, Eye, FileText, Paperclip, Loader2 } from "lucide-react";
 import { useSendEmail, useEmailTemplates, useEmailSettings, EmailTemplate } from "@/hooks/useEmailSettings";
 import { useCompanySettings } from "@/hooks/useCompanySettings";
 import { toast } from "sonner";
+import { 
+  generateInvoicePdfBlob, 
+  generateQuotePdfBlob, 
+  generateContractPdfBlob,
+  blobToBase64 
+} from "@/lib/pdf";
 
 interface SendEmailDialogProps {
   open: boolean;
@@ -42,6 +48,9 @@ interface SendEmailDialogProps {
   contactEmail?: string;
   total?: number;
   dueDate?: string;
+  // Full entity data for PDF generation
+  entityData?: Record<string, unknown>;
+  // Legacy props (kept for backwards compatibility)
   pdfHtml?: string;
   isLoadingDocument?: boolean;
 }
@@ -88,6 +97,7 @@ export function SendEmailDialog({
   contactEmail,
   total,
   dueDate,
+  entityData,
   pdfHtml,
   isLoadingDocument,
 }: SendEmailDialogProps) {
@@ -99,6 +109,7 @@ export function SendEmailDialog({
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [activeTab, setActiveTab] = useState<TabType>("compose");
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>("");
+  const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
   const [formData, setFormData] = useState({
     to: "",
     cc: "",
@@ -165,7 +176,7 @@ export function SendEmailDialog({
         html: content.html,
       });
     }
-  }, [open]); // Only run when dialog opens
+  }, [open]);
 
   // Update form content when template selection changes
   useEffect(() => {
@@ -177,7 +188,7 @@ export function SendEmailDialog({
         html: content.html,
       }));
     }
-  }, [selectedTemplateId]); // Only run when template selection changes
+  }, [selectedTemplateId]);
 
   const handleSendClick = () => {
     if (!formData.to) {
@@ -189,28 +200,79 @@ export function SendEmailDialog({
 
   const documentNumber = `${ENTITY_PREFIX_MAP[entityType]}-${String(entityNumber).padStart(4, "0")}`;
 
-  const handleConfirmSend = () => {
-    sendEmail.mutate({
-      to: formData.to,
-      cc: formData.cc || undefined,
-      subject: formData.subject,
-      html: formData.html,
-      entityType,
-      entityId,
-      attachPdf: !!pdfHtml,
-      pdfHtml: pdfHtml,
-      pdfFilename: `${documentNumber}.html`,
-    }, {
-      onSuccess: () => {
-        setShowConfirmDialog(false);
-        onOpenChange(false);
-        toast.success(`${ENTITY_NAME_MAP[entityType]} enviado correctamente`);
-      },
-      onError: (error) => {
-        setShowConfirmDialog(false);
-        toast.error(`Error al enviar: ${error.message}`);
-      },
-    });
+  // Generate PDF blob based on entity type
+  const generatePdfForEntity = async (): Promise<{ blob: Blob; base64: string } | null> => {
+    if (!entityData) return null;
+    
+    try {
+      let blob: Blob;
+      const settings = companySettings as unknown as Record<string, unknown> | undefined;
+      
+      switch (entityType) {
+        case "invoice":
+          blob = await generateInvoicePdfBlob(entityData, settings);
+          break;
+        case "quote":
+          blob = await generateQuotePdfBlob(entityData, settings);
+          break;
+        case "contract":
+          blob = await generateContractPdfBlob(entityData, settings);
+          break;
+        default:
+          return null;
+      }
+      
+      const base64 = await blobToBase64(blob);
+      return { blob, base64 };
+    } catch (error) {
+      console.error("Error generating PDF:", error);
+      return null;
+    }
+  };
+
+  const handleConfirmSend = async () => {
+    setIsGeneratingPdf(true);
+    
+    try {
+      let pdfBase64: string | undefined;
+      
+      // Try to generate real PDF if entityData is available
+      if (entityData) {
+        const pdfResult = await generatePdfForEntity();
+        if (pdfResult) {
+          pdfBase64 = pdfResult.base64;
+          console.log("PDF generated successfully, size:", pdfResult.blob.size);
+        }
+      }
+      
+      sendEmail.mutate({
+        to: formData.to,
+        cc: formData.cc || undefined,
+        subject: formData.subject,
+        html: formData.html,
+        entityType,
+        entityId,
+        attachPdf: !!(pdfBase64 || pdfHtml),
+        pdfBase64: pdfBase64,
+        pdfHtml: !pdfBase64 ? pdfHtml : undefined, // Fallback to HTML if no PDF
+        pdfFilename: `${documentNumber}.pdf`,
+      }, {
+        onSuccess: () => {
+          setShowConfirmDialog(false);
+          setIsGeneratingPdf(false);
+          onOpenChange(false);
+          toast.success(`${ENTITY_NAME_MAP[entityType]} enviado correctamente`);
+        },
+        onError: (error) => {
+          setShowConfirmDialog(false);
+          setIsGeneratingPdf(false);
+          toast.error(`Error al enviar: ${error.message}`);
+        },
+      });
+    } catch (error) {
+      setIsGeneratingPdf(false);
+      toast.error("Error al generar el PDF");
+    }
   };
 
   if (!emailSettings?.is_active) {
@@ -307,8 +369,8 @@ export function SendEmailDialog({
             <div className="flex items-center gap-2 p-3 bg-muted/50 rounded-lg border">
               <Paperclip className="h-4 w-4 text-muted-foreground" />
               <span className="text-sm text-muted-foreground">
-                Documento adjunto: <span className="font-medium text-foreground">{documentNumber}.html</span>
-                <span className="text-xs ml-2">(abre en navegador para imprimir como PDF)</span>
+                Documento adjunto: <span className="font-medium text-foreground">{documentNumber}.pdf</span>
+                {entityData && <span className="text-xs ml-2 text-green-600">(PDF real)</span>}
               </span>
             </div>
           </div>
@@ -337,9 +399,11 @@ export function SendEmailDialog({
             <div className="flex items-center gap-2 p-3 bg-primary/5 rounded-lg border border-primary/20">
               <FileText className="h-5 w-5 text-primary" />
               <div>
-                <p className="text-sm font-medium">{documentNumber}.html</p>
+                <p className="text-sm font-medium">{documentNumber}.pdf</p>
                 <p className="text-xs text-muted-foreground">
-                  El documento se adjuntará automáticamente al email
+                  {entityData 
+                    ? "Se generará un PDF real al enviar" 
+                    : "El documento se adjuntará automáticamente al email"}
                 </p>
               </div>
             </div>
@@ -374,8 +438,11 @@ export function SendEmailDialog({
           <div className="flex items-center justify-center h-[300px] border rounded-lg bg-muted/20">
             <div className="text-center">
               <FileText className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-              <p className="text-muted-foreground">No hay vista previa disponible</p>
-              <p className="text-sm text-muted-foreground">El documento se generará al enviar</p>
+              <p className="text-muted-foreground">
+                {entityData 
+                  ? "El PDF se generará automáticamente al enviar"
+                  : "No hay vista previa disponible"}
+              </p>
             </div>
           </div>
         );
@@ -466,18 +533,29 @@ export function SendEmailDialog({
                   <p><span className="text-muted-foreground">Para:</span> {formData.to}</p>
                   {formData.cc && <p><span className="text-muted-foreground">CC:</span> {formData.cc}</p>}
                   <p><span className="text-muted-foreground">Asunto:</span> {formData.subject}</p>
-                  <p><span className="text-muted-foreground">Documento:</span> {documentNumber}.html</p>
+                  <p><span className="text-muted-foreground">Documento:</span> {documentNumber}.pdf</p>
                 </div>
               </div>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogCancel disabled={isGeneratingPdf || sendEmail.isPending}>
+              Cancelar
+            </AlertDialogCancel>
             <AlertDialogAction 
               onClick={handleConfirmSend}
-              disabled={sendEmail.isPending}
+              disabled={isGeneratingPdf || sendEmail.isPending}
             >
-              {sendEmail.isPending ? "Enviando..." : "Confirmar y Enviar"}
+              {isGeneratingPdf ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                  Generando PDF...
+                </>
+              ) : sendEmail.isPending ? (
+                "Enviando..."
+              ) : (
+                "Confirmar y Enviar"
+              )}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
