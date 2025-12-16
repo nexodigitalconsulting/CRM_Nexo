@@ -26,3 +26,6 @@ verify_jwt = false
 
 [functions.bootstrap-admin]
 verify_jwt = false
+
+[functions.ping]
+verify_jwt = false
