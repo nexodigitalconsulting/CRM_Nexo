@@ -5,13 +5,13 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase, getSupabaseConfig } from "@/integrations/supabase/client";
 import { 
   CheckCircle2, Loader2, UserPlus, AlertCircle, Rocket, 
-  Database, Cloud, Eye, EyeOff, RefreshCw
+  Database, Cloud, Eye, EyeOff, RefreshCw, Settings
 } from "lucide-react";
 
-type SetupStep = "checking" | "admin" | "complete";
+type SetupStep = "checking" | "config-error" | "admin" | "complete";
 
 interface CheckResult {
   supabase: "pending" | "success" | "error";
@@ -54,6 +54,16 @@ export default function Setup() {
     setErrorMessage(null);
     setMissingTables([]);
     setCheckResult({ supabase: "pending", schema: "pending" });
+
+    // First check if Supabase is configured
+    const config = getSupabaseConfig();
+    if (!config.isConfigured) {
+      setCheckResult({ supabase: "error", schema: "pending" });
+      setErrorMessage("Variables de entorno VITE_SUPABASE_URL y VITE_SUPABASE_ANON_KEY no configuradas.");
+      setCurrentStep("config-error");
+      setIsChecking(false);
+      return;
+    }
 
     try {
       // Step 1: Check Supabase connection
@@ -228,6 +238,7 @@ export default function Setup() {
           <CardTitle className="text-2xl">Configuración del CRM</CardTitle>
           <CardDescription>
             {currentStep === "checking" && "Verificando sistema..."}
+            {currentStep === "config-error" && "Error de configuración"}
             {currentStep === "admin" && "Crea el usuario administrador"}
             {currentStep === "complete" && "¡Listo para usar!"}
           </CardDescription>
@@ -298,6 +309,62 @@ export default function Setup() {
                   Reintentar verificación
                 </Button>
               )}
+            </div>
+          )}
+
+          {/* Configuration Error Step */}
+          {currentStep === "config-error" && (
+            <div className="space-y-4">
+              <div className="flex items-center gap-3 p-3 bg-destructive/10 rounded-lg">
+                <AlertCircle className="h-5 w-5 text-destructive" />
+                <div className="flex-1">
+                  <p className="font-medium text-sm">Error de Configuración</p>
+                  <p className="text-xs text-muted-foreground">
+                    Las variables de entorno de Supabase no están configuradas
+                  </p>
+                </div>
+                <Settings className="h-5 w-5 text-muted-foreground" />
+              </div>
+
+              <div className="bg-muted rounded-lg p-4 space-y-2">
+                <p className="text-sm font-medium">Configuración actual:</p>
+                <div className="text-xs space-y-1 font-mono">
+                  <p>
+                    <span className="text-muted-foreground">VITE_SUPABASE_URL:</span>{" "}
+                    <span className={getSupabaseConfig().url ? "text-green-600" : "text-destructive"}>
+                      {getSupabaseConfig().url || "No configurada"}
+                    </span>
+                  </p>
+                  <p>
+                    <span className="text-muted-foreground">VITE_SUPABASE_ANON_KEY:</span>{" "}
+                    <span className={getSupabaseConfig().hasKey ? "text-green-600" : "text-destructive"}>
+                      {getSupabaseConfig().hasKey ? "✓ Configurada" : "No configurada"}
+                    </span>
+                  </p>
+                </div>
+              </div>
+
+              <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-3">
+                <p className="text-sm font-medium text-amber-700 dark:text-amber-400 mb-2">
+                  Para Easypanel + Supabase Self-hosted:
+                </p>
+                <ul className="text-xs text-muted-foreground space-y-1 list-disc list-inside">
+                  <li>Configura <code>VITE_SUPABASE_URL</code> en Build Args</li>
+                  <li>Configura <code>VITE_SUPABASE_ANON_KEY</code> en Build Args</li>
+                  <li>Reconstruye la imagen del contenedor</li>
+                </ul>
+              </div>
+
+              {errorMessage && (
+                <div className="bg-destructive/10 border border-destructive/30 rounded-lg p-3">
+                  <p className="text-sm text-destructive">{errorMessage}</p>
+                </div>
+              )}
+
+              <Button onClick={() => { setCurrentStep("checking"); runAutomaticChecks(); }} variant="outline" className="w-full">
+                <RefreshCw className="mr-2 h-4 w-4" />
+                Reintentar verificación
+              </Button>
             </div>
           )}
 
