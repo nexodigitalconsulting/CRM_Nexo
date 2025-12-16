@@ -391,7 +391,7 @@ export default function Setup() {
 
               <Button
                 onClick={createAdmin}
-                disabled={isCreating || !adminEmail || !adminPassword || !bootstrapToken}
+                disabled={isCreating || !adminEmail || !adminPassword}
                 className="w-full"
               >
                 {isCreating ? (
