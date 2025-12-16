@@ -1,468 +1,302 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { toast } from "sonner";
 import { supabase, getSupabaseConfig } from "@/integrations/supabase/client";
-import { 
-  CheckCircle2, Loader2, UserPlus, AlertCircle, Rocket, 
-  Database, Cloud, Eye, EyeOff, RefreshCw, Settings
-} from "lucide-react";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { CheckCircle, XCircle, Loader2, Database, Shield, AlertTriangle, Copy, ExternalLink, RefreshCw } from "lucide-react";
+import { toast } from "sonner";
 
-type SetupStep = "checking" | "config-error" | "admin" | "complete";
+type SetupStep = "checking" | "config-error" | "needs-admin" | "has-admin";
 
 interface CheckResult {
-  supabase: "pending" | "success" | "error";
-  schema: "pending" | "success" | "error";
+  supabaseConnection: "pending" | "success" | "error";
+  schemaValid: "pending" | "success" | "error";
+  adminExists: "pending" | "yes" | "no";
+  errorMessage?: string;
 }
 
 const REQUIRED_TABLES = [
-  "profiles", "user_roles", "company_settings", "contacts", "clients",
-  "services", "quotes", "quote_services", "contracts", "contract_services",
-  "invoices", "invoice_services", "expenses", "remittances", "campaigns",
-  "calendar_categories", "calendar_events", "user_availability",
-  "email_settings", "email_templates", "notification_rules", "notification_queue",
+  "profiles",
+  "user_roles",
+  "company_settings",
+  "clients",
+  "contacts",
+  "services",
+  "quotes",
+  "contracts",
+  "invoices",
+  "expenses",
 ];
 
 export default function Setup() {
   const navigate = useNavigate();
   const [currentStep, setCurrentStep] = useState<SetupStep>("checking");
   const [checkResult, setCheckResult] = useState<CheckResult>({
-    supabase: "pending",
-    schema: "pending",
+    supabaseConnection: "pending",
+    schemaValid: "pending",
+    adminExists: "pending",
   });
-  const [isChecking, setIsChecking] = useState(true);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [missingTables, setMissingTables] = useState<string[]>([]);
 
-  // Admin form
-  const [adminEmail, setAdminEmail] = useState("");
-  const [adminPassword, setAdminPassword] = useState("");
-  const [adminName, setAdminName] = useState("");
-  const [showPassword, setShowPassword] = useState(false);
-  const [isCreating, setIsCreating] = useState(false);
+  const supabaseConfig = getSupabaseConfig();
 
-  // Auto-run checks on mount
   useEffect(() => {
-    runAutomaticChecks();
-  }, []);
-
-  const runAutomaticChecks = async () => {
-    setIsChecking(true);
-    setErrorMessage(null);
-    setMissingTables([]);
-    setCheckResult({ supabase: "pending", schema: "pending" });
-
-    // First check if Supabase is configured
-    const config = getSupabaseConfig();
-    if (!config.isConfigured) {
-      setCheckResult({ supabase: "error", schema: "pending" });
-      setErrorMessage("Variables de entorno VITE_SUPABASE_URL y VITE_SUPABASE_ANON_KEY no configuradas.");
+    if (!supabaseConfig.isConfigured) {
       setCurrentStep("config-error");
-      setIsChecking(false);
       return;
     }
+    runChecks();
+  }, []);
+
+  const runChecks = async () => {
+    setCurrentStep("checking");
+    setCheckResult({
+      supabaseConnection: "pending",
+      schemaValid: "pending",
+      adminExists: "pending",
+    });
 
     try {
-      // Step 1: Check Supabase connection
-      const { error: connError } = await supabase
-        .from("company_settings")
-        .select("id")
-        .limit(1);
-
-      if (connError && !connError.message.includes("does not exist")) {
-        setCheckResult(prev => ({ ...prev, supabase: "error" }));
-        throw new Error(`Conexión a Supabase fallida: ${connError.message}`);
+      // Check 1: Supabase connection
+      const { error: connError } = await supabase.from("company_settings").select("id").limit(1);
+      
+      if (connError && !connError.message.includes("permission denied")) {
+        setCheckResult(prev => ({
+          ...prev,
+          supabaseConnection: "error",
+          errorMessage: `Conexión fallida: ${connError.message}`,
+        }));
+        setCurrentStep("config-error");
+        return;
       }
 
-      setCheckResult(prev => ({ ...prev, supabase: "success" }));
+      setCheckResult(prev => ({ ...prev, supabaseConnection: "success" }));
 
-      // Step 2: Check schema tables
-      const missing: string[] = [];
+      // Check 2: Schema validation
+      let missingTables: string[] = [];
       for (const table of REQUIRED_TABLES) {
-        const { error } = await supabase
-          .from(table as any)
-          .select("*", { count: "exact", head: true });
-
-        if (error) {
-          const msg = error.message.toLowerCase();
-          const code = error.code || "";
-          if (
-            msg.includes("does not exist") ||
-            code === "42P01" ||
-            code === "PGRST204"
-          ) {
-            missing.push(table);
-          }
+        const { error } = await supabase.from(table as any).select("*").limit(1);
+        if (error && error.message.includes("does not exist")) {
+          missingTables.push(table);
         }
       }
 
-      if (missing.length > 0) {
-        setMissingTables(missing);
-        setCheckResult(prev => ({ ...prev, schema: "error" }));
-        throw new Error(`Faltan ${missing.length} tablas en la base de datos.`);
+      if (missingTables.length > 0) {
+        setCheckResult(prev => ({
+          ...prev,
+          schemaValid: "error",
+          errorMessage: `Tablas faltantes: ${missingTables.join(", ")}`,
+        }));
+        setCurrentStep("config-error");
+        return;
       }
 
-      setCheckResult(prev => ({ ...prev, schema: "success" }));
-      
-      // Check if admin already exists
-      const { data: existingRoles } = await supabase
+      setCheckResult(prev => ({ ...prev, schemaValid: "success" }));
+
+      // Check 3: Admin exists
+      const { data: adminData, error: adminError } = await supabase
         .from("user_roles")
         .select("id")
         .eq("role", "admin")
         .limit(1);
 
-      if (existingRoles && existingRoles.length > 0) {
-        toast.success("CRM ya configurado. Redirigiendo...");
-        setTimeout(() => navigate("/auth"), 1500);
+      if (adminError) {
+        // RLS might block this query - that's OK, we'll assume no admin
+        setCheckResult(prev => ({ ...prev, adminExists: "no" }));
+        setCurrentStep("needs-admin");
         return;
       }
 
-      // All checks passed, go to admin creation
-      setCurrentStep("admin");
-      toast.success("Verificaciones completadas");
-
+      if (adminData && adminData.length > 0) {
+        setCheckResult(prev => ({ ...prev, adminExists: "yes" }));
+        setCurrentStep("has-admin");
+      } else {
+        setCheckResult(prev => ({ ...prev, adminExists: "no" }));
+        setCurrentStep("needs-admin");
+      }
     } catch (error: any) {
-      setErrorMessage(error.message);
-    } finally {
-      setIsChecking(false);
+      setCheckResult(prev => ({
+        ...prev,
+        supabaseConnection: "error",
+        errorMessage: error.message,
+      }));
+      setCurrentStep("config-error");
     }
   };
 
-  const createAdmin = async () => {
-    if (!adminEmail || !adminPassword) {
-      toast.error("Email y contraseña son obligatorios");
-      return;
-    }
-    if (adminPassword.length < 6) {
-      toast.error("La contraseña debe tener al menos 6 caracteres");
-      return;
-    }
-
-    setIsCreating(true);
-    setErrorMessage(null);
-
-    try {
-      // Paso 1) Crear usuario en Supabase Auth (no Edge Function)
-      const redirectUrl = `${window.location.origin}/auth`;
-      const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
-        email: adminEmail,
-        password: adminPassword,
-        options: {
-          // CRÍTICO: necesario para completar el flujo de confirmación si está activado
-          emailRedirectTo: redirectUrl,
-          data: { full_name: adminName || "Administrador" },
-        },
-      });
-
-      if (signUpError) {
-        throw new Error(`Registro: ${signUpError.message}`);
-      }
-
-      const createdUserId = signUpData.user?.id;
-      if (!createdUserId) {
-        throw new Error("Registro: Supabase no devolvió el usuario creado");
-      }
-
-      // IMPORTANTÍSIMO (posible punto de fallo):
-      // Si "Confirm email" está activado, signUp NO crea sesión.
-      // El RPC debería ejecutarse como usuario autenticado para tener auth.uid() disponible
-      // (aunque la función sea SECURITY DEFINER, el flujo es más robusto y consistente).
-      let sessionUserId = signUpData.session?.user?.id ?? null;
-
-      if (!sessionUserId) {
-        // Intento de login inmediato (funciona si confirmación de email está desactivada)
-        const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
-          email: adminEmail,
-          password: adminPassword,
-        });
-
-        if (signInError || !signInData.session?.user?.id) {
-          // Caso más común: confirmación de email activada.
-          throw new Error(
-            "Registro OK, pero no hay sesión activa (probablemente tienes 'Confirm email' activado). " +
-              "Para crear el primer admin sin Edge Functions, desactiva temporalmente 'Confirm email' en Supabase Auth y vuelve a intentarlo."
-          );
-        }
-
-        sessionUserId = signInData.session.user.id;
-      }
-
-      // Paso 2) Asignar rol admin vía función SQL
-      const { data: rpcResult, error: rpcError } = await supabase.rpc("bootstrap_first_admin", {
-        _user_id: createdUserId,
-        _email: adminEmail,
-        _full_name: adminName || "Administrador",
-      });
-
-      if (rpcError) {
-        throw new Error(`Asignación de admin (RPC): ${rpcError.message}`);
-      }
-
-      if (rpcResult && typeof rpcResult === "object" && "error" in rpcResult) {
-        throw new Error(`Asignación de admin: ${(rpcResult as { error: string }).error}`);
-      }
-
-      toast.success("¡Administrador creado correctamente!");
-      setCurrentStep("complete");
-    } catch (error: any) {
-      const msg = error?.message || "Error inesperado creando el administrador";
-      setErrorMessage(msg);
-      toast.error(msg);
-      // No logueamos credenciales; solo el mensaje.
-      console.error("createAdmin error:", msg);
-    } finally {
-      setIsCreating(false);
-    }
+  const copyToClipboard = (text: string) => {
+    navigator.clipboard.writeText(text);
+    toast.success("Copiado al portapapeles");
   };
 
-  const renderStatusIcon = (status: "pending" | "success" | "error") => {
+  const renderStatusIcon = (status: "pending" | "success" | "error" | "yes" | "no") => {
     switch (status) {
-      case "success": return <CheckCircle2 className="h-5 w-5 text-green-500" />;
-      case "error": return <AlertCircle className="h-5 w-5 text-destructive" />;
-      default: return <Loader2 className="h-5 w-5 animate-spin text-primary" />;
+      case "pending":
+        return <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />;
+      case "success":
+      case "yes":
+        return <CheckCircle className="h-5 w-5 text-green-500" />;
+      case "error":
+      case "no":
+        return <XCircle className="h-5 w-5 text-red-500" />;
     }
   };
+
+  const sqlCreateAdmin = `-- 1. Primero crea un usuario en Supabase Studio → Authentication → Add user
+-- 2. Copia el UUID del usuario creado
+-- 3. Ejecuta este SQL reemplazando los valores:
+
+INSERT INTO public.profiles (user_id, email, full_name)
+VALUES (
+  'PEGA_UUID_AQUI',           -- UUID del usuario
+  'admin@tuempresa.com',       -- Email del usuario
+  'Administrador'              -- Nombre
+)
+ON CONFLICT (user_id) DO UPDATE SET
+  email = EXCLUDED.email,
+  full_name = EXCLUDED.full_name;
+
+INSERT INTO public.user_roles (user_id, role)
+VALUES ('PEGA_UUID_AQUI', 'admin')
+ON CONFLICT (user_id, role) DO NOTHING;`;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background to-muted flex items-center justify-center p-4">
-      <Card className="w-full max-w-lg">
+    <div className="min-h-screen bg-background flex items-center justify-center p-4">
+      <Card className="w-full max-w-2xl">
         <CardHeader className="text-center">
-          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-primary/10">
-            <Rocket className="h-7 w-7 text-primary" />
+          <div className="mx-auto mb-4 h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center">
+            <Shield className="h-6 w-6 text-primary" />
           </div>
-          <CardTitle className="text-2xl">Configuración del CRM</CardTitle>
+          <CardTitle className="text-2xl">Configuración Inicial - CRM</CardTitle>
           <CardDescription>
-            {currentStep === "checking" && "Verificando sistema..."}
-            {currentStep === "config-error" && "Error de configuración"}
-            {currentStep === "admin" && "Crea el usuario administrador"}
-            {currentStep === "complete" && "¡Listo para usar!"}
+            Supabase Autoalojado + Easypanel
           </CardDescription>
         </CardHeader>
 
         <CardContent className="space-y-6">
-          {/* Checking Step */}
-          {currentStep === "checking" && (
-            <div className="space-y-4">
-              <div className="space-y-3">
-                <div className="flex items-center gap-3 p-3 bg-muted rounded-lg">
-                  {renderStatusIcon(checkResult.supabase)}
-                  <div className="flex-1">
-                    <p className="font-medium text-sm">Conexión Supabase</p>
-                    <p className="text-xs text-muted-foreground">
-                      {checkResult.supabase === "pending" && "Verificando..."}
-                      {checkResult.supabase === "success" && "Conectado correctamente"}
-                      {checkResult.supabase === "error" && "Error de conexión"}
-                    </p>
-                  </div>
-                  <Cloud className="h-5 w-5 text-muted-foreground" />
-                </div>
-
-                <div className="flex items-center gap-3 p-3 bg-muted rounded-lg">
-                  {renderStatusIcon(checkResult.schema)}
-                  <div className="flex-1">
-                    <p className="font-medium text-sm">Schema de Base de Datos</p>
-                    <p className="text-xs text-muted-foreground">
-                      {checkResult.schema === "pending" && "Verificando tablas..."}
-                      {checkResult.schema === "success" && `${REQUIRED_TABLES.length} tablas verificadas`}
-                      {checkResult.schema === "error" && `${missingTables.length} tablas faltantes`}
-                    </p>
-                  </div>
-                  <Database className="h-5 w-5 text-muted-foreground" />
-                </div>
-              </div>
-
-              {missingTables.length > 0 && (
-                <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-3">
-                  <p className="text-sm font-medium text-amber-700 dark:text-amber-400 mb-2">
-                    Tablas faltantes:
-                  </p>
-                  <div className="flex flex-wrap gap-1">
-                    {missingTables.slice(0, 8).map(t => (
-                      <span key={t} className="text-xs bg-amber-500/20 px-2 py-0.5 rounded">
-                        {t}
-                      </span>
-                    ))}
-                    {missingTables.length > 8 && (
-                      <span className="text-xs text-amber-600">+{missingTables.length - 8} más</span>
-                    )}
-                  </div>
-                  <p className="text-xs text-muted-foreground mt-2">
-                    Ejecuta las migraciones de Supabase antes de continuar.
-                  </p>
-                </div>
-              )}
-
-              {errorMessage && (
-                <div className="bg-destructive/10 border border-destructive/30 rounded-lg p-3">
-                  <p className="text-sm text-destructive">{errorMessage}</p>
-                </div>
-              )}
-
-              {!isChecking && (checkResult.supabase === "error" || checkResult.schema === "error") && (
-                <Button onClick={runAutomaticChecks} variant="outline" className="w-full">
-                  <RefreshCw className="mr-2 h-4 w-4" />
-                  Reintentar verificación
-                </Button>
-              )}
+          {/* Status checks */}
+          <div className="space-y-3">
+            <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/50">
+              {renderStatusIcon(checkResult.supabaseConnection)}
+              <span className="flex-1">Conexión a Supabase</span>
             </div>
-          )}
+            <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/50">
+              {renderStatusIcon(checkResult.schemaValid)}
+              <span className="flex-1">Esquema de base de datos</span>
+            </div>
+            <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/50">
+              {renderStatusIcon(checkResult.adminExists)}
+              <span className="flex-1">Usuario administrador</span>
+            </div>
+          </div>
 
-          {/* Configuration Error Step */}
+          {/* Config Error */}
           {currentStep === "config-error" && (
             <div className="space-y-4">
-              <div className="flex items-center gap-3 p-3 bg-destructive/10 rounded-lg">
-                <AlertCircle className="h-5 w-5 text-destructive" />
-                <div className="flex-1">
-                  <p className="font-medium text-sm">Error de Configuración</p>
-                  <p className="text-xs text-muted-foreground">
-                    Las variables de entorno de Supabase no están configuradas
-                  </p>
-                </div>
-                <Settings className="h-5 w-5 text-muted-foreground" />
-              </div>
-
-              <div className="bg-muted rounded-lg p-4 space-y-2">
-                <p className="text-sm font-medium">Configuración actual:</p>
-                <div className="text-xs space-y-1 font-mono">
-                  <p>
-                    <span className="text-muted-foreground">VITE_SUPABASE_URL:</span>{" "}
-                    <span className={getSupabaseConfig().url ? "text-green-600" : "text-destructive"}>
-                      {getSupabaseConfig().url || "No configurada"}
-                    </span>
-                  </p>
-                  <p>
-                    <span className="text-muted-foreground">VITE_SUPABASE_ANON_KEY:</span>{" "}
-                    <span className={getSupabaseConfig().hasKey ? "text-green-600" : "text-destructive"}>
-                      {getSupabaseConfig().hasKey ? "✓ Configurada" : "No configurada"}
-                    </span>
-                  </p>
+              <div className="p-4 rounded-lg bg-destructive/10 border border-destructive/20">
+                <div className="flex items-start gap-3">
+                  <AlertTriangle className="h-5 w-5 text-destructive mt-0.5" />
+                  <div>
+                    <p className="font-medium text-destructive">Error de configuración</p>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      {checkResult.errorMessage || "Verifica las variables de entorno VITE_SUPABASE_URL y VITE_SUPABASE_ANON_KEY"}
+                    </p>
+                  </div>
                 </div>
               </div>
-
-              <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-3">
-                <p className="text-sm font-medium text-amber-700 dark:text-amber-400 mb-2">
-                  Para Easypanel + Supabase Self-hosted:
-                </p>
-                <ul className="text-xs text-muted-foreground space-y-1 list-disc list-inside">
-                  <li>Configura <code>VITE_SUPABASE_URL</code> en Build Args</li>
-                  <li>Configura <code>VITE_SUPABASE_ANON_KEY</code> en Build Args</li>
-                  <li>Reconstruye la imagen del contenedor</li>
-                </ul>
-              </div>
-
-              {errorMessage && (
-                <div className="bg-destructive/10 border border-destructive/30 rounded-lg p-3">
-                  <p className="text-sm text-destructive">{errorMessage}</p>
-                </div>
-              )}
-
-              <Button onClick={() => { setCurrentStep("checking"); runAutomaticChecks(); }} variant="outline" className="w-full">
-                <RefreshCw className="mr-2 h-4 w-4" />
+              <Button onClick={runChecks} variant="outline" className="w-full">
+                <RefreshCw className="h-4 w-4 mr-2" />
                 Reintentar verificación
               </Button>
             </div>
           )}
 
-          {/* Admin Creation Step */}
-          {currentStep === "admin" && (
+          {/* Needs Admin - Show SQL instructions */}
+          {currentStep === "needs-admin" && (
             <div className="space-y-4">
-              <div className="flex items-center gap-3 p-3 bg-green-500/10 rounded-lg">
-                <CheckCircle2 className="h-5 w-5 text-green-500" />
-                <p className="text-sm text-green-700 dark:text-green-400">
-                  Sistema verificado correctamente
-                </p>
-              </div>
-
-              <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-3">
-                <p className="text-xs text-blue-700 dark:text-blue-400">
-                  <strong>Primera instalación:</strong> Crea tu cuenta de administrador. Este paso solo está disponible cuando no existe ningún admin.
-                </p>
-              </div>
-
-              <div className="space-y-3">
-                <div className="space-y-2">
-                  <Label htmlFor="admin-name">Nombre completo</Label>
-                  <Input
-                    id="admin-name"
-                    placeholder="Juan Pérez"
-                    value={adminName}
-                    onChange={(e) => setAdminName(e.target.value)}
-                    disabled={isCreating}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="admin-email">Email *</Label>
-                  <Input
-                    id="admin-email"
-                    type="email"
-                    placeholder="admin@empresa.com"
-                    value={adminEmail}
-                    onChange={(e) => setAdminEmail(e.target.value)}
-                    disabled={isCreating}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="admin-password">Contraseña *</Label>
-                  <div className="relative">
-                    <Input
-                      id="admin-password"
-                      type={showPassword ? "text" : "password"}
-                      placeholder="Mínimo 6 caracteres"
-                      value={adminPassword}
-                      onChange={(e) => setAdminPassword(e.target.value)}
-                      disabled={isCreating}
-                    />
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      className="absolute right-2 top-1/2 -translate-y-1/2 h-7 w-7"
-                      onClick={() => setShowPassword(!showPassword)}
-                    >
-                      {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                    </Button>
+              <div className="p-4 rounded-lg bg-amber-500/10 border border-amber-500/20">
+                <div className="flex items-start gap-3">
+                  <AlertTriangle className="h-5 w-5 text-amber-500 mt-0.5" />
+                  <div>
+                    <p className="font-medium text-amber-600">No hay administrador configurado</p>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      En Supabase autoalojado, crea el admin manualmente:
+                    </p>
                   </div>
                 </div>
               </div>
 
-              {errorMessage && (
-                <div className="bg-destructive/10 border border-destructive/30 rounded-lg p-3">
-                  <p className="text-sm text-destructive">{errorMessage}</p>
-                </div>
-              )}
+              <div className="space-y-3">
+                <h4 className="font-medium flex items-center gap-2">
+                  <Database className="h-4 w-4" />
+                  Pasos para crear el administrador:
+                </h4>
+                
+                <ol className="list-decimal list-inside space-y-2 text-sm text-muted-foreground">
+                  <li>Ve a <strong>Supabase Studio → Authentication → Users</strong></li>
+                  <li>Haz clic en <strong>"Add user"</strong></li>
+                  <li>Crea un usuario con email y contraseña</li>
+                  <li>Copia el <strong>UUID</strong> del usuario creado</li>
+                  <li>Ve a <strong>SQL Editor</strong> y ejecuta el SQL de abajo</li>
+                </ol>
 
-              <Button
-                onClick={createAdmin}
-                disabled={isCreating || !adminEmail || !adminPassword}
-                className="w-full"
-              >
-                {isCreating ? (
-                  <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Creando...</>
-                ) : (
-                  <><UserPlus className="mr-2 h-4 w-4" /> Crear Administrador</>
-                )}
+                <div className="relative">
+                  <pre className="p-4 rounded-lg bg-muted text-xs overflow-x-auto max-h-64">
+                    {sqlCreateAdmin}
+                  </pre>
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    className="absolute top-2 right-2"
+                    onClick={() => copyToClipboard(sqlCreateAdmin)}
+                  >
+                    <Copy className="h-3 w-3 mr-1" />
+                    Copiar
+                  </Button>
+                </div>
+              </div>
+
+              <div className="flex gap-2">
+                <Button onClick={runChecks} variant="outline" className="flex-1">
+                  <RefreshCw className="h-4 w-4 mr-2" />
+                  Verificar de nuevo
+                </Button>
+                <Button 
+                  variant="secondary"
+                  onClick={() => window.open(`${supabaseConfig.url?.replace('/rest/v1', '')}/project/default/auth/users`, '_blank')}
+                >
+                  <ExternalLink className="h-4 w-4 mr-2" />
+                  Abrir Supabase
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {/* Has Admin - Redirect to login */}
+          {currentStep === "has-admin" && (
+            <div className="space-y-4">
+              <div className="p-4 rounded-lg bg-green-500/10 border border-green-500/20">
+                <div className="flex items-start gap-3">
+                  <CheckCircle className="h-5 w-5 text-green-500 mt-0.5" />
+                  <div>
+                    <p className="font-medium text-green-600">¡Sistema configurado correctamente!</p>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      Ya existe un usuario administrador. Puedes iniciar sesión.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <Button onClick={() => navigate("/auth")} className="w-full">
+                Ir a Iniciar Sesión
               </Button>
             </div>
           )}
 
-          {/* Complete Step */}
-          {currentStep === "complete" && (
-            <div className="space-y-4 text-center">
-              <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-green-500/10">
-                <CheckCircle2 className="h-7 w-7 text-green-500" />
-              </div>
-              <div>
-                <p className="text-lg font-medium">¡Configuración completada!</p>
-                <p className="text-sm text-muted-foreground mt-1">
-                  Inicia sesión con tu cuenta de administrador
-                </p>
-              </div>
-              <Button onClick={() => navigate("/auth")} className="w-full">
-                Ir al Login
-              </Button>
+          {/* Checking state */}
+          {currentStep === "checking" && (
+            <div className="text-center py-4">
+              <Loader2 className="h-8 w-8 animate-spin mx-auto text-primary" />
+              <p className="text-sm text-muted-foreground mt-2">Verificando configuración...</p>
             </div>
           )}
         </CardContent>
