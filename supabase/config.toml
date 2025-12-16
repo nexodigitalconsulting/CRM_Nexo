@@ -23,3 +23,6 @@ verify_jwt = false
 
 [functions.postgres-proxy]
 verify_jwt = false
+
+[functions.bootstrap-admin]
+verify_jwt = false
