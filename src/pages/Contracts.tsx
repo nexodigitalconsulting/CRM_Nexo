@@ -16,7 +16,7 @@ import { ExportDropdown } from "@/components/common/ExportDropdown";
 import { TableViewManager, ColumnConfig } from "@/components/common/TableViewManager";
 import { useDefaultTableView } from "@/hooks/useTableViews";
 import { entityExportConfigs } from "@/lib/exportUtils";
-import { useContracts, useDeleteContract, useContract, ContractWithDetails } from "@/hooks/useContracts";
+import { useContracts, useDeleteContract, useContract, useMarkContractAsSent, ContractWithDetails } from "@/hooks/useContracts";
 import { useDefaultTemplate } from "@/hooks/useTemplates";
 import { useCompanySettings } from "@/hooks/useCompanySettings";
 import { printDocument, formatContractData } from "@/lib/pdfGenerator";
@@ -97,6 +97,7 @@ const columnConfigs: ColumnConfig[] = [
 export default function Contracts() {
   const { data: contracts = [], isLoading } = useContracts();
   const deleteContract = useDeleteContract();
+  const markAsSent = useMarkContractAsSent();
   const { data: contractTemplate } = useDefaultTemplate("contract");
   const { data: companySettings } = useCompanySettings();
   const { data: defaultView } = useDefaultTableView("contracts");
@@ -499,7 +500,10 @@ export default function Contracts() {
       {emailContract && (
         <SendEmailDialog
           open={emailDialogOpen}
-          onOpenChange={setEmailDialogOpen}
+          onOpenChange={(open) => {
+            setEmailDialogOpen(open);
+            if (!open) setEmailContract(null);
+          }}
           entityType="contract"
           entityId={emailContract.id}
           entityNumber={emailContract.contract_number}
@@ -507,6 +511,12 @@ export default function Contracts() {
           clientEmail={emailContract.client?.email || ""}
           total={emailContract.total || 0}
           dueDate={emailContract.end_date || undefined}
+          entityData={emailContract as unknown as Record<string, unknown>}
+          onSendSuccess={() => {
+            // Mark contract as sent for automation tracking
+            markAsSent.mutate(emailContract.id);
+            toast.success("Contrato marcado como enviado");
+          }}
         />
       )}
     </div>

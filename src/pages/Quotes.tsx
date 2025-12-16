@@ -22,7 +22,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { useQuotes, useQuote, useDeleteQuote, useUpdateQuoteStatus, QuoteWithDetails } from "@/hooks/useQuotes";
+import { useQuotes, useQuote, useDeleteQuote, useUpdateQuoteStatus, useMarkQuoteAsSent, QuoteWithDetails } from "@/hooks/useQuotes";
 import { QuoteFormDialog } from "@/components/quotes/QuoteFormDialog";
 import { ExportDropdown } from "@/components/common/ExportDropdown";
 import { TableViewManager, ColumnConfig } from "@/components/common/TableViewManager";
@@ -76,6 +76,7 @@ export default function Quotes() {
   const { data: quotes, isLoading, error } = useQuotes();
   const deleteQuote = useDeleteQuote();
   const updateStatus = useUpdateQuoteStatus();
+  const markAsSent = useMarkQuoteAsSent();
   const { data: quoteTemplate } = useDefaultTemplate("quote");
   const { data: companySettings } = useCompanySettings();
   const { data: defaultView } = useDefaultTableView("quotes");
@@ -522,6 +523,12 @@ export default function Quotes() {
           contactEmail={emailQuote.contact?.email || ""}
           total={Number(emailQuote.total) || 0}
           dueDate={emailQuote.valid_until || undefined}
+          entityData={emailQuote as unknown as Record<string, unknown>}
+          onSendSuccess={() => {
+            // Mark quote as sent and update status
+            markAsSent.mutate(emailQuote.id);
+            toast.success("Presupuesto marcado como enviado");
+          }}
         />
       )}
     </div>

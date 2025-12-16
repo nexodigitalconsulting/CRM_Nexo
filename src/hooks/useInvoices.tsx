@@ -314,3 +314,31 @@ export function useContractsForInvoice() {
     },
   });
 }
+
+// Mark invoice as sent (for automation control)
+export function useMarkInvoiceAsSent() {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { data, error } = await supabase
+        .from("invoices")
+        .update({ 
+          is_sent: true,
+          sent_at: new Date().toISOString()
+        })
+        .eq("id", id)
+        .select()
+        .single();
+      
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["invoices"] });
+    },
+    onError: (error) => {
+      toast.error("Error al marcar como enviada: " + error.message);
+    },
+  });
+}

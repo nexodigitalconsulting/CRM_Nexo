@@ -185,6 +185,35 @@ export function useUpdateQuoteStatus() {
   });
 }
 
+// Mark quote as sent (for automation control)
+export function useMarkQuoteAsSent() {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { data, error } = await supabase
+        .from("quotes")
+        .update({ 
+          status: "sent" as Quote["status"],
+          is_sent: true,
+          sent_at: new Date().toISOString()
+        })
+        .eq("id", id)
+        .select()
+        .single();
+      
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["quotes"] });
+    },
+    onError: (error) => {
+      toast.error("Error al marcar como enviado: " + error.message);
+    },
+  });
+}
+
 export function useDeleteQuote() {
   const queryClient = useQueryClient();
   

@@ -519,12 +519,14 @@ export type Database = {
           document_url: string | null
           end_date: string | null
           id: string
+          is_sent: boolean | null
           iva_total: number | null
           name: string | null
           next_billing_date: string | null
           notes: string | null
           payment_status: Database["public"]["Enums"]["payment_status"] | null
           quote_id: string | null
+          sent_at: string | null
           start_date: string
           status: Database["public"]["Enums"]["contract_status"] | null
           subtotal: number | null
@@ -540,12 +542,14 @@ export type Database = {
           document_url?: string | null
           end_date?: string | null
           id?: string
+          is_sent?: boolean | null
           iva_total?: number | null
           name?: string | null
           next_billing_date?: string | null
           notes?: string | null
           payment_status?: Database["public"]["Enums"]["payment_status"] | null
           quote_id?: string | null
+          sent_at?: string | null
           start_date: string
           status?: Database["public"]["Enums"]["contract_status"] | null
           subtotal?: number | null
@@ -561,12 +565,14 @@ export type Database = {
           document_url?: string | null
           end_date?: string | null
           id?: string
+          is_sent?: boolean | null
           iva_total?: number | null
           name?: string | null
           next_billing_date?: string | null
           notes?: string | null
           payment_status?: Database["public"]["Enums"]["payment_status"] | null
           quote_id?: string | null
+          sent_at?: string | null
           start_date?: string
           status?: Database["public"]["Enums"]["contract_status"] | null
           subtotal?: number | null
@@ -1045,11 +1051,13 @@ export type Database = {
           due_date: string | null
           id: string
           invoice_number: number
+          is_sent: boolean | null
           issue_date: string
           iva_amount: number | null
           iva_percent: number | null
           notes: string | null
           remittance_id: string | null
+          sent_at: string | null
           status: Database["public"]["Enums"]["invoice_status"] | null
           subtotal: number | null
           total: number | null
@@ -1064,11 +1072,13 @@ export type Database = {
           due_date?: string | null
           id?: string
           invoice_number?: number
+          is_sent?: boolean | null
           issue_date?: string
           iva_amount?: number | null
           iva_percent?: number | null
           notes?: string | null
           remittance_id?: string | null
+          sent_at?: string | null
           status?: Database["public"]["Enums"]["invoice_status"] | null
           subtotal?: number | null
           total?: number | null
@@ -1083,11 +1093,13 @@ export type Database = {
           due_date?: string | null
           id?: string
           invoice_number?: number
+          is_sent?: boolean | null
           issue_date?: string
           iva_amount?: number | null
           iva_percent?: number | null
           notes?: string | null
           remittance_id?: string | null
+          sent_at?: string | null
           status?: Database["public"]["Enums"]["invoice_status"] | null
           subtotal?: number | null
           total?: number | null
@@ -1419,10 +1431,12 @@ export type Database = {
           created_by: string | null
           document_url: string | null
           id: string
+          is_sent: boolean | null
           iva_total: number | null
           name: string | null
           notes: string | null
           quote_number: number
+          sent_at: string | null
           status: Database["public"]["Enums"]["quote_status"] | null
           subtotal: number | null
           total: number | null
@@ -1436,10 +1450,12 @@ export type Database = {
           created_by?: string | null
           document_url?: string | null
           id?: string
+          is_sent?: boolean | null
           iva_total?: number | null
           name?: string | null
           notes?: string | null
           quote_number?: number
+          sent_at?: string | null
           status?: Database["public"]["Enums"]["quote_status"] | null
           subtotal?: number | null
           total?: number | null
@@ -1453,10 +1469,12 @@ export type Database = {
           created_by?: string | null
           document_url?: string | null
           id?: string
+          is_sent?: boolean | null
           iva_total?: number | null
           name?: string | null
           notes?: string | null
           quote_number?: number
+          sent_at?: string | null
           status?: Database["public"]["Enums"]["quote_status"] | null
           subtotal?: number | null
           total?: number | null
