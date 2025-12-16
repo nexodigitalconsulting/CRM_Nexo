@@ -15,7 +15,8 @@ interface EmailRequest {
   entityType?: string;
   entityId?: string;
   attachPdf?: boolean;
-  pdfHtml?: string;
+  pdfBase64?: string;  // Real PDF as base64
+  pdfHtml?: string;    // Legacy: HTML fallback
   pdfFilename?: string;
   test?: boolean;
 }
@@ -117,36 +118,52 @@ serve(async (req) => {
       emailOptions.cc = body.cc;
     }
 
-    // If PDF attachment requested - send as HTML with PDF instructions
-    if (body.attachPdf && body.pdfHtml && body.pdfFilename) {
-      const filename = body.pdfFilename.replace('.pdf', '.html');
-      console.log("Attaching printable document:", filename);
-      
-      // Encode HTML to base64
-      const encoder = new TextEncoder();
-      const htmlBytes = encoder.encode(body.pdfHtml);
-      const pdfBase64 = btoa(String.fromCharCode(...htmlBytes));
-      
-      emailOptions.attachments = [
-        {
-          filename: filename,
-          content: pdfBase64,
-          encoding: "base64",
-          contentType: "text/html; charset=utf-8",
-        }
-      ];
-      
-      // Add PDF conversion instructions to the email body
-      const pdfInstructions = `
-        <div style="margin-top: 20px; padding: 15px; background-color: #f0f4f8; border-radius: 8px; border-left: 4px solid #3b82f6;">
-          <p style="margin: 0 0 8px 0; font-weight: 600; color: #1e40af;">📎 Documento adjunto: ${filename}</p>
-          <p style="margin: 0; font-size: 14px; color: #475569;">
-            Para guardar como PDF: Abra el archivo adjunto en su navegador → Pulse Ctrl+P (o Cmd+P en Mac) → Seleccione "Guardar como PDF"
-          </p>
-        </div>
-      `;
-      
-      emailOptions.html = body.html + pdfInstructions;
+    // If PDF attachment requested
+    if (body.attachPdf && body.pdfFilename) {
+      // Prefer real PDF (pdfBase64), fallback to HTML
+      if (body.pdfBase64) {
+        // Real PDF attachment
+        const filename = body.pdfFilename.replace(/\.(html|pdf)$/i, '') + '.pdf';
+        console.log("Attaching real PDF:", filename);
+        
+        emailOptions.attachments = [
+          {
+            filename: filename,
+            content: body.pdfBase64,
+            encoding: "base64",
+            contentType: "application/pdf",
+          }
+        ];
+      } else if (body.pdfHtml) {
+        // Legacy: HTML fallback
+        const filename = body.pdfFilename.replace('.pdf', '.html');
+        console.log("Attaching printable document (HTML fallback):", filename);
+        
+        const encoder = new TextEncoder();
+        const htmlBytes = encoder.encode(body.pdfHtml);
+        const htmlBase64 = btoa(String.fromCharCode(...htmlBytes));
+        
+        emailOptions.attachments = [
+          {
+            filename: filename,
+            content: htmlBase64,
+            encoding: "base64",
+            contentType: "text/html; charset=utf-8",
+          }
+        ];
+        
+        // Add PDF conversion instructions for HTML fallback
+        const pdfInstructions = `
+          <div style="margin-top: 20px; padding: 15px; background-color: #f0f4f8; border-radius: 8px; border-left: 4px solid #3b82f6;">
+            <p style="margin: 0 0 8px 0; font-weight: 600; color: #1e40af;">📎 Documento adjunto: ${filename}</p>
+            <p style="margin: 0; font-size: 14px; color: #475569;">
+              Para guardar como PDF: Abra el archivo adjunto en su navegador → Pulse Ctrl+P (o Cmd+P en Mac) → Seleccione "Guardar como PDF"
+            </p>
+          </div>
+        `;
+        
+        emailOptions.html = body.html + pdfInstructions;
+      }
     }
 
     // Send email
