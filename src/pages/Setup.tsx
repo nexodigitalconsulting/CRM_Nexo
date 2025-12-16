@@ -145,43 +145,45 @@ export default function Setup() {
     setErrorMessage(null);
 
     try {
-      // Call the bootstrap-admin edge function (no token required - only works if no admin exists)
-      const { data, error } = await supabase.functions.invoke("bootstrap-admin", {
-        body: {
-          email: adminEmail,
-          password: adminPassword,
-          fullName: adminName || "Administrador",
+      // Step 1: Create user via Supabase Auth (no Edge Function needed)
+      const redirectUrl = `${window.location.origin}/auth`;
+      const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
+        email: adminEmail,
+        password: adminPassword,
+        options: {
+          emailRedirectTo: redirectUrl,
+          data: { full_name: adminName || "Administrador" },
         },
       });
 
-      if (error) {
-        // Supabase returns a FunctionsHttpError for non-2xx responses.
-        // It contains a `context: Response` we can read to show the real cause.
-        const anyErr = error as unknown as { message?: string; context?: Response };
-        let detail = anyErr.message || "Error llamando a la función bootstrap-admin";
-
-        if (anyErr.context instanceof Response) {
-          const status = anyErr.context.status;
-          const statusText = anyErr.context.statusText;
-          let bodyText = "";
-          try {
-            bodyText = await anyErr.context.text();
-          } catch {
-            // ignore
-          }
-          detail = `Edge Function error ${status} ${statusText}${bodyText ? `: ${bodyText}` : ""}`;
-        }
-
-        console.error("bootstrap-admin invoke error:", error);
-        throw new Error(detail);
+      if (signUpError) {
+        throw new Error(signUpError.message);
       }
 
-      if (data?.error) {
-        throw new Error(data.error);
+      if (!signUpData.user) {
+        throw new Error("No se pudo crear el usuario");
+      }
+
+      // Step 2: Call database function to assign admin role (bypasses RLS via SECURITY DEFINER)
+      const { data: rpcResult, error: rpcError } = await supabase.rpc("bootstrap_first_admin", {
+        _user_id: signUpData.user.id,
+        _email: adminEmail,
+        _full_name: adminName || "Administrador",
+      });
+
+      if (rpcError) {
+        console.error("RPC error:", rpcError);
+        throw new Error(rpcError.message);
+      }
+
+      // Check if function returned an error
+      if (rpcResult && typeof rpcResult === "object" && "error" in rpcResult) {
+        throw new Error((rpcResult as { error: string }).error);
       }
 
       toast.success("¡Administrador creado correctamente!");
       setCurrentStep("complete");
+
     } catch (error: any) {
       const msg = error?.message || "Error inesperado creando el administrador";
       setErrorMessage(msg);
