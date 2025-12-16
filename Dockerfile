@@ -15,21 +15,14 @@ COPY . .
 # --- Build-time config for Vite (Easypanel passes these as --build-arg) ---
 ARG VITE_SUPABASE_URL
 ARG VITE_SUPABASE_ANON_KEY
-# Optional: Basic Auth for self-hosted Supabase behind Kong proxy
-ARG VITE_SUPABASE_BASIC_AUTH_USER
-ARG VITE_SUPABASE_BASIC_AUTH_PASSWORD
 
 # Make them available as env vars inside build container
 ENV VITE_SUPABASE_URL=${VITE_SUPABASE_URL}
 ENV VITE_SUPABASE_ANON_KEY=${VITE_SUPABASE_ANON_KEY}
-ENV VITE_SUPABASE_BASIC_AUTH_USER=${VITE_SUPABASE_BASIC_AUTH_USER}
-ENV VITE_SUPABASE_BASIC_AUTH_PASSWORD=${VITE_SUPABASE_BASIC_AUTH_PASSWORD}
 
 # Create .env so Vite can read them reliably at build-time
 RUN echo "VITE_SUPABASE_URL=${VITE_SUPABASE_URL}" > .env && \
-    echo "VITE_SUPABASE_ANON_KEY=${VITE_SUPABASE_ANON_KEY}" >> .env && \
-    echo "VITE_SUPABASE_BASIC_AUTH_USER=${VITE_SUPABASE_BASIC_AUTH_USER}" >> .env && \
-    echo "VITE_SUPABASE_BASIC_AUTH_PASSWORD=${VITE_SUPABASE_BASIC_AUTH_PASSWORD}" >> .env
+    echo "VITE_SUPABASE_ANON_KEY=${VITE_SUPABASE_ANON_KEY}" >> .env
 
 # Safe debug + fail fast (do NOT print the key, only its length)
 RUN echo "DEBUG_VITE_SUPABASE_URL=${VITE_SUPABASE_URL}" && \
