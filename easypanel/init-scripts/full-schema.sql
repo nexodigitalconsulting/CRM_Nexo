@@ -68,10 +68,10 @@ DO $$ BEGIN
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 -- ============================================
--- PARTE 2: FUNCIONES AUXILIARES
+-- PARTE 2: FUNCIÓN AUXILIAR BÁSICA
 -- ============================================
 
--- Función para actualizar updated_at
+-- Función para actualizar updated_at (no depende de tablas)
 CREATE OR REPLACE FUNCTION public.update_updated_at_column()
 RETURNS TRIGGER AS $$
 BEGIN
@@ -79,6 +79,41 @@ BEGIN
   RETURN NEW;
 END;
 $$ LANGUAGE plpgsql SET search_path = public;
+
+-- ============================================
+-- PARTE 3: TABLAS PRINCIPALES
+-- ============================================
+-- IMPORTANTE: Las tablas se crean ANTES de las funciones que las referencian
+
+-- Profiles (datos adicionales de usuarios)
+CREATE TABLE IF NOT EXISTS public.profiles (
+  id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id uuid NOT NULL UNIQUE,
+  email text NOT NULL,
+  full_name text,
+  avatar_url text,
+  phone text,
+  language text DEFAULT 'es',
+  timezone text DEFAULT 'Europe/Madrid',
+  is_active boolean DEFAULT true,
+  created_at timestamptz DEFAULT now(),
+  updated_at timestamptz DEFAULT now()
+);
+
+-- Roles de usuario (separado para seguridad)
+-- CRÍTICO: Esta tabla DEBE existir antes de crear has_role/has_any_role
+CREATE TABLE IF NOT EXISTS public.user_roles (
+  id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id uuid NOT NULL,
+  role app_role NOT NULL DEFAULT 'user',
+  created_at timestamptz DEFAULT now(),
+  UNIQUE(user_id, role)
+);
+
+-- ============================================
+-- PARTE 3B: FUNCIONES QUE DEPENDEN DE TABLAS
+-- ============================================
+-- Estas funciones se crean DESPUÉS de user_roles
 
 -- Función para verificar rol específico (SECURITY DEFINER para evitar recursión RLS)
 CREATE OR REPLACE FUNCTION public.has_role(_user_id uuid, _role app_role)
@@ -124,34 +159,6 @@ BEGIN
   RETURN NEW;
 END;
 $$;
-
--- ============================================
--- PARTE 3: TABLAS PRINCIPALES
--- ============================================
-
--- Profiles (datos adicionales de usuarios)
-CREATE TABLE IF NOT EXISTS public.profiles (
-  id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
-  user_id uuid NOT NULL UNIQUE,
-  email text NOT NULL,
-  full_name text,
-  avatar_url text,
-  phone text,
-  language text DEFAULT 'es',
-  timezone text DEFAULT 'Europe/Madrid',
-  is_active boolean DEFAULT true,
-  created_at timestamptz DEFAULT now(),
-  updated_at timestamptz DEFAULT now()
-);
-
--- Roles de usuario (separado para seguridad)
-CREATE TABLE IF NOT EXISTS public.user_roles (
-  id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
-  user_id uuid NOT NULL,
-  role app_role NOT NULL DEFAULT 'user',
-  created_at timestamptz DEFAULT now(),
-  UNIQUE(user_id, role)
-);
 
 -- Configuración de empresa
 CREATE TABLE IF NOT EXISTS public.company_settings (
