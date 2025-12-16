@@ -16,6 +16,19 @@
 -- ============================================
 
 -- ============================================
+-- PARTE 0: EXTENSIONES OPCIONALES
+-- ============================================
+-- pgvector es opcional (solo para funciones RAG/AI)
+-- Si no está disponible, documents_rag usará TEXT en lugar de VECTOR
+
+DO $$ 
+BEGIN
+  CREATE EXTENSION IF NOT EXISTS vector;
+EXCEPTION WHEN OTHERS THEN
+  RAISE NOTICE 'pgvector extension not available - RAG features will use TEXT fallback';
+END $$;
+
+-- ============================================
 -- PARTE 1: TIPOS ENUMERADOS
 -- ============================================
 
@@ -600,12 +613,29 @@ CREATE TABLE IF NOT EXISTS public.user_table_views (
 );
 
 -- Documentos RAG (para embeddings/AI)
-CREATE TABLE IF NOT EXISTS public.documents_rag (
-  id bigserial PRIMARY KEY,
-  content text NOT NULL,
-  metadata jsonb DEFAULT '{}',
-  embedding vector(1536)
-);
+-- Nota: Si pgvector está instalado, embedding será vector(1536), si no, será TEXT
+DO $$
+BEGIN
+  -- Intenta crear con vector si la extensión existe
+  IF EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'vector') THEN
+    CREATE TABLE IF NOT EXISTS public.documents_rag (
+      id bigserial PRIMARY KEY,
+      content text NOT NULL,
+      metadata jsonb DEFAULT '{}',
+      embedding vector(1536)
+    );
+  ELSE
+    -- Fallback sin vector type
+    CREATE TABLE IF NOT EXISTS public.documents_rag (
+      id bigserial PRIMARY KEY,
+      content text NOT NULL,
+      metadata jsonb DEFAULT '{}',
+      embedding text
+    );
+  END IF;
+EXCEPTION WHEN duplicate_table THEN 
+  NULL;
+END $$;
 
 -- Tablas desnormalizadas para reportes
 CREATE TABLE IF NOT EXISTS public.invoice_products (
