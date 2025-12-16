@@ -145,50 +145,74 @@ export default function Setup() {
     setErrorMessage(null);
 
     try {
-      // Step 1: Create user via Supabase Auth (no Edge Function needed)
+      // Paso 1) Crear usuario en Supabase Auth (no Edge Function)
       const redirectUrl = `${window.location.origin}/auth`;
       const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
         email: adminEmail,
         password: adminPassword,
         options: {
+          // CRÍTICO: necesario para completar el flujo de confirmación si está activado
           emailRedirectTo: redirectUrl,
           data: { full_name: adminName || "Administrador" },
         },
       });
 
       if (signUpError) {
-        throw new Error(signUpError.message);
+        throw new Error(`Registro: ${signUpError.message}`);
       }
 
-      if (!signUpData.user) {
-        throw new Error("No se pudo crear el usuario");
+      const createdUserId = signUpData.user?.id;
+      if (!createdUserId) {
+        throw new Error("Registro: Supabase no devolvió el usuario creado");
       }
 
-      // Step 2: Call database function to assign admin role (bypasses RLS via SECURITY DEFINER)
+      // IMPORTANTÍSIMO (posible punto de fallo):
+      // Si "Confirm email" está activado, signUp NO crea sesión.
+      // El RPC debería ejecutarse como usuario autenticado para tener auth.uid() disponible
+      // (aunque la función sea SECURITY DEFINER, el flujo es más robusto y consistente).
+      let sessionUserId = signUpData.session?.user?.id ?? null;
+
+      if (!sessionUserId) {
+        // Intento de login inmediato (funciona si confirmación de email está desactivada)
+        const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
+          email: adminEmail,
+          password: adminPassword,
+        });
+
+        if (signInError || !signInData.session?.user?.id) {
+          // Caso más común: confirmación de email activada.
+          throw new Error(
+            "Registro OK, pero no hay sesión activa (probablemente tienes 'Confirm email' activado). " +
+              "Para crear el primer admin sin Edge Functions, desactiva temporalmente 'Confirm email' en Supabase Auth y vuelve a intentarlo."
+          );
+        }
+
+        sessionUserId = signInData.session.user.id;
+      }
+
+      // Paso 2) Asignar rol admin vía función SQL
       const { data: rpcResult, error: rpcError } = await supabase.rpc("bootstrap_first_admin", {
-        _user_id: signUpData.user.id,
+        _user_id: createdUserId,
         _email: adminEmail,
         _full_name: adminName || "Administrador",
       });
 
       if (rpcError) {
-        console.error("RPC error:", rpcError);
-        throw new Error(rpcError.message);
+        throw new Error(`Asignación de admin (RPC): ${rpcError.message}`);
       }
 
-      // Check if function returned an error
       if (rpcResult && typeof rpcResult === "object" && "error" in rpcResult) {
-        throw new Error((rpcResult as { error: string }).error);
+        throw new Error(`Asignación de admin: ${(rpcResult as { error: string }).error}`);
       }
 
       toast.success("¡Administrador creado correctamente!");
       setCurrentStep("complete");
-
     } catch (error: any) {
       const msg = error?.message || "Error inesperado creando el administrador";
       setErrorMessage(msg);
       toast.error(msg);
-      console.error("createAdmin error:", error);
+      // No logueamos credenciales; solo el mensaje.
+      console.error("createAdmin error:", msg);
     } finally {
       setIsCreating(false);
     }
