@@ -241,10 +241,6 @@ export default function Quotes() {
               setEmailQuote(quote);
               setEmailDialogOpen(true);
             }}>
-            <DropdownMenuItem onClick={() => {
-              setEmailQuote(quote);
-              setEmailDialogOpen(true);
-            }}>
               <Mail className="h-4 w-4 mr-2" /> Enviar por email
             </DropdownMenuItem>
             <DropdownMenuItem onClick={() => {
@@ -410,9 +406,6 @@ export default function Quotes() {
                               </DropdownMenuTrigger>
                               <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
                                 <DropdownMenuItem onClick={() => handleEdit(quote)}>Editar</DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => handlePrint(quote.id)}>
-                                  <Printer className="h-4 w-4 mr-2" /> Imprimir
-                                </DropdownMenuItem>
                                 <DropdownMenuItem onClick={() => {
                                   setSelectedQuote({ ...quote, id: "" } as QuoteWithDetails);
                                   setDialogOpen(true);
