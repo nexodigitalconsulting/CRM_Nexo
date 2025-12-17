@@ -1,4 +1,9 @@
 # Dockerfile para CRM Web - Despliegue en Easypanel
+# =============================================================================
+# Multi-stage build con soporte para migraciones y Edge Functions
+# =============================================================================
+
+# === Stage 1: Build de la aplicación ===
 FROM docker.io/library/node:20-alpine AS builder
 
 WORKDIR /app
@@ -33,11 +38,24 @@ RUN echo "DEBUG_VITE_SUPABASE_URL=${VITE_SUPABASE_URL}" && \
 # Build
 RUN npm run build
 
-# Producción con Nginx
+# === Stage 2: Producción con Nginx + PostgreSQL client ===
 FROM docker.io/library/nginx:alpine
 
-# Copiar build
+# Instalar PostgreSQL client y bash para scripts de migración
+RUN apk add --no-cache postgresql-client bash curl
+
+# Copiar build de la aplicación
 COPY --from=builder /app/dist /usr/share/nginx/html
+
+# Copiar scripts de despliegue
+COPY --from=builder /app/easypanel/scripts /app/easypanel/scripts
+COPY --from=builder /app/easypanel/init-scripts /app/easypanel/init-scripts
+
+# Copiar Edge Functions para sincronización
+COPY --from=builder /app/supabase/functions /app/supabase/functions
+
+# Hacer ejecutables los scripts
+RUN chmod +x /app/easypanel/scripts/*.sh
 
 # Configuración Nginx para SPA
 RUN echo 'server { \
@@ -51,8 +69,15 @@ RUN echo 'server { \
         expires 1y; \
         add_header Cache-Control "public, immutable"; \
     } \
+    # Health check endpoint \
+    location /health { \
+        access_log off; \
+        return 200 "OK"; \
+        add_header Content-Type text/plain; \
+    } \
 }' > /etc/nginx/conf.d/default.conf
 
 EXPOSE 3000
 
-CMD ["nginx", "-g", "daemon off;"]
+# Usar startup.sh que ejecuta migraciones + sincroniza funciones + inicia nginx
+CMD ["/app/easypanel/scripts/startup.sh"]
