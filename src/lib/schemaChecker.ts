@@ -54,52 +54,63 @@ export async function checkSchemaDirectly(): Promise<SchemaStatus> {
   };
 
   try {
-    // 1. Check if schema_versions table exists by trying to query it
-    // Use profiles table to check connection first, then try schema_versions via RPC or direct
-    const { data: profileCheck, error: profileError } = await supabase
+    // 1. Check if profiles table exists (basic connectivity test)
+    const { error: profileError } = await supabase
       .from("profiles")
       .select("id")
       .limit(1);
 
     if (profileError?.code === "42P01") {
-      // Profiles table doesn't exist - needs full setup
       status.missingComponents.push("profiles table");
       return status;
     }
 
-    // Try to check schema_versions by querying pdf_settings (which was added in v1.1.0)
-    const { data: pdfCheck, error: pdfError } = await supabase
-      .from("pdf_settings")
-      .select("id")
+    // 2. Check schema_versions table EXPLICITLY
+    const { data: schemaVersionData, error: schemaVersionError } = await supabase
+      .from("schema_versions")
+      .select("version")
+      .order("applied_at", { ascending: false })
       .limit(1);
 
-    if (!pdfError) {
-      // pdf_settings exists, schema is at least v1.1.0
+    if (schemaVersionError?.code === "42P01") {
+      // schema_versions table doesn't exist
+      status.hasSchemaVersions = false;
+      status.missingComponents.push("schema_versions table");
+    } else if (!schemaVersionError && schemaVersionData?.length > 0) {
+      // schema_versions exists and has data
       status.hasSchemaVersions = true;
-      status.currentVersion = "v1.1.0"; // Minimum confirmed version
-    } else if (pdfError?.code === "42P01") {
-      status.missingComponents.push("pdf_settings table (v1.1.0)");
+      status.currentVersion = schemaVersionData[0].version;
+    } else if (!schemaVersionError) {
+      // Table exists but is empty
+      status.hasSchemaVersions = true;
+      status.currentVersion = "v0.0.0";
     }
 
-    // 2. Check critical tables exist by querying them
+    // 3. Check critical tables
     const tablesToCheck = ["user_roles", "company_settings", "clients"];
     
     for (const table of tablesToCheck) {
-      try {
-        const { error } = await supabase
-          .from(table as "profiles")
-          .select("id")
-          .limit(1);
-        
-        if (error?.code === "42P01") {
-          status.missingComponents.push(`${table} table`);
-        }
-      } catch {
+      const { error } = await supabase
+        .from(table as "profiles")
+        .select("id")
+        .limit(1);
+      
+      if (error?.code === "42P01") {
         status.missingComponents.push(`${table} table`);
       }
     }
 
-    // 3. Check for invoice_products and quote_products (v1.2.0 additions)
+    // 4. Check pdf_settings (v1.1.0)
+    const { error: pdfError } = await supabase
+      .from("pdf_settings")
+      .select("id")
+      .limit(1);
+
+    if (pdfError?.code === "42P01") {
+      status.missingComponents.push("pdf_settings table (v1.1.0)");
+    }
+
+    // 5. Check invoice_products and quote_products (v1.2.0)
     const { error: ipError } = await supabase
       .from("invoice_products")
       .select("id")
@@ -107,9 +118,6 @@ export async function checkSchemaDirectly(): Promise<SchemaStatus> {
     
     if (ipError?.code === "42P01") {
       status.missingComponents.push("invoice_products table (v1.2.0)");
-    } else if (!ipError) {
-      // invoice_products exists, schema is v1.2.0
-      status.currentVersion = "v1.2.0";
     }
 
     const { error: qpError } = await supabase
@@ -121,9 +129,9 @@ export async function checkSchemaDirectly(): Promise<SchemaStatus> {
       status.missingComponents.push("quote_products table (v1.2.0)");
     }
 
-    // 4. Check email_settings for signature_html column
+    // 6. Check email_settings for signature_html column
     try {
-      const { data, error } = await supabase
+      const { error } = await supabase
         .from("email_settings")
         .select("signature_html")
         .limit(1);
@@ -132,16 +140,10 @@ export async function checkSchemaDirectly(): Promise<SchemaStatus> {
         status.missingComponents.push("signature_html column (v1.2.0)");
       }
     } catch {
-      // Column check failed, might be missing
+      // Column check failed
     }
 
-    // 5. Determine environment
-    // If we can query tables but no Edge Functions, likely self-hosted
-    if (status.hasSchemaVersions || status.missingComponents.length < REQUIRED_TABLES.length) {
-      status.environment = "self-hosted"; // Assume self-hosted if schema exists but Edge Functions might not
-    }
-
-    // 6. Determine if complete
+    // 7. Determine if complete
     status.isComplete = 
       status.missingComponents.length === 0 && 
       status.currentVersion === TARGET_VERSION;

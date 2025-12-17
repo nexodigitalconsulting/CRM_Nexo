@@ -1597,6 +1597,30 @@ export type Database = {
         }
         Relationships: []
       }
+      schema_versions: {
+        Row: {
+          applied_at: string | null
+          applied_by: string | null
+          description: string | null
+          id: number
+          version: string
+        }
+        Insert: {
+          applied_at?: string | null
+          applied_by?: string | null
+          description?: string | null
+          id?: number
+          version: string
+        }
+        Update: {
+          applied_at?: string | null
+          applied_by?: string | null
+          description?: string | null
+          id?: number
+          version?: string
+        }
+        Relationships: []
+      }
       services: {
         Row: {
           category: string | null
@@ -1741,6 +1765,7 @@ export type Database = {
         Args: { _email: string; _full_name?: string; _user_id: string }
         Returns: Json
       }
+      get_current_schema_version: { Args: never; Returns: string }
       has_any_role: { Args: { _user_id: string }; Returns: boolean }
       has_role: {
         Args: {
@@ -1749,6 +1774,7 @@ export type Database = {
         }
         Returns: boolean
       }
+      is_version_applied: { Args: { check_version: string }; Returns: boolean }
       match_documents_rag: {
         Args: { filter?: Json; match_count?: number; query_embedding: string }
         Returns: {
