@@ -12,6 +12,7 @@ export interface EmailSettings {
   from_email: string;
   from_name: string | null;
   is_active: boolean;
+  signature_html: string | null;
   created_at: string;
   updated_at: string;
 }

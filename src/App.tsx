@@ -19,6 +19,7 @@ import Remittances from "./pages/Remittances";
 import Flows from "./pages/Flows";
 import Calendar from "./pages/Calendar";
 import Settings from "./pages/Settings";
+import Profile from "./pages/Profile";
 import ProductAnalysis from "./pages/ProductAnalysis";
 import Auth from "./pages/Auth";
 import Setup from "./pages/Setup";
@@ -55,7 +56,15 @@ const App = () => (
                       <Route path="/product-analysis" element={<ProductAnalysis />} />
                       <Route path="/flows" element={<Flows />} />
                       <Route path="/calendar" element={<Calendar />} />
-                      <Route path="/settings" element={<Settings />} />
+                      <Route path="/profile" element={<Profile />} />
+                      <Route 
+                        path="/settings" 
+                        element={
+                          <ProtectedRoute requiredRole="admin">
+                            <Settings />
+                          </ProtectedRoute>
+                        } 
+                      />
                       <Route path="*" element={<NotFound />} />
                     </Routes>
                   </MainLayout>

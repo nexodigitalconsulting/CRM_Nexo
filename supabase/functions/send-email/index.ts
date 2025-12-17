@@ -15,8 +15,7 @@ interface EmailRequest {
   entityType?: string;
   entityId?: string;
   attachPdf?: boolean;
-  pdfBase64?: string;  // Real PDF as base64
-  pdfHtml?: string;    // Legacy: HTML fallback
+  pdfBase64?: string;
   pdfFilename?: string;
   test?: boolean;
 }
@@ -102,6 +101,12 @@ serve(async (req) => {
       throw new Error("Faltan campos requeridos: to, subject, html");
     }
 
+    // Append signature if configured
+    let finalHtml = body.html;
+    if (settings.signature_html) {
+      finalHtml = body.html + settings.signature_html;
+    }
+
     // Prepare email options
     const emailOptions: any = {
       from: settings.from_name 
@@ -110,7 +115,7 @@ serve(async (req) => {
       to: body.to,
       subject: body.subject,
       content: "auto",
-      html: body.html,
+      html: finalHtml,
     };
 
     // Add CC if provided
@@ -119,51 +124,18 @@ serve(async (req) => {
     }
 
     // If PDF attachment requested
-    if (body.attachPdf && body.pdfFilename) {
-      // Prefer real PDF (pdfBase64), fallback to HTML
-      if (body.pdfBase64) {
-        // Real PDF attachment
-        const filename = body.pdfFilename.replace(/\.(html|pdf)$/i, '') + '.pdf';
-        console.log("Attaching real PDF:", filename);
-        
-        emailOptions.attachments = [
-          {
-            filename: filename,
-            content: body.pdfBase64,
-            encoding: "base64",
-            contentType: "application/pdf",
-          }
-        ];
-      } else if (body.pdfHtml) {
-        // Legacy: HTML fallback
-        const filename = body.pdfFilename.replace('.pdf', '.html');
-        console.log("Attaching printable document (HTML fallback):", filename);
-        
-        const encoder = new TextEncoder();
-        const htmlBytes = encoder.encode(body.pdfHtml);
-        const htmlBase64 = btoa(String.fromCharCode(...htmlBytes));
-        
-        emailOptions.attachments = [
-          {
-            filename: filename,
-            content: htmlBase64,
-            encoding: "base64",
-            contentType: "text/html; charset=utf-8",
-          }
-        ];
-        
-        // Add PDF conversion instructions for HTML fallback
-        const pdfInstructions = `
-          <div style="margin-top: 20px; padding: 15px; background-color: #f0f4f8; border-radius: 8px; border-left: 4px solid #3b82f6;">
-            <p style="margin: 0 0 8px 0; font-weight: 600; color: #1e40af;">📎 Documento adjunto: ${filename}</p>
-            <p style="margin: 0; font-size: 14px; color: #475569;">
-              Para guardar como PDF: Abra el archivo adjunto en su navegador → Pulse Ctrl+P (o Cmd+P en Mac) → Seleccione "Guardar como PDF"
-            </p>
-          </div>
-        `;
-        
-        emailOptions.html = body.html + pdfInstructions;
-      }
+    if (body.attachPdf && body.pdfFilename && body.pdfBase64) {
+      const filename = body.pdfFilename.replace(/\.(html|pdf)$/i, '') + '.pdf';
+      console.log("Attaching real PDF:", filename);
+      
+      emailOptions.attachments = [
+        {
+          filename: filename,
+          content: body.pdfBase64,
+          encoding: "base64",
+          contentType: "application/pdf",
+        }
+      ];
     }
 
     // Send email
