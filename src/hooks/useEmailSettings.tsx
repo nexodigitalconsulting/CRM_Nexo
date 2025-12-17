@@ -54,13 +54,28 @@ export function useEmailSettings() {
   return useQuery({
     queryKey: ["email-settings"],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("email_settings")
-        .select("*")
-        .limit(1)
-        .maybeSingle();
-      if (error) throw error;
-      return data as EmailSettings | null;
+      try {
+        const { data, error } = await supabase
+          .from("email_settings")
+          .select("*")
+          .limit(1)
+          .maybeSingle();
+        
+        // Handle missing table or column gracefully
+        if (error) {
+          // If table doesn't exist or column missing, return null
+          if (error.code === "42P01" || error.code === "42703" || error.message?.includes("does not exist")) {
+            console.warn("email_settings table or column missing:", error.message);
+            return null;
+          }
+          throw error;
+        }
+        
+        return data as EmailSettings | null;
+      } catch (err: any) {
+        console.warn("Error fetching email settings:", err.message);
+        return null;
+      }
     },
   });
 }
