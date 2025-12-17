@@ -101,17 +101,9 @@ export default function Settings() {
                     className="font-mono text-sm"
                   />
                 </div>
-                <Button
-                  variant="outline"
-                  onClick={() =>
-                    window.open(
-                      "https://supabase.com/dashboard/project/honfwrfkiukckyoelsdm",
-                      "_blank"
-                    )
-                  }
-                >
-                  Abrir Panel de Supabase
-                </Button>
+                <div className="text-sm text-muted-foreground">
+                  Si estás en self-hosted, abre tu Supabase Studio local (no existe panel en supabase.com).
+                </div>
               </CardContent>
             </Card>
           </TabsContent>
@@ -132,18 +124,9 @@ export default function Settings() {
                     políticas de acceso.
                   </AlertDescription>
                 </Alert>
-                <Button
-                  variant="outline"
-                  className="mt-4"
-                  onClick={() =>
-                    window.open(
-                      "https://supabase.com/dashboard/project/honfwrfkiukckyoelsdm/auth/users",
-                      "_blank"
-                    )
-                  }
-                >
-                  Gestionar Usuarios
-                </Button>
+                <div className="text-sm text-muted-foreground mt-4">
+                  Self-hosted: gestiona usuarios desde tu Supabase Studio local (Auth → Users).
+                </div>
               </CardContent>
             </Card>
           </TabsContent>
