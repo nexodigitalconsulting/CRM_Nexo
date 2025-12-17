@@ -53,20 +53,31 @@ export function MigrationGate({ children }: MigrationGateProps) {
         if (!error && data) {
           setResult(data);
 
+          // Edge Function worked - this is Cloud environment
+          const directStatus = await checkSchemaDirectly();
+          directStatus.environment = "cloud";
+          setSchemaStatus(directStatus);
+
           if (data.requiresSetup) {
             setStatus("needs-setup");
             return;
           }
 
-          if (data.success) {
-            // Check if actually needs migration (new response format)
-            if ((data as any).needsMigration) {
-              const directStatus = await checkSchemaDirectly();
-              setSchemaStatus(directStatus);
-              setStatus("needs-migration");
-              return;
-            }
+          // Check response format for different states
+          const responseData = data as any;
+          
+          if (responseData.isUpToDate === true) {
+            // Schema is up to date
+            setStatus("ready");
+            return;
+          }
 
+          if (responseData.needsMigration === true) {
+            setStatus("needs-migration");
+            return;
+          }
+
+          if (data.success) {
             if (data.migrationsApplied && data.migrationsApplied > 0) {
               setStatus("success");
               setTimeout(() => setStatus("ready"), 2000);
@@ -85,11 +96,12 @@ export function MigrationGate({ children }: MigrationGateProps) {
       } catch (edgeFunctionError: any) {
         // Edge function timeout or not available - use direct schema check
         const errorMsg = edgeFunctionError?.message || "";
-        console.log("Edge function issue:", errorMsg, "- using direct schema check");
+        console.log("Edge function unavailable:", errorMsg, "- using direct schema check");
       }
 
       // Strategy 2: Direct schema check (for Easypanel/self-hosted or timeout)
       const directStatus = await checkSchemaDirectly();
+      directStatus.environment = "self-hosted";
       setSchemaStatus(directStatus);
 
       // Check if base tables exist
@@ -330,7 +342,9 @@ export function MigrationGate({ children }: MigrationGateProps) {
         {/* Footer info */}
         <div className="mt-6 pt-4 border-t border-border">
           <p className="text-xs text-muted-foreground text-center">
-            {schemaStatus?.environment === "self-hosted" ? (
+            {schemaStatus?.environment === "cloud" ? (
+              <>Entorno: Lovable Cloud</>
+            ) : schemaStatus?.environment === "self-hosted" ? (
               <>Entorno: Self-hosted (Easypanel/VPS)</>
             ) : (
               <>Verificando entorno...</>
