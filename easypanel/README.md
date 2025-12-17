@@ -151,8 +151,47 @@ profiles, user_roles, company_settings, contacts, clients,
 services, quotes, quote_services, contracts, contract_services,
 invoices, invoice_services, expenses, remittances, campaigns,
 calendar_categories, calendar_events, user_availability,
-email_settings, email_templates, notification_rules, notification_queue
+email_settings, email_templates, notification_rules, notification_queue,
+pdf_settings, schema_versions
 ```
+
+---
+
+## Actualización de Instalaciones Existentes
+
+Si tienes una instalación anterior y necesitas actualizar a la última versión:
+
+### Método 1: Aplicador Automático (Recomendado)
+
+1. Abre **Supabase SQL Editor** o tu cliente PostgreSQL
+2. Ejecuta el contenido de `easypanel/init-scripts/migrations/apply_all.sql`
+3. El script:
+   - Detecta automáticamente la versión actual
+   - Aplica solo las migraciones pendientes
+   - Muestra un resumen de cambios
+
+### Método 2: Migraciones Individuales
+
+Si prefieres control granular:
+
+1. Verifica tu versión actual:
+```sql
+SELECT get_current_schema_version();
+```
+
+2. Ejecuta las migraciones pendientes en orden:
+   - `v1.1.0_2024-12-17_pdf_settings.sql`
+   - `v1.2.0_2024-12-17_email_signature.sql`
+
+### Verificar versión instalada
+
+```sql
+SELECT version, description, applied_at 
+FROM schema_versions 
+ORDER BY applied_at;
+```
+
+> 📚 Ver documentación completa en `README-migrations.md`
 
 ---
 

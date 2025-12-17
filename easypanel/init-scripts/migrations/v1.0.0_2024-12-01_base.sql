@@ -1,0 +1,38 @@
+-- ============================================
+-- MIGRACIÓN v1.0.0 - Schema Base
+-- Fecha: 2024-12-01
+-- Descripción: Instalación inicial del CRM
+-- ============================================
+-- Esta migración es de REFERENCIA ÚNICAMENTE.
+-- El schema base se instala con full-schema.sql o postgres-external-schema.sql
+-- 
+-- NO EJECUTAR MANUALMENTE - Solo para registro histórico
+-- ============================================
+
+-- Esta versión incluye las siguientes tablas:
+-- - profiles / users
+-- - user_roles
+-- - company_settings
+-- - contacts
+-- - clients
+-- - services
+-- - quotes / quote_services
+-- - contracts / contract_services
+-- - invoices / invoice_services
+-- - expenses
+-- - remittances
+-- - campaigns
+-- - calendar_categories / calendar_events
+-- - user_availability
+-- - google_calendar_config
+-- - email_settings
+-- - email_templates
+-- - notification_rules / notification_queue
+-- - client_notification_preferences
+-- - document_templates
+-- - entity_configurations
+-- - user_table_views
+-- - documents_rag
+-- - invoice_products / quote_products
+
+SELECT 'v1.0.0 es la versión base - no requiere migración' as info;

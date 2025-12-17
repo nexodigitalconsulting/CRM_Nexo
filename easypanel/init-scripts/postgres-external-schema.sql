@@ -85,6 +85,30 @@ END;
 $$ LANGUAGE plpgsql;
 
 -- ============================================
+-- PARTE 4: TABLA DE VERSIONES
+-- ============================================
+
+-- Control de versiones del schema (para migraciones)
+CREATE TABLE IF NOT EXISTS schema_versions (
+  id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+  version text NOT NULL UNIQUE,
+  description text,
+  applied_at timestamptz DEFAULT now(),
+  applied_by text DEFAULT current_user
+);
+
+-- Funciones de versionado
+CREATE OR REPLACE FUNCTION is_version_applied(p_version text)
+RETURNS boolean
+LANGUAGE sql
+AS $$ SELECT EXISTS (SELECT 1 FROM schema_versions WHERE version = p_version); $$;
+
+CREATE OR REPLACE FUNCTION get_current_schema_version()
+RETURNS text
+LANGUAGE sql
+AS $$ SELECT version FROM schema_versions ORDER BY applied_at DESC LIMIT 1; $$;
+
+-- ============================================
 -- PARTE 4: TABLAS PRINCIPALES
 -- ============================================
 
@@ -454,7 +478,25 @@ CREATE TABLE IF NOT EXISTS email_settings (
   smtp_secure boolean DEFAULT true,
   from_email text NOT NULL,
   from_name text,
+  signature_html text,
   is_active boolean DEFAULT false,
+  created_at timestamptz DEFAULT now(),
+  updated_at timestamptz DEFAULT now()
+);
+
+-- Configuración de PDF
+CREATE TABLE IF NOT EXISTS pdf_settings (
+  id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+  primary_color text DEFAULT '#3366cc',
+  secondary_color text DEFAULT '#666666',
+  accent_color text DEFAULT '#0066cc',
+  show_logo boolean DEFAULT true,
+  logo_position text DEFAULT 'left' CHECK (logo_position IN ('left', 'center', 'right')),
+  show_iban_footer boolean DEFAULT true,
+  show_notes boolean DEFAULT true,
+  show_discounts_column boolean DEFAULT true,
+  header_style text DEFAULT 'classic' CHECK (header_style IN ('classic', 'modern', 'minimal')),
+  font_size_base integer DEFAULT 10 CHECK (font_size_base BETWEEN 8 AND 14),
   created_at timestamptz DEFAULT now(),
   updated_at timestamptz DEFAULT now()
 );
@@ -745,18 +787,35 @@ BEGIN
   END IF;
 END $$;
 
+-- Configuración PDF por defecto
+INSERT INTO pdf_settings (id)
+SELECT gen_random_uuid()
+WHERE NOT EXISTS (SELECT 1 FROM pdf_settings LIMIT 1);
+
+-- Trigger para pdf_settings
+DROP TRIGGER IF EXISTS update_pdf_settings_updated_at ON pdf_settings;
+CREATE TRIGGER update_pdf_settings_updated_at
+  BEFORE UPDATE ON pdf_settings
+  FOR EACH ROW
+  EXECUTE FUNCTION update_updated_at_column();
+
+-- Registrar versión del schema
+INSERT INTO schema_versions (version, description, applied_at)
+VALUES ('v1.2.0', 'Schema completo con pdf_settings y signature_html', now())
+ON CONFLICT (version) DO NOTHING;
+
 -- ============================================
--- ✅ SCHEMA COMPLETO INSTALADO
+-- ✅ SCHEMA COMPLETO INSTALADO - v1.2.0
 -- ============================================
 
 DO $$
 BEGIN
   RAISE NOTICE '';
   RAISE NOTICE '╔═══════════════════════════════════════════════════╗';
-  RAISE NOTICE '║  ✅ CRM Schema (PostgreSQL Externo) instalado     ║';
+  RAISE NOTICE '║  ✅ CRM Schema v1.2.0 (PostgreSQL Externo)        ║';
   RAISE NOTICE '╠═══════════════════════════════════════════════════╣';
-  RAISE NOTICE '║  Tablas creadas: 27 (incluye users)               ║';
-  RAISE NOTICE '║  Triggers: 13                                     ║';
+  RAISE NOTICE '║  Tablas creadas: 29 (incluye users)               ║';
+  RAISE NOTICE '║  Triggers: 14                                     ║';
   RAISE NOTICE '║  Índices: 16                                      ║';
   RAISE NOTICE '║  Datos iniciales: Sí                              ║';
   RAISE NOTICE '║  Usuario admin: admin@tuempresa.com / admin123    ║';
