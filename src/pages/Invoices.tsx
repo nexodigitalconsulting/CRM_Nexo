@@ -463,40 +463,11 @@ export default function Invoices() {
           dueDate={emailFullInvoice.due_date || undefined}
           isLoadingDocument={isLoadingEmailInvoice}
           entityData={emailFullInvoice as unknown as Record<string, unknown>}
-          pdfHtml={invoiceTemplate ? generatePrintableHTML({
-            template: invoiceTemplate.content,
-            data: formatInvoiceData(
-              emailFullInvoice as unknown as Record<string, unknown>,
-              companySettings as unknown as Record<string, unknown>
-            ),
-            logoUrl: companySettings?.logo_url || undefined,
-          }) : undefined}
           onSendSuccess={() => {
             // Mark invoice as sent for automation tracking
             markAsSent.mutate(emailFullInvoice.id);
           }}
         />
-      )}
-      
-      {/* Loading state for email dialog */}
-      {emailDialogOpen && (!emailFullInvoice || isLoadingEmailInvoice) && (
-        <Dialog open={emailDialogOpen} onOpenChange={(open) => {
-          setEmailDialogOpen(open);
-          if (!open) setEmailInvoiceId(null);
-        }}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle className="flex items-center gap-2">
-                <Mail className="h-5 w-5" />
-                Preparando envío...
-              </DialogTitle>
-            </DialogHeader>
-            <div className="py-8 flex flex-col items-center">
-              <div className="h-8 w-8 border-4 border-primary border-t-transparent rounded-full animate-spin mb-4" />
-              <p className="text-muted-foreground">Cargando datos de la factura...</p>
-            </div>
-          </DialogContent>
-        </Dialog>
       )}
     </div>
   );
