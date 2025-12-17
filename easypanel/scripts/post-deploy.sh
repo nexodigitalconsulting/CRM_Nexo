@@ -130,6 +130,55 @@ echo ""
 echo "6. Historial de versiones:"
 psql -c "SELECT version, description, applied_at FROM schema_versions ORDER BY applied_at;"
 
+# =============================================================================
+# SECCIÓN 7: Deploy Edge Functions
+# =============================================================================
+echo ""
+echo "7. Sincronizando Edge Functions..."
+
+SUPABASE_FUNCTIONS_VOLUME="${SUPABASE_FUNCTIONS_VOLUME:-}"
+CRM_FUNCTIONS_DIR="/app/supabase/functions"
+
+if [ -n "$SUPABASE_FUNCTIONS_VOLUME" ]; then
+    if [ -d "$CRM_FUNCTIONS_DIR" ] && [ -d "$SUPABASE_FUNCTIONS_VOLUME" ]; then
+        echo "   Destino: $SUPABASE_FUNCTIONS_VOLUME"
+        
+        # Copiar cada función
+        FN_COUNT=0
+        for fn in "$CRM_FUNCTIONS_DIR"/*/; do
+            if [ -d "$fn" ] && [ -f "$fn/index.ts" ]; then
+                fn_name=$(basename "$fn")
+                mkdir -p "$SUPABASE_FUNCTIONS_VOLUME/$fn_name"
+                cp -r "$fn"/* "$SUPABASE_FUNCTIONS_VOLUME/$fn_name/"
+                FN_COUNT=$((FN_COUNT + 1))
+            fi
+        done
+        
+        # Copiar version.json
+        if [ -f "$CRM_FUNCTIONS_DIR/version.json" ]; then
+            cp "$CRM_FUNCTIONS_DIR/version.json" "$SUPABASE_FUNCTIONS_VOLUME/"
+        fi
+        
+        # Crear main healthcheck
+        mkdir -p "$SUPABASE_FUNCTIONS_VOLUME/main"
+        cat > "$SUPABASE_FUNCTIONS_VOLUME/main/index.ts" << 'MAINEOF'
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+serve(() => new Response(JSON.stringify({ ok: true, message: "Edge Functions Ready" }), {
+  headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
+}));
+MAINEOF
+        
+        echo "   ✅ $FN_COUNT funciones sincronizadas"
+        echo ""
+        echo "   ⚠️  Reinicia edge-runtime para aplicar: docker restart supabase-edge-functions"
+    else
+        echo "   ⚠️  Directorio de funciones o volumen no accesible"
+    fi
+else
+    echo "   ⏭️  SUPABASE_FUNCTIONS_VOLUME no configurado - saltando"
+    echo "   Para habilitar, configura la variable con la ruta al volumen de funciones"
+fi
+
 echo ""
 echo "=========================================="
 echo "Post-Deploy completado"
