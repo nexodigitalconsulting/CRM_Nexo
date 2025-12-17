@@ -1,5 +1,5 @@
 // Minimal Edge Function to verify the Edge runtime can start workers.
-// No external imports on purpose.
+// Also provides environment info for hybrid architecture detection.
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -12,8 +12,31 @@ Deno.serve(async (req) => {
   }
 
   try {
+    // Check for environment indicators
+    const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
+    const externalPostgres = Deno.env.get("EXTERNAL_POSTGRES_HOST");
+    
+    // Determine environment type
+    let environment: "lovable-cloud" | "self-hosted" | "hybrid" = "lovable-cloud";
+    
+    if (externalPostgres) {
+      environment = "hybrid"; // Using external Postgres with Lovable Edge Functions
+    } else if (supabaseUrl.includes("localhost") || supabaseUrl.includes("self-hosted")) {
+      environment = "self-hosted";
+    }
+
     return new Response(
-      JSON.stringify({ ok: true, now: new Date().toISOString() }),
+      JSON.stringify({ 
+        ok: true, 
+        now: new Date().toISOString(),
+        environment,
+        capabilities: {
+          edgeFunctions: true,
+          dbMigrate: true,
+          setupDatabase: true,
+        },
+        version: "1.2.0",
+      }),
       {
         status: 200,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
