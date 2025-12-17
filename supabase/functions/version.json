@@ -1,0 +1,21 @@
+{
+  "version": "1.2.0",
+  "lastUpdated": "2024-12-17",
+  "functions": [
+    "bootstrap-admin",
+    "calendar-ical",
+    "db-migrate",
+    "google-calendar-auth",
+    "google-calendar-callback",
+    "google-calendar-events",
+    "ping",
+    "process-notifications",
+    "send-email",
+    "setup-database"
+  ],
+  "changelog": {
+    "1.2.0": "Added email signature support, PDF settings",
+    "1.1.0": "Added PDF settings table",
+    "1.0.0": "Initial release with core functions"
+  }
+}

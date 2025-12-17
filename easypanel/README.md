@@ -127,15 +127,69 @@ En Easypanel, ve a la configuración del servicio CRM:
 
 ---
 
-## Paso 6: Deploy
+## Paso 6: Configurar Edge Functions
+
+Las Edge Functions se sincronizan automáticamente durante el deploy si configuras el volumen.
+
+### 6.1 Identificar el volumen de funciones
+
+En Supabase desplegado en Easypanel, el volumen está típicamente en:
+```
+/var/lib/easypanel/projects/{nombre-proyecto-supabase}/volumes/functions
+```
+
+Para encontrar la ruta exacta:
+```bash
+docker inspect supabase-edge-functions | grep -A5 "Mounts"
+```
+
+### 6.2 Configurar variable de entorno
+
+En el servicio CRM de Easypanel, añade en **Environment Variables**:
+
+| Variable | Valor |
+|----------|-------|
+| `SUPABASE_FUNCTIONS_VOLUME` | `/var/lib/easypanel/projects/supabase/volumes/functions` |
+
+### 6.3 Verificar funciones disponibles
+
+Después del deploy, verifica que las funciones están:
+```bash
+curl https://tu-supabase.dominio.com/functions/v1/ping
+```
+
+Respuesta esperada:
+```json
+{"ok":true,"version":"1.2.0","environment":"hybrid"}
+```
+
+### 6.4 Lista de Edge Functions
+
+| Función | Descripción |
+|---------|-------------|
+| `ping` | Health check y versión |
+| `send-email` | Envío de emails SMTP |
+| `process-notifications` | Procesamiento de notificaciones |
+| `calendar-ical` | Exportación calendario iCal |
+| `db-migrate` | Verificación de migraciones |
+| `setup-database` | Setup inicial |
+| `bootstrap-admin` | Creación de admin |
+| `google-calendar-*` | Integración Google Calendar |
+
+---
+
+## Paso 7: Deploy
 
 1. Guarda la configuración
 2. Haz click en **Deploy**
 3. Espera a que se complete el build
+4. El script post-deploy sincroniza automáticamente:
+   - ✅ Migraciones de base de datos
+   - ✅ Edge Functions (si `SUPABASE_FUNCTIONS_VOLUME` está configurado)
 
 ---
 
-## Paso 7: Acceder al CRM
+## Paso 8: Acceder al CRM
 
 1. Accede a `https://tu-crm.dominio.com/auth`
 2. Inicia sesión con el usuario admin creado en el Paso 2
@@ -394,6 +448,17 @@ Recomendaciones:
 | `VITE_SUPABASE_URL` | URL de la API de Supabase | `https://supabase.tudominio.com` |
 | `VITE_SUPABASE_ANON_KEY` | Clave anónima de Supabase | `eyJhbGciOiJI...` |
 
+### Variables de Entorno (Runtime)
+
+| Variable | Descripción | Ejemplo |
+|----------|-------------|---------|
+| `EXTERNAL_POSTGRES_HOST` | Host PostgreSQL para migraciones | `supabase-db` |
+| `EXTERNAL_POSTGRES_PORT` | Puerto PostgreSQL | `5432` |
+| `EXTERNAL_POSTGRES_DB` | Base de datos | `postgres` |
+| `EXTERNAL_POSTGRES_USER` | Usuario PostgreSQL | `postgres` |
+| `EXTERNAL_POSTGRES_PASSWORD` | Contraseña PostgreSQL | `tu_password` |
+| `SUPABASE_FUNCTIONS_VOLUME` | **NUEVO** Ruta al volumen de funciones | `/var/lib/easypanel/projects/supabase/volumes/functions` |
+
 ### Variables de Supabase (si necesitas personalizarlas)
 
 | Variable | Descripción |
@@ -405,10 +470,37 @@ Recomendaciones:
 
 ---
 
+## Anexo C: Scripts de Deployment
+
+### Scripts disponibles
+
+| Script | Descripción | Uso |
+|--------|-------------|-----|
+| `post-deploy.sh` | Migraciones + sync funciones | Automático en post-deploy |
+| `deploy-functions.sh` | Solo sync de Edge Functions | Manual si es necesario |
+| `verify-deployment.sh` | Verificación completa | Diagnóstico |
+
+### Ejecución manual
+
+```bash
+# Verificar deployment
+/app/easypanel/scripts/verify-deployment.sh
+
+# Deploy solo funciones
+/app/easypanel/scripts/deploy-functions.sh
+
+# Después de deploy funciones, reiniciar edge-runtime
+docker restart supabase-edge-functions
+```
+
+---
+
 ## Soporte
 
 Si tienes problemas:
-1. Revisa los logs en Easypanel
-2. Verifica la conexión con Supabase
-3. Comprueba que el schema está correctamente instalado
-4. Asegúrate de que el usuario admin tiene el rol correcto
+1. Ejecuta `/app/easypanel/scripts/verify-deployment.sh` para diagnóstico
+2. Revisa los logs en Easypanel
+3. Verifica la conexión con Supabase
+4. Comprueba que el schema está correctamente instalado
+5. Asegúrate de que el usuario admin tiene el rol correcto
+6. Si las Edge Functions no funcionan, verifica `SUPABASE_FUNCTIONS_VOLUME`
