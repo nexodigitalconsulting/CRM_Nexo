@@ -257,19 +257,6 @@ export function MigrationGate({ children }: MigrationGateProps) {
                   )}
                   Probar función (ping)
                 </button>
-                <button
-                  onClick={() => {
-                    navigator.clipboard.writeText(
-                      "docker restart supabase-edge-functions\n# (antes: reinicia el servicio CRM para copiar funciones al volumen)"
-                    );
-                    setCopied(true);
-                    setTimeout(() => setCopied(false), 1500);
-                  }}
-                  className="inline-flex items-center gap-2 px-3 py-2 bg-secondary text-secondary-foreground rounded text-xs hover:bg-secondary/90"
-                >
-                  <Copy className="h-4 w-4" />
-                  {copied ? "¡Copiado!" : "Copiar comando reinicio"}
-                </button>
               </div>
 
               {edgeFnCheck.state === "ok" && (
@@ -277,11 +264,66 @@ export function MigrationGate({ children }: MigrationGateProps) {
                   OK: {edgeFnCheck.message}
                 </div>
               )}
-              {edgeFnCheck.state === "error" && (
+              
+              {edgeFnCheck.state === "error" && schemaStatus?.environment === "self-hosted" && (
+                <div className="bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded p-3 space-y-3">
+                  <p className="text-sm font-medium text-amber-800 dark:text-amber-200">
+                    ⚠️ Configuración requerida en EasyPanel
+                  </p>
+                  <div className="text-xs text-amber-700 dark:text-amber-300 space-y-2">
+                    <p><strong>1. Variable de entorno</strong> (CRM → Environment Variables):</p>
+                    <code className="block bg-amber-100 dark:bg-amber-900/50 px-2 py-1 rounded text-[10px] break-all">
+                      SUPABASE_FUNCTIONS_VOLUME=/var/lib/easypanel/projects/NOMBRE_PROYECTO/volumes/supabase/functions
+                    </code>
+                    <p className="text-muted-foreground">(Reemplaza NOMBRE_PROYECTO con: mangas, nexo_n8n, etc.)</p>
+                    
+                    <p className="mt-2"><strong>2. Rebuild del CRM</strong> para copiar funciones al volumen</p>
+                    
+                    <p><strong>3. Reiniciar edge-runtime:</strong></p>
+                    <div className="flex items-center gap-2">
+                      <code className="bg-amber-100 dark:bg-amber-900/50 px-2 py-1 rounded flex-1">
+                        docker restart NOMBRE_supabase-edge-functions
+                      </code>
+                      <button
+                        onClick={() => {
+                          navigator.clipboard.writeText("docker restart mangas_supabase-edge-functions\n# O para nexo: docker restart nexo_n8n_supabase-edge-functions");
+                          setCopied(true);
+                          setTimeout(() => setCopied(false), 1500);
+                        }}
+                        className="p-1 hover:bg-amber-200 dark:hover:bg-amber-800 rounded"
+                      >
+                        <Copy className="h-3 w-3" />
+                      </button>
+                    </div>
+                    
+                    <p className="mt-2"><strong>4. Ver logs:</strong></p>
+                    <div className="flex items-center gap-2">
+                      <code className="bg-amber-100 dark:bg-amber-900/50 px-2 py-1 rounded flex-1">
+                        docker logs -f NOMBRE_supabase-edge-functions
+                      </code>
+                      <button
+                        onClick={() => {
+                          navigator.clipboard.writeText("docker logs -f mangas_supabase-edge-functions\n# O: docker logs -f nexo_n8n_supabase-edge-functions");
+                          setCopied(true);
+                          setTimeout(() => setCopied(false), 1500);
+                        }}
+                        className="p-1 hover:bg-amber-200 dark:hover:bg-amber-800 rounded"
+                      >
+                        <Copy className="h-3 w-3" />
+                      </button>
+                    </div>
+                  </div>
+                  <p className="text-xs text-red-600 dark:text-red-400 mt-2">
+                    Error: {edgeFnCheck.message}
+                  </p>
+                </div>
+              )}
+              
+              {edgeFnCheck.state === "error" && schemaStatus?.environment === "cloud" && (
                 <div className="text-xs font-mono bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-200 rounded p-2">
                   ERROR: {edgeFnCheck.message}
                   <p className="mt-1 text-muted-foreground">
-                    Self-hosted: reinicia edge-runtime después de deploy
+                    Las funciones deberían estar disponibles automáticamente en Cloud.
                   </p>
                 </div>
               )}
