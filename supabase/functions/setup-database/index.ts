@@ -6,6 +6,9 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+// Current schema version
+const CURRENT_VERSION = "v1.2.0";
+
 // Pool de conexiones simulado para Postgres externo
 async function connectExternalPostgres(config: {
   host: string;
@@ -15,7 +18,6 @@ async function connectExternalPostgres(config: {
   password: string;
 }): Promise<{ success: boolean; error?: string; version?: string }> {
   try {
-    // Usamos Deno's postgres driver
     const { Client } = await import("https://deno.land/x/postgres@v0.17.0/mod.ts");
     
     const client = new Client({
@@ -64,7 +66,38 @@ async function createCRMSchema(config: {
     await client.connect();
     logs.push("✓ Conectado a PostgreSQL");
 
-    // Crear ENUMs
+    // ============================================
+    // SISTEMA DE VERSIONADO (CREAR PRIMERO)
+    // ============================================
+    logs.push("Creando sistema de versionado...");
+    await client.queryObject(`
+      CREATE TABLE IF NOT EXISTS schema_versions (
+        id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+        version text NOT NULL UNIQUE,
+        description text,
+        applied_at timestamptz DEFAULT now(),
+        applied_by text DEFAULT current_user
+      );
+      
+      -- Create helper functions
+      CREATE OR REPLACE FUNCTION is_version_applied(p_version text)
+      RETURNS boolean AS $$
+        SELECT EXISTS (SELECT 1 FROM schema_versions WHERE version = p_version);
+      $$ LANGUAGE sql STABLE;
+      
+      CREATE OR REPLACE FUNCTION get_current_schema_version()
+      RETURNS text AS $$
+        SELECT COALESCE(
+          (SELECT version FROM schema_versions ORDER BY applied_at DESC LIMIT 1),
+          'v0.0.0'
+        );
+      $$ LANGUAGE sql STABLE;
+    `);
+    logs.push("✓ Sistema de versionado creado");
+
+    // ============================================
+    // CREAR ENUMs
+    // ============================================
     logs.push("Creando tipos ENUM...");
     const enums = `
       DO $$ BEGIN
@@ -118,7 +151,9 @@ async function createCRMSchema(config: {
     await client.queryObject(enums);
     logs.push("✓ Tipos ENUM creados");
 
-    // Crear función update_updated_at
+    // ============================================
+    // FUNCIONES DE UTILIDAD
+    // ============================================
     logs.push("Creando funciones...");
     await client.queryObject(`
       CREATE OR REPLACE FUNCTION update_updated_at_column()
@@ -131,7 +166,9 @@ async function createCRMSchema(config: {
     `);
     logs.push("✓ Función update_updated_at creada");
 
-    // Crear tablas principales
+    // ============================================
+    // TABLAS PRINCIPALES
+    // ============================================
     logs.push("Creando tablas...");
     
     // Profiles
@@ -270,6 +307,8 @@ async function createCRMSchema(config: {
         total numeric DEFAULT 0,
         notes text,
         document_url text,
+        is_sent boolean DEFAULT false,
+        sent_at timestamptz,
         created_by uuid,
         created_at timestamptz DEFAULT now(),
         updated_at timestamptz DEFAULT now()
@@ -315,6 +354,8 @@ async function createCRMSchema(config: {
         total numeric DEFAULT 0,
         notes text,
         document_url text,
+        is_sent boolean DEFAULT false,
+        sent_at timestamptz,
         created_by uuid,
         created_at timestamptz DEFAULT now(),
         updated_at timestamptz DEFAULT now()
@@ -359,6 +400,8 @@ async function createCRMSchema(config: {
         total numeric DEFAULT 0,
         notes text,
         document_url text,
+        is_sent boolean DEFAULT false,
+        sent_at timestamptz,
         remittance_id uuid,
         created_by uuid,
         created_at timestamptz DEFAULT now(),
@@ -519,7 +562,7 @@ async function createCRMSchema(config: {
     `);
     logs.push("✓ Tabla user_availability");
 
-    // Email settings
+    // Email settings (con signature_html)
     await client.queryObject(`
       CREATE TABLE IF NOT EXISTS email_settings (
         id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -530,12 +573,13 @@ async function createCRMSchema(config: {
         smtp_secure boolean DEFAULT true,
         from_email text NOT NULL,
         from_name text,
+        signature_html text,
         is_active boolean DEFAULT false,
         created_at timestamptz DEFAULT now(),
         updated_at timestamptz DEFAULT now()
       );
     `);
-    logs.push("✓ Tabla email_settings");
+    logs.push("✓ Tabla email_settings (con signature_html)");
 
     // Email templates
     await client.queryObject(`
@@ -668,7 +712,262 @@ async function createCRMSchema(config: {
     `);
     logs.push("✓ Tabla google_calendar_config");
 
-    // Añadir FK de invoices a remittances
+    // ============================================
+    // PDF SETTINGS (v1.1.0)
+    // ============================================
+    await client.queryObject(`
+      CREATE TABLE IF NOT EXISTS pdf_settings (
+        id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+        primary_color text DEFAULT '#3366cc',
+        secondary_color text DEFAULT '#666666',
+        accent_color text DEFAULT '#0066cc',
+        show_logo boolean DEFAULT true,
+        logo_position text DEFAULT 'left',
+        show_iban_footer boolean DEFAULT true,
+        show_notes boolean DEFAULT true,
+        show_discounts_column boolean DEFAULT true,
+        header_style text DEFAULT 'classic',
+        font_size_base integer DEFAULT 10,
+        created_at timestamptz DEFAULT now(),
+        updated_at timestamptz DEFAULT now()
+      );
+      
+      -- Insert default if empty
+      INSERT INTO pdf_settings (id)
+      SELECT gen_random_uuid()
+      WHERE NOT EXISTS (SELECT 1 FROM pdf_settings LIMIT 1);
+    `);
+    logs.push("✓ Tabla pdf_settings");
+
+    // ============================================
+    // INVOICE PRODUCTS (tabla desnormalizada para reportes)
+    // ============================================
+    await client.queryObject(`
+      CREATE TABLE IF NOT EXISTS invoice_products (
+        id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+        invoice_id uuid NOT NULL REFERENCES invoices(id) ON DELETE CASCADE,
+        invoice_number integer NOT NULL,
+        invoice_date date NOT NULL,
+        invoice_status text,
+        client_id uuid NOT NULL REFERENCES clients(id),
+        client_name text NOT NULL,
+        client_cif text,
+        service_id uuid NOT NULL REFERENCES services(id),
+        service_name text NOT NULL,
+        service_category text,
+        quantity integer NOT NULL DEFAULT 1,
+        unit_price numeric NOT NULL,
+        discount_percent numeric DEFAULT 0,
+        discount_amount numeric DEFAULT 0,
+        subtotal numeric NOT NULL,
+        iva_percent numeric DEFAULT 21,
+        iva_amount numeric DEFAULT 0,
+        total numeric NOT NULL,
+        created_at timestamptz DEFAULT now(),
+        updated_at timestamptz DEFAULT now()
+      );
+    `);
+    logs.push("✓ Tabla invoice_products");
+
+    // ============================================
+    // QUOTE PRODUCTS (tabla desnormalizada para reportes)
+    // ============================================
+    await client.queryObject(`
+      CREATE TABLE IF NOT EXISTS quote_products (
+        id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+        quote_id uuid NOT NULL REFERENCES quotes(id) ON DELETE CASCADE,
+        quote_number integer NOT NULL,
+        quote_date date NOT NULL,
+        quote_status text,
+        client_id uuid REFERENCES clients(id),
+        client_name text,
+        contact_id uuid REFERENCES contacts(id),
+        contact_name text,
+        service_id uuid NOT NULL REFERENCES services(id),
+        service_name text NOT NULL,
+        service_category text,
+        quantity integer NOT NULL DEFAULT 1,
+        unit_price numeric NOT NULL,
+        discount_percent numeric DEFAULT 0,
+        discount_amount numeric DEFAULT 0,
+        subtotal numeric NOT NULL,
+        iva_percent numeric DEFAULT 21,
+        iva_amount numeric DEFAULT 0,
+        total numeric NOT NULL,
+        created_at timestamptz DEFAULT now(),
+        updated_at timestamptz DEFAULT now()
+      );
+    `);
+    logs.push("✓ Tabla quote_products");
+
+    // ============================================
+    // DOCUMENTS RAG (para funcionalidad IA)
+    // ============================================
+    await client.queryObject(`
+      CREATE TABLE IF NOT EXISTS documents_rag (
+        id bigserial PRIMARY KEY,
+        content text NOT NULL,
+        metadata jsonb DEFAULT '{}',
+        embedding vector(1536)
+      );
+    `);
+    logs.push("✓ Tabla documents_rag");
+
+    // ============================================
+    // FUNCIONES DE SINCRONIZACIÓN
+    // ============================================
+    logs.push("Creando funciones de sincronización...");
+    
+    // sync_invoice_products
+    await client.queryObject(`
+      CREATE OR REPLACE FUNCTION sync_invoice_products()
+      RETURNS trigger AS $$
+      DECLARE
+        inv_record RECORD;
+        svc_record RECORD;
+        cli_record RECORD;
+      BEGIN
+        IF TG_OP = 'DELETE' THEN
+          DELETE FROM invoice_products WHERE invoice_id = OLD.invoice_id AND service_id = OLD.service_id;
+          RETURN OLD;
+        END IF;
+
+        SELECT * INTO inv_record FROM invoices WHERE id = NEW.invoice_id;
+        SELECT * INTO svc_record FROM services WHERE id = NEW.service_id;
+        SELECT * INTO cli_record FROM clients WHERE id = inv_record.client_id;
+
+        INSERT INTO invoice_products (
+          invoice_id, invoice_number, invoice_date, invoice_status,
+          client_id, client_name, client_cif,
+          service_id, service_name, service_category,
+          quantity, unit_price, discount_percent, discount_amount,
+          subtotal, iva_percent, iva_amount, total
+        ) VALUES (
+          NEW.invoice_id, inv_record.invoice_number, inv_record.issue_date, inv_record.status::text,
+          inv_record.client_id, cli_record.name, cli_record.cif,
+          NEW.service_id, svc_record.name, svc_record.category,
+          NEW.quantity, NEW.unit_price, NEW.discount_percent, NEW.discount_amount,
+          NEW.subtotal, NEW.iva_percent, NEW.iva_amount, NEW.total
+        )
+        ON CONFLICT (id) DO UPDATE SET
+          invoice_status = EXCLUDED.invoice_status,
+          quantity = EXCLUDED.quantity,
+          unit_price = EXCLUDED.unit_price,
+          discount_percent = EXCLUDED.discount_percent,
+          discount_amount = EXCLUDED.discount_amount,
+          subtotal = EXCLUDED.subtotal,
+          iva_percent = EXCLUDED.iva_percent,
+          iva_amount = EXCLUDED.iva_amount,
+          total = EXCLUDED.total,
+          updated_at = now();
+
+        RETURN NEW;
+      END;
+      $$ LANGUAGE plpgsql;
+    `);
+    logs.push("✓ Función sync_invoice_products");
+
+    // sync_quote_products
+    await client.queryObject(`
+      CREATE OR REPLACE FUNCTION sync_quote_products()
+      RETURNS trigger AS $$
+      DECLARE
+        qt_record RECORD;
+        svc_record RECORD;
+        v_client_name text := NULL;
+        v_contact_name text := NULL;
+      BEGIN
+        IF TG_OP = 'DELETE' THEN
+          DELETE FROM quote_products WHERE quote_id = OLD.quote_id AND service_id = OLD.service_id;
+          RETURN OLD;
+        END IF;
+
+        SELECT * INTO qt_record FROM quotes WHERE id = NEW.quote_id;
+        SELECT * INTO svc_record FROM services WHERE id = NEW.service_id;
+        
+        IF qt_record.client_id IS NOT NULL THEN
+          SELECT name INTO v_client_name FROM clients WHERE id = qt_record.client_id;
+        END IF;
+        
+        IF qt_record.contact_id IS NOT NULL THEN
+          SELECT name INTO v_contact_name FROM contacts WHERE id = qt_record.contact_id;
+        END IF;
+
+        INSERT INTO quote_products (
+          quote_id, quote_number, quote_date, quote_status,
+          client_id, client_name, contact_id, contact_name,
+          service_id, service_name, service_category,
+          quantity, unit_price, discount_percent, discount_amount,
+          subtotal, iva_percent, iva_amount, total
+        ) VALUES (
+          NEW.quote_id, qt_record.quote_number, qt_record.created_at::date, qt_record.status::text,
+          qt_record.client_id, v_client_name, qt_record.contact_id, v_contact_name,
+          NEW.service_id, svc_record.name, svc_record.category,
+          NEW.quantity, NEW.unit_price, NEW.discount_percent, NEW.discount_amount,
+          NEW.subtotal, NEW.iva_percent, NEW.iva_amount, NEW.total
+        )
+        ON CONFLICT (id) DO UPDATE SET
+          quote_status = EXCLUDED.quote_status,
+          client_name = EXCLUDED.client_name,
+          contact_name = EXCLUDED.contact_name,
+          quantity = EXCLUDED.quantity,
+          unit_price = EXCLUDED.unit_price,
+          discount_percent = EXCLUDED.discount_percent,
+          discount_amount = EXCLUDED.discount_amount,
+          subtotal = EXCLUDED.subtotal,
+          iva_percent = EXCLUDED.iva_percent,
+          iva_amount = EXCLUDED.iva_amount,
+          total = EXCLUDED.total,
+          updated_at = now();
+
+        RETURN NEW;
+      END;
+      $$ LANGUAGE plpgsql;
+    `);
+    logs.push("✓ Función sync_quote_products");
+
+    // ============================================
+    // TRIGGERS
+    // ============================================
+    logs.push("Creando triggers...");
+    
+    await client.queryObject(`
+      DROP TRIGGER IF EXISTS trg_sync_invoice_products ON invoice_services;
+      CREATE TRIGGER trg_sync_invoice_products
+        AFTER INSERT OR UPDATE OR DELETE ON invoice_services
+        FOR EACH ROW EXECUTE FUNCTION sync_invoice_products();
+        
+      DROP TRIGGER IF EXISTS trg_sync_quote_products ON quote_services;
+      CREATE TRIGGER trg_sync_quote_products
+        AFTER INSERT OR UPDATE OR DELETE ON quote_services
+        FOR EACH ROW EXECUTE FUNCTION sync_quote_products();
+    `);
+    logs.push("✓ Triggers de sincronización creados");
+
+    // ============================================
+    // FUNCIONES DE ROLES
+    // ============================================
+    await client.queryObject(`
+      CREATE OR REPLACE FUNCTION has_role(_user_id uuid, _role app_role)
+      RETURNS boolean AS $$
+        SELECT EXISTS (
+          SELECT 1 FROM user_roles
+          WHERE user_id = _user_id AND role = _role
+        );
+      $$ LANGUAGE sql STABLE SECURITY DEFINER;
+      
+      CREATE OR REPLACE FUNCTION has_any_role(_user_id uuid)
+      RETURNS boolean AS $$
+        SELECT EXISTS (
+          SELECT 1 FROM user_roles WHERE user_id = _user_id
+        );
+      $$ LANGUAGE sql STABLE SECURITY DEFINER;
+    `);
+    logs.push("✓ Funciones de roles creadas");
+
+    // ============================================
+    // FK Y CONSTRAINTS ADICIONALES
+    // ============================================
     await client.queryObject(`
       DO $$ BEGIN
         ALTER TABLE invoices ADD CONSTRAINT fk_invoice_remittance 
@@ -676,7 +975,9 @@ async function createCRMSchema(config: {
       EXCEPTION WHEN duplicate_object THEN null; END $$;
     `);
 
-    // Crear índices
+    // ============================================
+    // ÍNDICES
+    // ============================================
     logs.push("Creando índices...");
     await client.queryObject(`
       CREATE INDEX IF NOT EXISTS idx_profiles_user_id ON profiles(user_id);
@@ -691,8 +992,21 @@ async function createCRMSchema(config: {
       CREATE INDEX IF NOT EXISTS idx_contracts_status ON contracts(status);
       CREATE INDEX IF NOT EXISTS idx_calendar_events_user_id ON calendar_events(user_id);
       CREATE INDEX IF NOT EXISTS idx_calendar_events_dates ON calendar_events(start_datetime, end_datetime);
+      CREATE INDEX IF NOT EXISTS idx_invoice_products_invoice_id ON invoice_products(invoice_id);
+      CREATE INDEX IF NOT EXISTS idx_invoice_products_client_id ON invoice_products(client_id);
+      CREATE INDEX IF NOT EXISTS idx_quote_products_quote_id ON quote_products(quote_id);
     `);
     logs.push("✓ Índices creados");
+
+    // ============================================
+    // REGISTRAR VERSIÓN
+    // ============================================
+    await client.queryObject(`
+      INSERT INTO schema_versions (version, description)
+      VALUES ('${CURRENT_VERSION}', 'Schema completo del CRM con todas las tablas y funciones')
+      ON CONFLICT (version) DO NOTHING;
+    `);
+    logs.push(`✓ Versión ${CURRENT_VERSION} registrada`);
 
     await client.end();
     logs.push("✅ Schema del CRM creado correctamente");
@@ -719,7 +1033,6 @@ serve(async (req) => {
 
     const logs: string[] = [];
 
-    // Verificar conexión a Supabase
     const supabaseUrl = Deno.env.get("SUPABASE_URL");
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
 
@@ -778,7 +1091,6 @@ serve(async (req) => {
         auth: { persistSession: false },
       });
 
-      // Verificar que podemos acceder a auth
       const { data: users, error } = await supabaseAdmin.auth.admin.listUsers({ perPage: 1 });
       
       if (error) {
@@ -838,7 +1150,6 @@ serve(async (req) => {
 
       logs.push(`Configurando admin para ${email}...`);
 
-      // Conectar a Postgres externo para crear profile y role
       const { Client } = await import("https://deno.land/x/postgres@v0.17.0/mod.ts");
       
       const client = new Client({
@@ -852,7 +1163,6 @@ serve(async (req) => {
       
       await client.connect();
 
-      // Verificar si ya existe el perfil
       const existing = await client.queryObject(
         "SELECT id FROM profiles WHERE user_id = $1",
         [userId]
@@ -868,7 +1178,6 @@ serve(async (req) => {
         logs.push("ℹ️ Perfil ya existe");
       }
 
-      // Eliminar roles anteriores y asignar admin
       await client.queryObject("DELETE FROM user_roles WHERE user_id = $1", [userId]);
       await client.queryObject(
         "INSERT INTO user_roles (user_id, role) VALUES ($1, 'admin')",
@@ -876,7 +1185,6 @@ serve(async (req) => {
       );
       logs.push("✓ Rol admin asignado");
 
-      // Crear company_settings si no existe
       const companyExists = await client.queryObject("SELECT id FROM company_settings LIMIT 1");
       if (companyExists.rows.length === 0) {
         await client.queryObject(`

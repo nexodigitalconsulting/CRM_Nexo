@@ -13,9 +13,10 @@ interface MigrationResult {
   migrationsApplied?: number;
   logs?: string[];
   error?: string;
+  requiresSetup?: boolean;
 }
 
-type MigrationStatus = "checking" | "migrating" | "success" | "error" | "ready";
+type MigrationStatus = "checking" | "migrating" | "success" | "error" | "ready" | "needs-setup";
 
 export function MigrationGate({ children }: MigrationGateProps) {
   const [status, setStatus] = useState<MigrationStatus>("checking");
@@ -41,6 +42,12 @@ export function MigrationGate({ children }: MigrationGateProps) {
       }
 
       setResult(data);
+
+      // If requires setup, redirect to setup page
+      if (data?.requiresSetup) {
+        setStatus("needs-setup");
+        return;
+      }
 
       if (!data?.success) {
         // If migration failed but it's because no external postgres, just continue
@@ -115,6 +122,24 @@ export function MigrationGate({ children }: MigrationGateProps) {
                 Versión: {result.currentVersion} • {result.migrationsApplied} migración(es) aplicada(s)
               </p>
             )}
+          </div>
+        )}
+
+        {status === "needs-setup" && (
+          <div className="space-y-3">
+            <div className="flex items-center gap-3 text-orange-500">
+              <AlertCircle className="h-5 w-5" />
+              <span>Configuración requerida</span>
+            </div>
+            <p className="text-sm text-muted-foreground">
+              La base de datos necesita ser configurada inicialmente.
+            </p>
+            <a
+              href="/setup"
+              className="inline-block px-4 py-2 bg-primary text-primary-foreground rounded text-sm hover:bg-primary/90"
+            >
+              Ir a Configuración
+            </a>
           </div>
         )}
 
