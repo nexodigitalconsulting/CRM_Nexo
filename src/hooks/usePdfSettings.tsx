@@ -20,6 +20,23 @@ export interface PdfSettings {
 
 export type PdfSettingsUpdate = Partial<Omit<PdfSettings, 'id' | 'created_at' | 'updated_at'>>;
 
+// Valores por defecto si la tabla no existe o está vacía
+export const DEFAULT_PDF_SETTINGS: PdfSettings = {
+  id: '',
+  primary_color: '#3366cc',
+  secondary_color: '#666666',
+  accent_color: '#0066cc',
+  show_logo: true,
+  logo_position: 'left',
+  show_iban_footer: true,
+  show_notes: true,
+  show_discounts_column: true,
+  header_style: 'classic',
+  font_size_base: 10,
+  created_at: new Date().toISOString(),
+  updated_at: new Date().toISOString(),
+};
+
 export function usePdfSettings() {
   return useQuery({
     queryKey: ["pdf_settings"],
@@ -28,11 +45,18 @@ export function usePdfSettings() {
         .from("pdf_settings")
         .select("*")
         .limit(1)
-        .single();
+        .maybeSingle();
       
-      if (error) throw error;
-      return data as PdfSettings;
+      // Si hay error (tabla no existe) o no hay datos, retornar defaults
+      if (error) {
+        console.warn('pdf_settings no disponible, usando valores por defecto:', error.message);
+        return DEFAULT_PDF_SETTINGS;
+      }
+      
+      return (data as PdfSettings) || DEFAULT_PDF_SETTINGS;
     },
+    // No fallar si la tabla no existe
+    retry: false,
   });
 }
 
