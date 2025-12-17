@@ -20,49 +20,16 @@ import {
   FileText,
   Settings2,
   Mail,
-  FlaskConical,
+  FileOutput,
 } from "lucide-react";
 import { TemplateManager } from "@/components/settings/TemplateManager";
 import { EntityConfigManager } from "@/components/settings/EntityConfigManager";
 import { CompanySettings } from "@/components/settings/CompanySettings";
 import { EmailSettings } from "@/components/settings/EmailSettings";
 import { NotificationRulesSettings } from "@/components/settings/NotificationRulesSettings";
-import { downloadTestPdf, testPdfLib } from "@/lib/pdfLibTest";
-import { toast } from "sonner";
-import { useState } from "react";
+import { PdfSettingsManager } from "@/components/settings/PdfSettingsManager";
 
 export default function Settings() {
-  const [testLoading, setTestLoading] = useState(false);
-  const [testResult, setTestResult] = useState<string | null>(null);
-
-  const handleTestPdfLib = async () => {
-    setTestLoading(true);
-    setTestResult(null);
-    try {
-      const result = await testPdfLib();
-      if (result.success) {
-        setTestResult(`✅ PDF generado: ${result.blob?.size} bytes, Base64: ${result.base64?.length} chars`);
-        toast.success("pdf-lib funciona correctamente");
-      } else {
-        setTestResult(`❌ Error: ${result.error}`);
-        toast.error("Error en pdf-lib: " + result.error);
-      }
-    } catch (error) {
-      setTestResult(`❌ Excepción: ${error}`);
-      toast.error("Error inesperado");
-    }
-    setTestLoading(false);
-  };
-
-  const handleDownloadTest = async () => {
-    try {
-      await downloadTestPdf();
-      toast.success("PDF descargado");
-    } catch (error) {
-      toast.error("Error al descargar: " + String(error));
-    }
-  };
-
   return (
     <div className="animate-fade-in">
       <Header title="Configuración" subtitle="Ajustes del sistema" />
@@ -98,13 +65,13 @@ export default function Settings() {
               <FileText className="h-4 w-4" />
               Plantillas
             </TabsTrigger>
+            <TabsTrigger value="pdfs" className="gap-2">
+              <FileOutput className="h-4 w-4" />
+              PDFs
+            </TabsTrigger>
             <TabsTrigger value="entities" className="gap-2">
               <Settings2 className="h-4 w-4" />
               Entidades
-            </TabsTrigger>
-            <TabsTrigger value="pdftest" className="gap-2 bg-amber-500/20 text-amber-700">
-              <FlaskConical className="h-4 w-4" />
-              Test PDF
             </TabsTrigger>
           </TabsList>
 
@@ -304,55 +271,12 @@ export default function Settings() {
             <TemplateManager />
           </TabsContent>
 
-          <TabsContent value="entities" className="space-y-6">
-            <EntityConfigManager />
+          <TabsContent value="pdfs" className="space-y-6">
+            <PdfSettingsManager />
           </TabsContent>
 
-          <TabsContent value="pdftest" className="space-y-6">
-            <div className="bg-card rounded-xl border border-amber-500/30 p-6">
-              <h3 className="text-lg font-semibold mb-2 flex items-center gap-2">
-                <FlaskConical className="h-5 w-5 text-amber-500" />
-                Test de pdf-lib
-              </h3>
-              <p className="text-sm text-muted-foreground mb-6">
-                Prueba de compatibilidad de la librería pdf-lib para generar PDFs reales.
-              </p>
-              
-              <div className="flex gap-4 mb-4">
-                <Button 
-                  onClick={handleTestPdfLib} 
-                  disabled={testLoading}
-                  variant="outline"
-                >
-                  {testLoading ? "Generando..." : "1. Test Generación"}
-                </Button>
-                <Button 
-                  onClick={handleDownloadTest}
-                  variant="default"
-                >
-                  2. Descargar PDF Test
-                </Button>
-              </div>
-
-              {testResult && (
-                <div className={`p-4 rounded-lg text-sm font-mono ${
-                  testResult.startsWith('✅') 
-                    ? 'bg-green-500/10 text-green-700 border border-green-500/30' 
-                    : 'bg-red-500/10 text-red-700 border border-red-500/30'
-                }`}>
-                  {testResult}
-                </div>
-              )}
-
-              <div className="mt-6 p-4 bg-muted/50 rounded-lg text-sm">
-                <p className="font-medium mb-2">Instrucciones:</p>
-                <ol className="list-decimal list-inside space-y-1 text-muted-foreground">
-                  <li>Haz clic en "Test Generación" para verificar que pdf-lib funciona</li>
-                  <li>Si aparece ✅, haz clic en "Descargar PDF Test" para ver el resultado</li>
-                  <li>Abre el PDF descargado y verifica que se ve correctamente</li>
-                </ol>
-              </div>
-            </div>
+          <TabsContent value="entities" className="space-y-6">
+            <EntityConfigManager />
           </TabsContent>
         </Tabs>
       </div>

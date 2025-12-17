@@ -1217,6 +1217,54 @@ export type Database = {
           },
         ]
       }
+      pdf_settings: {
+        Row: {
+          accent_color: string | null
+          created_at: string | null
+          font_size_base: number | null
+          header_style: string | null
+          id: string
+          logo_position: string | null
+          primary_color: string | null
+          secondary_color: string | null
+          show_discounts_column: boolean | null
+          show_iban_footer: boolean | null
+          show_logo: boolean | null
+          show_notes: boolean | null
+          updated_at: string | null
+        }
+        Insert: {
+          accent_color?: string | null
+          created_at?: string | null
+          font_size_base?: number | null
+          header_style?: string | null
+          id?: string
+          logo_position?: string | null
+          primary_color?: string | null
+          secondary_color?: string | null
+          show_discounts_column?: boolean | null
+          show_iban_footer?: boolean | null
+          show_logo?: boolean | null
+          show_notes?: boolean | null
+          updated_at?: string | null
+        }
+        Update: {
+          accent_color?: string | null
+          created_at?: string | null
+          font_size_base?: number | null
+          header_style?: string | null
+          id?: string
+          logo_position?: string | null
+          primary_color?: string | null
+          secondary_color?: string | null
+          show_discounts_column?: boolean | null
+          show_iban_footer?: boolean | null
+          show_logo?: boolean | null
+          show_notes?: boolean | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           avatar_url: string | null

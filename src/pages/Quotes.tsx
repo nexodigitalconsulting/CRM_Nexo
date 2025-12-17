@@ -4,7 +4,7 @@ import { DataTable } from "@/components/ui/data-table";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Plus, Filter, MoreVertical, FileText, Send, Check, X, Loader2, ArrowRight, Printer, LayoutGrid, List, Mail } from "lucide-react";
+import { Plus, Filter, MoreVertical, FileText, Send, Check, X, Loader2, ArrowRight, Printer, LayoutGrid, List, Mail, Download } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -30,7 +30,8 @@ import { useDefaultTableView } from "@/hooks/useTableViews";
 import { entityExportConfigs } from "@/lib/exportUtils";
 import { useDefaultTemplate } from "@/hooks/useTemplates";
 import { useCompanySettings } from "@/hooks/useCompanySettings";
-import { printDocument, formatQuoteData } from "@/lib/pdfGenerator";
+import { printDocument, formatQuoteData } from "@/lib/printUtils";
+import { downloadQuotePdf } from "@/lib/pdf/quotePdf";
 import { SendEmailDialog } from "@/components/common/SendEmailDialog";
 import { toast } from "sonner";
 
@@ -246,6 +247,28 @@ export default function Quotes() {
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
             <DropdownMenuItem onClick={() => handleEdit(quote)}>Editar</DropdownMenuItem>
+            <DropdownMenuItem onClick={async () => {
+              try {
+                const quoteData = {
+                  quote_number: quote.quote_number,
+                  created_at: quote.created_at || new Date().toISOString(),
+                  valid_until: quote.valid_until,
+                  subtotal: quote.subtotal,
+                  iva_total: quote.iva_total,
+                  total: quote.total,
+                  notes: quote.notes,
+                  name: quote.name,
+                  client: quote.client,
+                  contact: quote.contact,
+                };
+                await downloadQuotePdf(quoteData as any, companySettings as any);
+                toast.success("PDF descargado");
+              } catch (error) {
+                toast.error("Error al descargar PDF");
+              }
+            }}>
+              <Download className="h-4 w-4 mr-2" /> Descargar PDF
+            </DropdownMenuItem>
             <DropdownMenuItem onClick={() => handlePrint(quote.id)}>
               <Printer className="h-4 w-4 mr-2" /> Imprimir
             </DropdownMenuItem>
