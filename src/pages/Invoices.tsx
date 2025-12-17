@@ -11,7 +11,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Plus, Filter, FileText, Edit, Trash2, Printer, Mail, Download } from "lucide-react";
+import { Plus, Filter, FileText, Edit, Trash2, Mail, Download, Send } from "lucide-react";
 import { ExportDropdown } from "@/components/common/ExportDropdown";
 import { TableViewManager, ColumnConfig } from "@/components/common/TableViewManager";
 import { useDefaultTableView } from "@/hooks/useTableViews";
@@ -31,18 +31,16 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { useDefaultTemplate } from "@/hooks/useTemplates";
 import { useCompanySettings } from "@/hooks/useCompanySettings";
-import { printDocument, formatInvoiceData, generatePrintableHTML } from "@/lib/printUtils";
 import { downloadInvoicePdf } from "@/lib/pdf/invoicePdf";
 import { SendEmailDialog } from "@/components/common/SendEmailDialog";
 import { toast } from "sonner";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 const statusMap: Record<string, "active" | "pending" | "inactive" | "danger"> = {
   draft: "inactive",
@@ -84,13 +82,11 @@ export default function Invoices() {
   const { data: invoices = [], isLoading } = useInvoices();
   const deleteInvoice = useDeleteInvoice();
   const markAsSent = useMarkInvoiceAsSent();
-  const { data: invoiceTemplate } = useDefaultTemplate("invoice");
   const { data: companySettings } = useCompanySettings();
   const { data: defaultView } = useDefaultTableView("invoices");
   
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingInvoice, setEditingInvoice] = useState<InvoiceWithDetails | null>(null);
-  const [invoiceForPrint, setInvoiceForPrint] = useState<string | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [invoiceToDelete, setInvoiceToDelete] = useState<InvoiceWithDetails | null>(null);
   const [statusFilter, setStatusFilter] = useState<string>("all");
@@ -111,9 +107,6 @@ export default function Invoices() {
     const cols = defaultView.visible_columns as string[];
     if (cols.length > 0) setVisibleColumns(cols);
   }
-
-  // Fetch full invoice for printing
-  const { data: fullInvoice } = useInvoice(invoiceForPrint || undefined);
 
   const filteredInvoices = invoices.filter((invoice) => {
     const matchesStatus = statusFilter === "all" || invoice.status === statusFilter;
@@ -140,25 +133,6 @@ export default function Invoices() {
       setInvoiceToDelete(null);
     }
   };
-
-  const handlePrint = async (invoiceId: string) => {
-    setInvoiceForPrint(invoiceId);
-  };
-
-  // Effect to print when full invoice is loaded
-  if (fullInvoice && invoiceForPrint && invoiceTemplate) {
-    const data = formatInvoiceData(
-      fullInvoice as unknown as Record<string, unknown>,
-      companySettings as unknown as Record<string, unknown>
-    );
-    printDocument({
-      template: invoiceTemplate.content,
-      data,
-      filename: `factura-${fullInvoice.invoice_number}.html`,
-      logoUrl: companySettings?.logo_url || undefined,
-    });
-    setInvoiceForPrint(null);
-  }
 
   const handleDialogClose = () => {
     setDialogOpen(false);
@@ -268,6 +242,17 @@ export default function Invoices() {
       ),
     },
     {
+      key: "is_sent",
+      label: "Enviada",
+      render: (invoice: InvoiceWithDetails) => (
+        (invoice as any).is_sent ? (
+          <Send className="h-4 w-4 text-primary" />
+        ) : (
+          <span className="text-muted-foreground">-</span>
+        )
+      ),
+    },
+    {
       key: "actions",
       label: "Acciones",
       render: (invoice: InvoiceWithDetails) => (
@@ -296,20 +281,6 @@ export default function Invoices() {
             title="Descargar PDF"
           >
             <Download className="h-4 w-4" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => {
-              if (!invoiceTemplate) {
-                toast.error("No hay plantilla de factura configurada");
-                return;
-              }
-              handlePrint(invoice.id);
-            }}
-            title="Imprimir"
-          >
-            <Printer className="h-4 w-4" />
           </Button>
           <Button
             variant="ghost"

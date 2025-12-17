@@ -4,7 +4,7 @@ import { DataTable } from "@/components/ui/data-table";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Plus, Filter, MoreVertical, FileText, Send, Check, X, Loader2, ArrowRight, Printer, LayoutGrid, List, Mail, Download } from "lucide-react";
+import { Plus, Filter, MoreVertical, FileText, Send, Check, X, Loader2, ArrowRight, LayoutGrid, List, Mail, Download } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -22,15 +22,13 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { useQuotes, useQuote, useDeleteQuote, useUpdateQuoteStatus, useMarkQuoteAsSent, QuoteWithDetails } from "@/hooks/useQuotes";
+import { useQuotes, useDeleteQuote, useUpdateQuoteStatus, useMarkQuoteAsSent, QuoteWithDetails } from "@/hooks/useQuotes";
 import { QuoteFormDialog } from "@/components/quotes/QuoteFormDialog";
 import { ExportDropdown } from "@/components/common/ExportDropdown";
 import { TableViewManager, ColumnConfig } from "@/components/common/TableViewManager";
 import { useDefaultTableView } from "@/hooks/useTableViews";
 import { entityExportConfigs } from "@/lib/exportUtils";
-import { useDefaultTemplate } from "@/hooks/useTemplates";
 import { useCompanySettings } from "@/hooks/useCompanySettings";
-import { printDocument, formatQuoteData } from "@/lib/printUtils";
 import { downloadQuotePdf } from "@/lib/pdf/quotePdf";
 import { SendEmailDialog } from "@/components/common/SendEmailDialog";
 import { toast } from "sonner";
@@ -78,7 +76,6 @@ export default function Quotes() {
   const deleteQuote = useDeleteQuote();
   const updateStatus = useUpdateQuoteStatus();
   const markAsSent = useMarkQuoteAsSent();
-  const { data: quoteTemplate } = useDefaultTemplate("quote");
   const { data: companySettings } = useCompanySettings();
   const { data: defaultView } = useDefaultTableView("quotes");
   
@@ -86,39 +83,18 @@ export default function Quotes() {
   const [selectedQuote, setSelectedQuote] = useState<QuoteWithDetails | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [quoteToDelete, setQuoteToDelete] = useState<QuoteWithDetails | null>(null);
-  const [quoteForPrint, setQuoteForPrint] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [viewMode, setViewMode] = useState<"kanban" | "table">("kanban");
   const [visibleColumns, setVisibleColumns] = useState<string[]>(
     columnConfigs.filter((c) => c.defaultVisible).map((c) => c.key)
   );
   
-  // Email dialog state
   const [emailDialogOpen, setEmailDialogOpen] = useState(false);
   const [emailQuote, setEmailQuote] = useState<QuoteWithDetails | null>(null);
 
-  // Apply default view
   if (defaultView && visibleColumns.length === columnConfigs.filter(c => c.defaultVisible).length) {
     const cols = defaultView.visible_columns as string[];
     if (cols.length > 0) setVisibleColumns(cols);
-  }
-
-  // Fetch full quote for printing
-  const { data: fullQuote } = useQuote(quoteForPrint || undefined);
-
-  // Effect to print when full quote is loaded
-  if (fullQuote && quoteForPrint && quoteTemplate) {
-    const data = formatQuoteData(
-      fullQuote as unknown as Record<string, unknown>,
-      companySettings as unknown as Record<string, unknown>
-    );
-    printDocument({
-      template: quoteTemplate.content,
-      data,
-      filename: `presupuesto-${fullQuote.quote_number}.html`,
-      logoUrl: companySettings?.logo_url || undefined,
-    });
-    setQuoteForPrint(null);
   }
 
   const handleEdit = (quote: QuoteWithDetails) => {
@@ -129,14 +105,6 @@ export default function Quotes() {
   const handleDelete = (quote: QuoteWithDetails) => {
     setQuoteToDelete(quote);
     setDeleteDialogOpen(true);
-  };
-
-  const handlePrint = (quoteId: string) => {
-    if (!quoteTemplate) {
-      toast.error("No hay plantilla de presupuesto configurada. Ve a Configuración > Plantillas.");
-      return;
-    }
-    setQuoteForPrint(quoteId);
   };
 
   const confirmDelete = async () => {
@@ -269,9 +237,10 @@ export default function Quotes() {
             }}>
               <Download className="h-4 w-4 mr-2" /> Descargar PDF
             </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => handlePrint(quote.id)}>
-              <Printer className="h-4 w-4 mr-2" /> Imprimir
-            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => {
+              setEmailQuote(quote);
+              setEmailDialogOpen(true);
+            }}>
             <DropdownMenuItem onClick={() => {
               setEmailQuote(quote);
               setEmailDialogOpen(true);

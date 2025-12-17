@@ -14,6 +14,7 @@ import {
   Workflow,
   LogOut,
   BarChart3,
+  User,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useState } from "react";
@@ -55,10 +56,6 @@ const navigation: NavItem[] = [
   { label: "Análisis Productos", icon: BarChart3, href: "/product-analysis" },
   { label: "Flujos", icon: Workflow, href: "/flows" },
   { label: "Calendario", icon: CalendarDays, href: "/calendar" },
-];
-
-const bottomNav: NavItem[] = [
-  { label: "Configuración", icon: Settings, href: "/settings" },
 ];
 
 export function Sidebar() {
@@ -169,20 +166,32 @@ export function Sidebar() {
         {/* Bottom Navigation */}
         <div className="border-t border-sidebar-border px-3 py-4">
           <ul className="space-y-1">
-            {bottomNav.map((item) => (
-              <li key={item.label}>
+            <li>
+              <Link
+                to="/profile"
+                className={cn(
+                  "sidebar-item",
+                  location.pathname === "/profile" && "sidebar-item-active"
+                )}
+              >
+                <User className="h-5 w-5" />
+                Mi Perfil
+              </Link>
+            </li>
+            {isAdmin && (
+              <li>
                 <Link
-                  to={item.href!}
+                  to="/settings"
                   className={cn(
                     "sidebar-item",
-                    location.pathname === item.href && "sidebar-item-active"
+                    location.pathname === "/settings" && "sidebar-item-active"
                   )}
                 >
-                  <item.icon className="h-5 w-5" />
-                  {item.label}
+                  <Settings className="h-5 w-5" />
+                  Configuración
                 </Link>
               </li>
-            ))}
+            )}
           </ul>
         </div>
 

@@ -11,15 +11,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Plus, Filter, Calendar, Edit, Trash2, Printer, Mail, Download } from "lucide-react";
+import { Plus, Filter, Calendar, Edit, Trash2, Mail, Download, Send } from "lucide-react";
 import { ExportDropdown } from "@/components/common/ExportDropdown";
 import { TableViewManager, ColumnConfig } from "@/components/common/TableViewManager";
 import { useDefaultTableView } from "@/hooks/useTableViews";
 import { entityExportConfigs } from "@/lib/exportUtils";
-import { useContracts, useDeleteContract, useContract, useMarkContractAsSent, ContractWithDetails } from "@/hooks/useContracts";
-import { useDefaultTemplate } from "@/hooks/useTemplates";
+import { useContracts, useDeleteContract, useMarkContractAsSent, ContractWithDetails } from "@/hooks/useContracts";
 import { useCompanySettings } from "@/hooks/useCompanySettings";
-import { printDocument, formatContractData } from "@/lib/printUtils";
 import { downloadContractPdf } from "@/lib/pdf/contractPdf";
 import { toast } from "sonner";
 import { ContractFormDialog } from "@/components/contracts/ContractFormDialog";
@@ -99,13 +97,11 @@ export default function Contracts() {
   const { data: contracts = [], isLoading } = useContracts();
   const deleteContract = useDeleteContract();
   const markAsSent = useMarkContractAsSent();
-  const { data: contractTemplate } = useDefaultTemplate("contract");
   const { data: companySettings } = useCompanySettings();
   const { data: defaultView } = useDefaultTableView("contracts");
   
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingContract, setEditingContract] = useState<ContractWithDetails | null>(null);
-  const [contractForPrint, setContractForPrint] = useState<string | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [contractToDelete, setContractToDelete] = useState<ContractWithDetails | null>(null);
   const [statusFilter, setStatusFilter] = useState<string>("all");
@@ -115,40 +111,13 @@ export default function Contracts() {
     columnConfigs.filter((c) => c.defaultVisible).map((c) => c.key)
   );
   
-  // Email dialog state
   const [emailDialogOpen, setEmailDialogOpen] = useState(false);
   const [emailContract, setEmailContract] = useState<ContractWithDetails | null>(null);
 
-  // Apply default view
   if (defaultView && visibleColumns.length === columnConfigs.filter(c => c.defaultVisible).length) {
     const cols = defaultView.visible_columns as string[];
     if (cols.length > 0) setVisibleColumns(cols);
   }
-
-  const { data: fullContract } = useContract(contractForPrint || undefined);
-
-  // Print when contract is loaded
-  if (fullContract && contractForPrint && contractTemplate) {
-    const data = formatContractData(
-      fullContract as unknown as Record<string, unknown>,
-      companySettings as unknown as Record<string, unknown>
-    );
-    printDocument({
-      template: contractTemplate.content,
-      data,
-      filename: `contrato-${fullContract.contract_number}.html`,
-      logoUrl: companySettings?.logo_url || undefined,
-    });
-    setContractForPrint(null);
-  }
-
-  const handlePrint = (contractId: string) => {
-    if (!contractTemplate) {
-      toast.error("No hay plantilla de contrato configurada");
-      return;
-    }
-    setContractForPrint(contractId);
-  };
 
   const filteredContracts = contracts.filter((contract) => {
     const matchesStatus = statusFilter === "all" || contract.status === statusFilter;
@@ -333,18 +302,6 @@ export default function Contracts() {
                 </Button>
               </TooltipTrigger>
               <TooltipContent>Descargar PDF</TooltipContent>
-            </Tooltip>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => handlePrint(contract.id)}
-                >
-                  <Printer className="h-4 w-4" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>Imprimir</TooltipContent>
             </Tooltip>
             <Tooltip>
               <TooltipTrigger asChild>

@@ -5,7 +5,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Mail, Server, Lock, Save, TestTube } from "lucide-react";
+import { Textarea } from "@/components/ui/textarea";
+import { Mail, Server, Lock, Save, TestTube, FileSignature } from "lucide-react";
 import { useEmailSettings, useUpdateEmailSettings, useTestEmailConnection } from "@/hooks/useEmailSettings";
 import { toast } from "sonner";
 
@@ -23,6 +24,7 @@ export function EmailSettings() {
     from_email: "",
     from_name: "",
     is_active: false,
+    signature_html: "",
   });
 
   useEffect(() => {
@@ -36,26 +38,21 @@ export function EmailSettings() {
         from_email: settings.from_email || "",
         from_name: settings.from_name || "",
         is_active: settings.is_active ?? false,
+        signature_html: settings.signature_html || "",
       });
     }
   }, [settings]);
 
   const handleSave = () => {
-    updateSettings.mutate(formData, {
-      onSuccess: () => {
-        // After saving, we can test if user wants
-      }
-    });
+    updateSettings.mutate(formData);
   };
 
   const handleTest = () => {
-    // First save, then test
     if (!formData.smtp_host || !formData.smtp_user || !formData.smtp_password || !formData.from_email) {
       toast.error("Completa todos los campos de configuración SMTP antes de probar");
       return;
     }
     
-    // Save first, then test
     updateSettings.mutate(formData, {
       onSuccess: () => {
         testConnection.mutate();
@@ -188,6 +185,44 @@ export function EmailSettings() {
               />
             </div>
           </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <FileSignature className="h-5 w-5" />
+            Firma de Email
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <p className="text-sm text-muted-foreground">
+            Esta firma HTML se añadirá automáticamente al final de cada email enviado.
+          </p>
+          <div className="space-y-2">
+            <Label htmlFor="signature_html">Firma HTML</Label>
+            <Textarea
+              id="signature_html"
+              placeholder={`<div style="margin-top: 20px; border-top: 1px solid #e5e7eb; padding-top: 15px;">
+  <p style="margin: 0; font-weight: 600;">Tu Nombre</p>
+  <p style="margin: 0; color: #6b7280; font-size: 14px;">Tu Empresa</p>
+  <p style="margin: 0; color: #6b7280; font-size: 14px;">+34 600 000 000</p>
+</div>`}
+              value={formData.signature_html}
+              onChange={(e) => setFormData({ ...formData, signature_html: e.target.value })}
+              rows={8}
+              className="font-mono text-sm"
+            />
+          </div>
+          {formData.signature_html && (
+            <div className="space-y-2">
+              <Label>Vista previa</Label>
+              <div 
+                className="p-4 border rounded-lg bg-white"
+                dangerouslySetInnerHTML={{ __html: formData.signature_html }}
+              />
+            </div>
+          )}
         </CardContent>
       </Card>
 

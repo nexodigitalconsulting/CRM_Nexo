@@ -663,6 +663,7 @@ export type Database = {
           from_name: string | null
           id: string
           is_active: boolean | null
+          signature_html: string | null
           smtp_host: string
           smtp_password: string
           smtp_port: number
@@ -676,6 +677,7 @@ export type Database = {
           from_name?: string | null
           id?: string
           is_active?: boolean | null
+          signature_html?: string | null
           smtp_host: string
           smtp_password: string
           smtp_port?: number
@@ -689,6 +691,7 @@ export type Database = {
           from_name?: string | null
           id?: string
           is_active?: boolean | null
+          signature_html?: string | null
           smtp_host?: string
           smtp_password?: string
           smtp_port?: number
