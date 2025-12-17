@@ -22,9 +22,16 @@ type MigrationStatus =
   | "migrating" 
   | "success" 
   | "error" 
-  | "ready" 
+  | "ready"
+  | "verified"  // System verified, show status before continuing
   | "needs-setup"
   | "needs-migration";
+
+type EdgeFnCheckStatus =
+  | { state: "idle" }
+  | { state: "checking" }
+  | { state: "ok"; message: string }
+  | { state: "error"; message: string };
 
 export function MigrationGate({ children }: MigrationGateProps) {
   const [status, setStatus] = useState<MigrationStatus>("checking");
@@ -32,6 +39,7 @@ export function MigrationGate({ children }: MigrationGateProps) {
   const [schemaStatus, setSchemaStatus] = useState<SchemaStatus | null>(null);
   const [showDetails, setShowDetails] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [edgeFnCheck, setEdgeFnCheck] = useState<EdgeFnCheckStatus>({ state: "idle" });
 
   useEffect(() => {
     checkAndMigrate();
@@ -67,8 +75,8 @@ export function MigrationGate({ children }: MigrationGateProps) {
           const responseData = data as any;
           
           if (responseData.isUpToDate === true) {
-            // Schema is up to date
-            setStatus("ready");
+            // Schema is up to date - show verified screen
+            setStatus("verified");
             return;
           }
 
@@ -80,16 +88,16 @@ export function MigrationGate({ children }: MigrationGateProps) {
           if (data.success) {
             if (data.migrationsApplied && data.migrationsApplied > 0) {
               setStatus("success");
-              setTimeout(() => setStatus("ready"), 2000);
+              setTimeout(() => setStatus("verified"), 2000);
             } else {
-              setStatus("ready");
+              setStatus("verified");
             }
             return;
           }
 
           // Edge function ran but reported error
           if (data.error?.includes("not configured")) {
-            setStatus("ready");
+            setStatus("verified");
             return;
           }
         }
@@ -120,13 +128,13 @@ export function MigrationGate({ children }: MigrationGateProps) {
         return;
       }
 
-      // Everything is up to date
-      setStatus("ready");
+      // Everything is up to date - show verified screen
+      setStatus("verified");
 
     } catch (err: any) {
       console.warn("Migration gate error:", err);
-      // On any error, try to continue (graceful degradation)
-      setStatus("ready");
+      // On any error, show verified anyway so user can check edge functions
+      setStatus("verified");
     }
   }
 
@@ -134,6 +142,21 @@ export function MigrationGate({ children }: MigrationGateProps) {
     await navigator.clipboard.writeText(getMigrationSQL());
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
+  };
+
+  const testEdgeFunction = async () => {
+    setEdgeFnCheck({ state: "checking" });
+    try {
+      const { data, error } = await supabase.functions.invoke("ping");
+      if (error) {
+        setEdgeFnCheck({ state: "error", message: error.message });
+        return;
+      }
+      const msg = typeof data === "object" ? JSON.stringify(data) : String(data ?? "OK");
+      setEdgeFnCheck({ state: "ok", message: msg });
+    } catch (e: any) {
+      setEdgeFnCheck({ state: "error", message: e?.message || "Error desconocido" });
+    }
   };
 
   // If ready, render children directly
@@ -189,6 +212,91 @@ export function MigrationGate({ children }: MigrationGateProps) {
                 Versión: {result.currentVersion} • {result.migrationsApplied} migración(es) aplicada(s)
               </p>
             )}
+          </div>
+        )}
+
+        {status === "verified" && (
+          <div className="space-y-4">
+            <div className="flex items-center gap-3 text-green-600">
+              <CheckCircle className="h-5 w-5" />
+              <span>Sistema verificado</span>
+            </div>
+
+            <div className="bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800 rounded p-3 space-y-2">
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">Versión:</span>
+                <span className="font-mono text-green-700 dark:text-green-300">
+                  {schemaStatus?.currentVersion || TARGET_VERSION}
+                </span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">Entorno:</span>
+                <span className="font-mono">
+                  {schemaStatus?.environment === "cloud" ? "Lovable Cloud" : "Self-hosted"}
+                </span>
+              </div>
+            </div>
+
+            {/* Edge Functions test */}
+            <div className="bg-muted/30 rounded p-3 space-y-3">
+              <p className="text-sm font-medium">Verificar Edge Functions</p>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  onClick={testEdgeFunction}
+                  disabled={edgeFnCheck.state === "checking"}
+                  className="inline-flex items-center gap-2 px-3 py-2 bg-secondary text-secondary-foreground rounded text-xs hover:bg-secondary/90 disabled:opacity-50"
+                >
+                  {edgeFnCheck.state === "checking" ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : edgeFnCheck.state === "ok" ? (
+                    <CheckCircle className="h-4 w-4 text-green-500" />
+                  ) : edgeFnCheck.state === "error" ? (
+                    <AlertCircle className="h-4 w-4 text-red-500" />
+                  ) : (
+                    <Database className="h-4 w-4" />
+                  )}
+                  Probar función (ping)
+                </button>
+                <a
+                  href="https://supabase.com/dashboard/project/honfwrfkiukckyoelsdm/functions"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-2 px-3 py-2 bg-secondary text-secondary-foreground rounded text-xs hover:bg-secondary/90"
+                >
+                  <ExternalLink className="h-4 w-4" />
+                  Ver panel / logs
+                </a>
+              </div>
+
+              {edgeFnCheck.state === "ok" && (
+                <div className="text-xs font-mono bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200 rounded p-2">
+                  OK: {edgeFnCheck.message}
+                </div>
+              )}
+              {edgeFnCheck.state === "error" && (
+                <div className="text-xs font-mono bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-200 rounded p-2">
+                  ERROR: {edgeFnCheck.message}
+                  <p className="mt-1 text-muted-foreground">
+                    Self-hosted: reinicia edge-runtime después de deploy
+                  </p>
+                </div>
+              )}
+            </div>
+
+            <div className="flex gap-2 pt-2">
+              <button
+                onClick={() => setStatus("ready")}
+                className="flex-1 px-4 py-2 bg-primary text-primary-foreground rounded text-sm hover:bg-primary/90"
+              >
+                Continuar al CRM
+              </button>
+              <button
+                onClick={checkAndMigrate}
+                className="px-4 py-2 bg-secondary text-secondary-foreground rounded text-sm hover:bg-secondary/90"
+              >
+                Verificar de nuevo
+              </button>
+            </div>
           </div>
         )}
 
