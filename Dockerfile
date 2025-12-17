@@ -38,11 +38,11 @@ RUN echo "DEBUG_VITE_SUPABASE_URL=${VITE_SUPABASE_URL}" && \
 # Build
 RUN npm run build
 
-# === Stage 2: Producción con Nginx + PostgreSQL client ===
+# === Stage 2: Producción con Nginx + PostgreSQL client + Docker CLI ===
 FROM docker.io/library/nginx:alpine
 
-# Instalar PostgreSQL client y bash para scripts de migración
-RUN apk add --no-cache postgresql-client bash curl
+# Instalar PostgreSQL client, bash, curl y Docker CLI para reiniciar edge-runtime
+RUN apk add --no-cache postgresql-client bash curl docker-cli
 
 # Copiar build de la aplicación
 COPY --from=builder /app/dist /usr/share/nginx/html

@@ -270,48 +270,69 @@ export function MigrationGate({ children }: MigrationGateProps) {
                   <p className="text-sm font-medium text-amber-800 dark:text-amber-200">
                     ⚠️ Configuración requerida en EasyPanel
                   </p>
-                  <div className="text-xs text-amber-700 dark:text-amber-300 space-y-2">
-                    <p><strong>1. Variable de entorno</strong> (CRM → Environment Variables):</p>
-                    <code className="block bg-amber-100 dark:bg-amber-900/50 px-2 py-1 rounded text-[10px] break-all">
-                      SUPABASE_FUNCTIONS_VOLUME=/var/lib/easypanel/projects/NOMBRE_PROYECTO/volumes/supabase/functions
-                    </code>
-                    <p className="text-muted-foreground">(Reemplaza NOMBRE_PROYECTO con: mangas, nexo_n8n, etc.)</p>
-                    
-                    <p className="mt-2"><strong>2. Rebuild del CRM</strong> para copiar funciones al volumen</p>
-                    
-                    <p><strong>3. Reiniciar edge-runtime:</strong></p>
-                    <div className="flex items-center gap-2">
-                      <code className="bg-amber-100 dark:bg-amber-900/50 px-2 py-1 rounded flex-1">
-                        docker restart NOMBRE_supabase-edge-functions
-                      </code>
-                      <button
-                        onClick={() => {
-                          navigator.clipboard.writeText("docker restart mangas_supabase-edge-functions\n# O para nexo: docker restart nexo_n8n_supabase-edge-functions");
-                          setCopied(true);
-                          setTimeout(() => setCopied(false), 1500);
-                        }}
-                        className="p-1 hover:bg-amber-200 dark:hover:bg-amber-800 rounded"
-                      >
-                        <Copy className="h-3 w-3" />
-                      </button>
+                  <div className="text-xs text-amber-700 dark:text-amber-300 space-y-3">
+                    <div>
+                      <p className="font-semibold mb-1">1. Variables de entorno (CRM → Environment):</p>
+                      <div className="space-y-1">
+                        <code className="block bg-amber-100 dark:bg-amber-900/50 px-2 py-1 rounded text-[10px]">
+                          SUPABASE_FUNCTIONS_VOLUME=/supabase-functions
+                        </code>
+                        <code className="block bg-amber-100 dark:bg-amber-900/50 px-2 py-1 rounded text-[10px]">
+                          EDGE_RUNTIME_CONTAINER=PROYECTO_supabase-edge-functions
+                        </code>
+                      </div>
                     </div>
                     
-                    <p className="mt-2"><strong>4. Ver logs:</strong></p>
-                    <div className="flex items-center gap-2">
-                      <code className="bg-amber-100 dark:bg-amber-900/50 px-2 py-1 rounded flex-1">
-                        docker logs -f NOMBRE_supabase-edge-functions
-                      </code>
-                      <button
-                        onClick={() => {
-                          navigator.clipboard.writeText("docker logs -f mangas_supabase-edge-functions\n# O: docker logs -f nexo_n8n_supabase-edge-functions");
-                          setCopied(true);
-                          setTimeout(() => setCopied(false), 1500);
-                        }}
-                        className="p-1 hover:bg-amber-200 dark:hover:bg-amber-800 rounded"
-                      >
-                        <Copy className="h-3 w-3" />
-                      </button>
+                    <div>
+                      <p className="font-semibold mb-1">2. Mounts (CRM → Advanced → Mounts):</p>
+                      <div className="space-y-1 text-[10px]">
+                        <div className="bg-amber-100 dark:bg-amber-900/50 px-2 py-1 rounded">
+                          <span className="text-muted-foreground">Host:</span> /etc/easypanel/projects/PROYECTO/supabase/code/volumes/functions<br/>
+                          <span className="text-muted-foreground">Container:</span> /supabase-functions
+                        </div>
+                        <div className="bg-amber-100 dark:bg-amber-900/50 px-2 py-1 rounded">
+                          <span className="text-muted-foreground">Host:</span> /var/run/docker.sock<br/>
+                          <span className="text-muted-foreground">Container:</span> /var/run/docker.sock
+                        </div>
+                      </div>
+                      <p className="text-muted-foreground mt-1">(Reemplaza PROYECTO con: mangas, nexo_n8n, etc.)</p>
                     </div>
+
+                    <div>
+                      <p className="font-semibold mb-1">3. Rebuild del CRM</p>
+                      <p className="text-muted-foreground">Las funciones se sincronizarán automáticamente al iniciar</p>
+                    </div>
+
+                    <div>
+                      <p className="font-semibold mb-1">4. Comandos manuales (si es necesario):</p>
+                      <div className="flex items-center gap-2">
+                        <code className="bg-amber-100 dark:bg-amber-900/50 px-2 py-1 rounded flex-1 text-[10px]">
+                          docker exec CRM /app/easypanel/scripts/sync-edge-functions.sh
+                        </code>
+                        <button
+                          onClick={() => {
+                            navigator.clipboard.writeText("# Sincronizar funciones manualmente\ndocker exec -it mangas_crm-web /app/easypanel/scripts/sync-edge-functions.sh\n\n# Reiniciar edge-runtime\ndocker restart mangas_supabase-edge-functions\n\n# Ver logs\ndocker logs -f mangas_supabase-edge-functions");
+                            setCopied(true);
+                            setTimeout(() => setCopied(false), 1500);
+                          }}
+                          className="p-1 hover:bg-amber-200 dark:hover:bg-amber-800 rounded"
+                          title="Copiar comandos"
+                        >
+                          <Copy className="h-3 w-3" />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 pt-2">
+                    <a 
+                      href="https://github.com/TU_REPO/blob/main/easypanel/README.md#paso-6-configurar-edge-functions-crítico"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 text-xs text-amber-700 dark:text-amber-300 hover:underline"
+                    >
+                      <ExternalLink className="h-3 w-3" />
+                      Ver documentación completa
+                    </a>
                   </div>
                   <p className="text-xs text-red-600 dark:text-red-400 mt-2">
                     Error: {edgeFnCheck.message}

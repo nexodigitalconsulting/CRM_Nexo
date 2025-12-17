@@ -129,35 +129,68 @@ En Easypanel, ve a la configuración del servicio CRM:
 
 ## Paso 6: Configurar Edge Functions (CRÍTICO)
 
-> ⚠️ **IMPORTANTE**: Las Edge Functions NO se despliegan automáticamente a Supabase self-hosted.
-> Debes configurar un volumen compartido para sincronizarlas.
+> ⚠️ **IMPORTANTE**: Las Edge Functions se sincronizan automáticamente al iniciar el CRM
+> si configuras correctamente el volumen compartido y los mounts.
 
-Las Edge Functions se sincronizan automáticamente durante el deploy si configuras el volumen.
+### 6.1 Encontrar la ruta del volumen de funciones
 
-### 6.1 Identificar el volumen de funciones
+Ejecuta en tu VPS para encontrar la ruta exacta:
 
-En Supabase desplegado en Easypanel, el volumen está típicamente en:
-```
-/var/lib/easypanel/projects/{nombre-proyecto-supabase}/volumes/functions
-```
-
-Para encontrar la ruta exacta:
 ```bash
-docker inspect supabase-edge-functions | grep -A5 "Mounts"
+# Buscar el contenedor edge-functions
+docker ps | grep edge-functions
+
+# Ver los mounts del contenedor (busca el que termina en /home/deno/functions)
+docker inspect NOMBRE_CONTENEDOR | grep -A10 "Mounts"
 ```
 
-### 6.2 Configurar variable de entorno
+**Ruta típica en EasyPanel:**
+```
+/etc/easypanel/projects/{PROYECTO}/supabase/code/volumes/functions
+```
 
-En el servicio CRM de Easypanel, añade en **Environment Variables**:
+Ejemplo para proyecto "mangas":
+```
+/etc/easypanel/projects/mangas/supabase/code/volumes/functions
+```
 
-| Variable | Valor |
-|----------|-------|
-| `SUPABASE_FUNCTIONS_VOLUME` | `/var/lib/easypanel/projects/supabase/volumes/functions` |
+### 6.2 Configurar el servicio CRM en EasyPanel
 
-### 6.3 Verificar funciones disponibles
+En el servicio CRM, configura:
 
-Después del deploy, verifica que las funciones están:
+#### A) Variables de Entorno (Environment Variables)
+
+| Variable | Valor | Descripción |
+|----------|-------|-------------|
+| `SUPABASE_FUNCTIONS_VOLUME` | `/supabase-functions` | Ruta **dentro** del contenedor CRM |
+| `EDGE_RUNTIME_CONTAINER` | `mangas_supabase-edge-functions` | Nombre del contenedor edge-runtime (opcional, se auto-detecta) |
+
+#### B) Mounts (Volumes)
+
+Añade estos dos mounts en **Advanced → Mounts**:
+
+| Host Path | Container Path | Descripción |
+|-----------|----------------|-------------|
+| `/etc/easypanel/projects/PROYECTO/supabase/code/volumes/functions` | `/supabase-functions` | Volumen de funciones |
+| `/var/run/docker.sock` | `/var/run/docker.sock` | Docker socket (para reinicio automático) |
+
+> ⚠️ Reemplaza `PROYECTO` con el nombre de tu proyecto en EasyPanel (ej: `mangas`, `nexo_n8n`)
+
+### 6.3 Funcionamiento automático
+
+Al hacer deploy del CRM:
+
+1. ✅ Se construye la imagen con las funciones incluidas en `/app/supabase/functions`
+2. ✅ Al iniciar, `startup.sh` ejecuta `sync-edge-functions.sh`
+3. ✅ Las funciones se copian al volumen compartido
+4. ✅ Se crea la función `_main` (healthcheck requerido por edge-runtime)
+5. ✅ Si Docker socket está montado, reinicia automáticamente edge-runtime
+6. ✅ Las Edge Functions están disponibles sin intervención manual
+
+### 6.4 Verificar funciones disponibles
+
 ```bash
+# Desde tu VPS
 curl https://tu-supabase.dominio.com/functions/v1/ping
 ```
 
@@ -166,7 +199,17 @@ Respuesta esperada:
 {"ok":true,"version":"1.2.0","environment":"hybrid"}
 ```
 
-### 6.4 Lista de Edge Functions
+### 6.5 Sincronización manual (si es necesario)
+
+```bash
+# Ejecutar sincronización manualmente dentro del contenedor CRM
+docker exec -it NOMBRE_CRM /app/easypanel/scripts/sync-edge-functions.sh
+
+# Reiniciar edge-runtime manualmente
+docker restart NOMBRE_supabase-edge-functions
+```
+
+### 6.6 Lista de Edge Functions
 
 | Función | Descripción |
 |---------|-------------|
@@ -178,6 +221,7 @@ Respuesta esperada:
 | `setup-database` | Setup inicial |
 | `bootstrap-admin` | Creación de admin |
 | `google-calendar-*` | Integración Google Calendar |
+| `_main` | Healthcheck (auto-generado) |
 
 ---
 
