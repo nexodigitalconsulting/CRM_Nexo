@@ -29,6 +29,7 @@ import { TableViewManager, ColumnConfig } from "@/components/common/TableViewMan
 import { useDefaultTableView } from "@/hooks/useTableViews";
 import { entityExportConfigs } from "@/lib/exportUtils";
 import { useCompanySettings } from "@/hooks/useCompanySettings";
+import { usePdfSettings } from "@/hooks/usePdfSettings";
 import { downloadQuotePdf } from "@/lib/pdf/quotePdf";
 import { SendEmailDialog } from "@/components/common/SendEmailDialog";
 import { toast } from "sonner";
@@ -77,6 +78,7 @@ export default function Quotes() {
   const updateStatus = useUpdateQuoteStatus();
   const markAsSent = useMarkQuoteAsSent();
   const { data: companySettings } = useCompanySettings();
+  const { data: pdfSettings } = usePdfSettings();
   const { data: defaultView } = useDefaultTableView("quotes");
   
   const [dialogOpen, setDialogOpen] = useState(false);

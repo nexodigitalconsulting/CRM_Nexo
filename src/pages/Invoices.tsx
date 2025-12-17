@@ -32,6 +32,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useCompanySettings } from "@/hooks/useCompanySettings";
+import { usePdfSettings } from "@/hooks/usePdfSettings";
 import { downloadInvoicePdf } from "@/lib/pdf/invoicePdf";
 import { SendEmailDialog } from "@/components/common/SendEmailDialog";
 import { toast } from "sonner";
@@ -83,6 +84,7 @@ export default function Invoices() {
   const deleteInvoice = useDeleteInvoice();
   const markAsSent = useMarkInvoiceAsSent();
   const { data: companySettings } = useCompanySettings();
+  const { data: pdfSettings } = usePdfSettings();
   const { data: defaultView } = useDefaultTableView("invoices");
   
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -272,7 +274,7 @@ export default function Invoices() {
                   notes: invoice.notes,
                   client: invoice.client,
                 };
-                await downloadInvoicePdf(invoiceData as any, companySettings as any);
+                await downloadInvoicePdf(invoiceData as any, companySettings as any, pdfSettings || undefined);
                 toast.success("PDF descargado");
               } catch (error) {
                 toast.error("Error al descargar PDF");

@@ -5,23 +5,66 @@ export const A4_WIDTH = 595.28;
 export const A4_HEIGHT = 841.89;
 export const MARGIN = 50;
 
+// PDF Configuration interface matching pdf_settings table
+export interface PdfConfig {
+  primary_color?: string;
+  secondary_color?: string;
+  accent_color?: string;
+  show_logo?: boolean;
+  logo_position?: 'left' | 'center' | 'right';
+  show_iban_footer?: boolean;
+  show_notes?: boolean;
+  show_discounts_column?: boolean;
+  header_style?: 'classic' | 'modern' | 'minimal';
+  font_size_base?: number;
+}
+
 export interface PdfColors {
   primary: ReturnType<typeof rgb>;
   secondary: ReturnType<typeof rgb>;
+  accent: ReturnType<typeof rgb>;
   text: ReturnType<typeof rgb>;
   muted: ReturnType<typeof rgb>;
   border: ReturnType<typeof rgb>;
   white: ReturnType<typeof rgb>;
 }
 
-export const colors: PdfColors = {
-  primary: rgb(0.2, 0.4, 0.8),
-  secondary: rgb(0.4, 0.4, 0.4),
-  text: rgb(0, 0, 0),
-  muted: rgb(0.5, 0.5, 0.5),
-  border: rgb(0.8, 0.8, 0.8),
-  white: rgb(1, 1, 1),
-};
+// Convert hex color to rgb values (0-1)
+export function hexToRgb(hex: string): { r: number; g: number; b: number } {
+  const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+  if (result) {
+    return {
+      r: parseInt(result[1], 16) / 255,
+      g: parseInt(result[2], 16) / 255,
+      b: parseInt(result[3], 16) / 255,
+    };
+  }
+  return { r: 0.2, g: 0.4, b: 0.8 }; // Default blue
+}
+
+// Create colors from config
+export function createColorsFromConfig(config?: PdfConfig): PdfColors {
+  const primaryHex = config?.primary_color || '#3366cc';
+  const secondaryHex = config?.secondary_color || '#666666';
+  const accentHex = config?.accent_color || '#0066cc';
+  
+  const primary = hexToRgb(primaryHex);
+  const secondary = hexToRgb(secondaryHex);
+  const accent = hexToRgb(accentHex);
+  
+  return {
+    primary: rgb(primary.r, primary.g, primary.b),
+    secondary: rgb(secondary.r, secondary.g, secondary.b),
+    accent: rgb(accent.r, accent.g, accent.b),
+    text: rgb(0, 0, 0),
+    muted: rgb(0.5, 0.5, 0.5),
+    border: rgb(0.8, 0.8, 0.8),
+    white: rgb(1, 1, 1),
+  };
+}
+
+// Default colors (for backward compatibility)
+export const colors: PdfColors = createColorsFromConfig();
 
 export interface PdfFonts {
   regular: PDFFont;
@@ -40,6 +83,79 @@ export async function embedFonts(pdfDoc: PDFDocument): Promise<PdfFonts> {
 
 export function addPage(pdfDoc: PDFDocument): PDFPage {
   return pdfDoc.addPage([A4_WIDTH, A4_HEIGHT]);
+}
+
+// Embed logo from URL
+export async function embedLogo(
+  pdfDoc: PDFDocument,
+  logoUrl: string | null | undefined
+): Promise<{ image: Awaited<ReturnType<typeof pdfDoc.embedPng | typeof pdfDoc.embedJpg>>; width: number; height: number } | null> {
+  if (!logoUrl) return null;
+  
+  try {
+    const response = await fetch(logoUrl);
+    if (!response.ok) return null;
+    
+    const arrayBuffer = await response.arrayBuffer();
+    const uint8Array = new Uint8Array(arrayBuffer);
+    
+    // Try to determine image type from URL or content
+    const isPng = logoUrl.toLowerCase().includes('.png') || 
+      (uint8Array[0] === 0x89 && uint8Array[1] === 0x50);
+    
+    let image;
+    if (isPng) {
+      image = await pdfDoc.embedPng(uint8Array);
+    } else {
+      image = await pdfDoc.embedJpg(uint8Array);
+    }
+    
+    // Calculate dimensions - max height 60, maintain aspect ratio
+    const maxHeight = 60;
+    const maxWidth = 150;
+    const aspectRatio = image.width / image.height;
+    
+    let width = image.width;
+    let height = image.height;
+    
+    if (height > maxHeight) {
+      height = maxHeight;
+      width = height * aspectRatio;
+    }
+    
+    if (width > maxWidth) {
+      width = maxWidth;
+      height = width / aspectRatio;
+    }
+    
+    return { image, width, height };
+  } catch (error) {
+    console.error('Error embedding logo:', error);
+    return null;
+  }
+}
+
+// Draw logo on page
+export function drawLogo(
+  page: PDFPage,
+  logo: { image: any; width: number; height: number },
+  position: 'left' | 'center' | 'right',
+  y: number
+): void {
+  let x = MARGIN;
+  
+  if (position === 'center') {
+    x = (A4_WIDTH - logo.width) / 2;
+  } else if (position === 'right') {
+    x = A4_WIDTH - MARGIN - logo.width;
+  }
+  
+  page.drawImage(logo.image, {
+    x,
+    y: y - logo.height,
+    width: logo.width,
+    height: logo.height,
+  });
 }
 
 export function formatCurrency(amount: number | null | undefined): string {
@@ -84,7 +200,9 @@ export function drawTableHeader(
   page: PDFPage,
   y: number,
   columns: { label: string; x: number; width: number }[],
-  fonts: PdfFonts
+  fonts: PdfFonts,
+  pdfColors: PdfColors = colors,
+  fontSize: number = 9
 ): number {
   const headerHeight = 25;
   
@@ -102,9 +220,9 @@ export function drawTableHeader(
     page.drawText(col.label, {
       x: col.x,
       y: y - 12,
-      size: 9,
+      size: fontSize,
       font: fonts.bold,
-      color: colors.text,
+      color: pdfColors.text,
     });
   });
   
@@ -116,7 +234,8 @@ export function drawTableRow(
   y: number,
   values: { text: string; x: number }[],
   fonts: PdfFonts,
-  isAlternate = false
+  isAlternate = false,
+  fontSize: number = 9
 ): number {
   const rowHeight = 20;
   
@@ -134,7 +253,7 @@ export function drawTableRow(
     page.drawText(val.text, {
       x: val.x,
       y: y - 12,
-      size: 9,
+      size: fontSize,
       font: fonts.regular,
       color: colors.text,
     });
@@ -182,15 +301,34 @@ export interface CompanyData {
   phone?: string | null;
   email?: string | null;
   iban?: string | null;
+  logo_url?: string | null;
 }
 
-export function drawCompanyHeader(
+export async function drawCompanyHeaderWithLogo(
+  pdfDoc: PDFDocument,
   page: PDFPage,
   company: CompanyData,
   fonts: PdfFonts,
-  startY: number
-): number {
+  startY: number,
+  config?: PdfConfig
+): Promise<number> {
   let y = startY;
+  const pdfColors = createColorsFromConfig(config);
+  const fontSize = config?.font_size_base || 10;
+  const showLogo = config?.show_logo !== false;
+  const logoPosition = config?.logo_position || 'left';
+  
+  // Embed and draw logo if enabled
+  if (showLogo && company.logo_url) {
+    const logo = await embedLogo(pdfDoc, company.logo_url);
+    if (logo) {
+      drawLogo(page, logo, logoPosition, y);
+      if (logoPosition === 'left') {
+        // Move company text to the right of logo
+        y -= logo.height + 10;
+      }
+    }
+  }
   
   // Company name
   page.drawText(company.name || 'Mi Empresa', {
@@ -198,7 +336,7 @@ export function drawCompanyHeader(
     y,
     size: 18,
     font: fonts.bold,
-    color: colors.primary,
+    color: pdfColors.primary,
   });
   y -= 20;
   
@@ -216,9 +354,54 @@ export function drawCompanyHeader(
     page.drawText(detail, {
       x: MARGIN,
       y,
-      size: 9,
+      size: fontSize - 1,
       font: fonts.regular,
-      color: colors.secondary,
+      color: pdfColors.secondary,
+    });
+    y -= 14;
+  });
+  
+  return y - 10;
+}
+
+// Legacy function for backward compatibility
+export function drawCompanyHeader(
+  page: PDFPage,
+  company: CompanyData,
+  fonts: PdfFonts,
+  startY: number,
+  pdfColors: PdfColors = colors,
+  fontSize: number = 10
+): number {
+  let y = startY;
+  
+  // Company name
+  page.drawText(company.name || 'Mi Empresa', {
+    x: MARGIN,
+    y,
+    size: 18,
+    font: fonts.bold,
+    color: pdfColors.primary,
+  });
+  y -= 20;
+  
+  // Company details
+  const details: string[] = [];
+  if (company.cif) details.push(`CIF: ${company.cif}`);
+  if (company.address) details.push(company.address);
+  if (company.city || company.postal_code) {
+    details.push([company.postal_code, company.city].filter(Boolean).join(' '));
+  }
+  if (company.phone) details.push(`Tel: ${company.phone}`);
+  if (company.email) details.push(company.email);
+  
+  details.forEach((detail) => {
+    page.drawText(detail, {
+      x: MARGIN,
+      y,
+      size: fontSize - 1,
+      font: fonts.regular,
+      color: pdfColors.secondary,
     });
     y -= 14;
   });
@@ -239,25 +422,27 @@ export function drawClientSection(
   page: PDFPage,
   client: ClientData,
   fonts: PdfFonts,
-  startY: number
+  startY: number,
+  pdfColors: PdfColors = colors,
+  fontSize: number = 10
 ): number {
   let y = startY;
   
   page.drawText('CLIENTE', {
     x: MARGIN,
     y,
-    size: 10,
+    size: fontSize,
     font: fonts.bold,
-    color: colors.muted,
+    color: pdfColors.muted,
   });
   y -= 16;
   
   page.drawText(client.name || '', {
     x: MARGIN,
     y,
-    size: 11,
+    size: fontSize + 1,
     font: fonts.bold,
-    color: colors.text,
+    color: pdfColors.text,
   });
   y -= 14;
   
@@ -265,9 +450,9 @@ export function drawClientSection(
     page.drawText(`CIF: ${client.cif}`, {
       x: MARGIN,
       y,
-      size: 9,
+      size: fontSize - 1,
       font: fonts.regular,
-      color: colors.secondary,
+      color: pdfColors.secondary,
     });
     y -= 12;
   }
@@ -276,9 +461,9 @@ export function drawClientSection(
     page.drawText(client.address, {
       x: MARGIN,
       y,
-      size: 9,
+      size: fontSize - 1,
       font: fonts.regular,
-      color: colors.secondary,
+      color: pdfColors.secondary,
     });
     y -= 12;
   }
@@ -287,9 +472,9 @@ export function drawClientSection(
     page.drawText([client.postal_code, client.city].filter(Boolean).join(' '), {
       x: MARGIN,
       y,
-      size: 9,
+      size: fontSize - 1,
       font: fonts.regular,
-      color: colors.secondary,
+      color: pdfColors.secondary,
     });
     y -= 12;
   }
@@ -298,9 +483,9 @@ export function drawClientSection(
     page.drawText(client.email, {
       x: MARGIN,
       y,
-      size: 9,
+      size: fontSize - 1,
       font: fonts.regular,
-      color: colors.secondary,
+      color: pdfColors.secondary,
     });
     y -= 12;
   }
@@ -313,7 +498,8 @@ export function drawDocumentTitle(
   title: string,
   number: string | number,
   fonts: PdfFonts,
-  y: number
+  y: number,
+  pdfColors: PdfColors = colors
 ): void {
   const rightX = A4_WIDTH - MARGIN;
   
@@ -322,7 +508,7 @@ export function drawDocumentTitle(
     y: y + 20,
     size: 16,
     font: fonts.bold,
-    color: colors.primary,
+    color: pdfColors.primary,
   });
   
   page.drawText(`#${number}`, {
@@ -330,7 +516,7 @@ export function drawDocumentTitle(
     y: y - 5,
     size: 20,
     font: fonts.bold,
-    color: colors.text,
+    color: pdfColors.text,
   });
 }
 
@@ -341,7 +527,9 @@ export function drawTotals(
   total: number,
   fonts: PdfFonts,
   startY: number,
-  ivaPercent?: number
+  ivaPercent?: number,
+  pdfColors: PdfColors = colors,
+  fontSize: number = 10
 ): number {
   let y = startY;
   const rightX = A4_WIDTH - MARGIN;
@@ -351,16 +539,16 @@ export function drawTotals(
   page.drawText('Subtotal:', {
     x: labelX,
     y,
-    size: 10,
+    size: fontSize,
     font: fonts.regular,
-    color: colors.secondary,
+    color: pdfColors.secondary,
   });
   page.drawText(formatCurrency(subtotal), {
-    x: rightX - fonts.regular.widthOfTextAtSize(formatCurrency(subtotal), 10),
+    x: rightX - fonts.regular.widthOfTextAtSize(formatCurrency(subtotal), fontSize),
     y,
-    size: 10,
+    size: fontSize,
     font: fonts.regular,
-    color: colors.text,
+    color: pdfColors.text,
   });
   y -= 18;
   
@@ -369,36 +557,36 @@ export function drawTotals(
   page.drawText(ivaLabel, {
     x: labelX,
     y,
-    size: 10,
+    size: fontSize,
     font: fonts.regular,
-    color: colors.secondary,
+    color: pdfColors.secondary,
   });
   page.drawText(formatCurrency(ivaAmount), {
-    x: rightX - fonts.regular.widthOfTextAtSize(formatCurrency(ivaAmount), 10),
+    x: rightX - fonts.regular.widthOfTextAtSize(formatCurrency(ivaAmount), fontSize),
     y,
-    size: 10,
+    size: fontSize,
     font: fonts.regular,
-    color: colors.text,
+    color: pdfColors.text,
   });
   y -= 20;
   
   // Line before total
-  drawLine(page, labelX, y + 8, rightX, y + 8, colors.border, 1);
+  drawLine(page, labelX, y + 8, rightX, y + 8, pdfColors.border, 1);
   
   // Total
   page.drawText('TOTAL:', {
     x: labelX,
     y,
-    size: 12,
+    size: fontSize + 2,
     font: fonts.bold,
-    color: colors.text,
+    color: pdfColors.text,
   });
   page.drawText(formatCurrency(total), {
-    x: rightX - fonts.bold.widthOfTextAtSize(formatCurrency(total), 14),
+    x: rightX - fonts.bold.widthOfTextAtSize(formatCurrency(total), fontSize + 4),
     y,
-    size: 14,
+    size: fontSize + 4,
     font: fonts.bold,
-    color: colors.primary,
+    color: pdfColors.primary,
   });
   
   return y - 30;
@@ -407,13 +595,15 @@ export function drawTotals(
 export function drawFooter(
   page: PDFPage,
   company: CompanyData,
-  fonts: PdfFonts
+  fonts: PdfFonts,
+  showIban: boolean = true,
+  pdfColors: PdfColors = colors
 ): void {
   const y = 40;
   
-  drawLine(page, MARGIN, y + 20, A4_WIDTH - MARGIN, y + 20, colors.border, 0.5);
+  drawLine(page, MARGIN, y + 20, A4_WIDTH - MARGIN, y + 20, pdfColors.border, 0.5);
   
-  const footerText = company.iban 
+  const footerText = (showIban && company.iban)
     ? `IBAN: ${company.iban}`
     : company.name || '';
   
@@ -423,6 +613,6 @@ export function drawFooter(
     y,
     size: 8,
     font: fonts.regular,
-    color: colors.muted,
+    color: pdfColors.muted,
   });
 }

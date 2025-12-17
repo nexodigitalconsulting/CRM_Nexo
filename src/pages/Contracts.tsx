@@ -18,6 +18,7 @@ import { useDefaultTableView } from "@/hooks/useTableViews";
 import { entityExportConfigs } from "@/lib/exportUtils";
 import { useContracts, useDeleteContract, useMarkContractAsSent, ContractWithDetails } from "@/hooks/useContracts";
 import { useCompanySettings } from "@/hooks/useCompanySettings";
+import { usePdfSettings } from "@/hooks/usePdfSettings";
 import { downloadContractPdf } from "@/lib/pdf/contractPdf";
 import { toast } from "sonner";
 import { ContractFormDialog } from "@/components/contracts/ContractFormDialog";
@@ -98,6 +99,7 @@ export default function Contracts() {
   const deleteContract = useDeleteContract();
   const markAsSent = useMarkContractAsSent();
   const { data: companySettings } = useCompanySettings();
+  const { data: pdfSettings } = usePdfSettings();
   const { data: defaultView } = useDefaultTableView("contracts");
   
   const [dialogOpen, setDialogOpen] = useState(false);
