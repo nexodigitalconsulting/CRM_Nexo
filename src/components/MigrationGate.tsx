@@ -41,9 +41,14 @@ export function MigrationGate({ children }: MigrationGateProps) {
     try {
       setStatus("checking");
       
-      // Strategy 1: Try Edge Function first (works in Lovable Cloud)
+      // Strategy 1: Try Edge Function with timeout (works in Lovable Cloud)
+      const edgeFunctionPromise = supabase.functions.invoke<MigrationResult>("db-migrate");
+      const timeoutPromise = new Promise<{ data: null; error: Error }>((_, reject) => 
+        setTimeout(() => reject(new Error("timeout")), 8000)
+      );
+
       try {
-        const { data, error } = await supabase.functions.invoke<MigrationResult>("db-migrate");
+        const { data, error } = await Promise.race([edgeFunctionPromise, timeoutPromise]);
         
         if (!error && data) {
           setResult(data);
@@ -54,6 +59,14 @@ export function MigrationGate({ children }: MigrationGateProps) {
           }
 
           if (data.success) {
+            // Check if actually needs migration (new response format)
+            if ((data as any).needsMigration) {
+              const directStatus = await checkSchemaDirectly();
+              setSchemaStatus(directStatus);
+              setStatus("needs-migration");
+              return;
+            }
+
             if (data.migrationsApplied && data.migrationsApplied > 0) {
               setStatus("success");
               setTimeout(() => setStatus("ready"), 2000);
@@ -70,11 +83,12 @@ export function MigrationGate({ children }: MigrationGateProps) {
           }
         }
       } catch (edgeFunctionError: any) {
-        // Edge function not available - likely self-hosted environment
-        console.log("Edge function not available, using direct schema check");
+        // Edge function timeout or not available - use direct schema check
+        const errorMsg = edgeFunctionError?.message || "";
+        console.log("Edge function issue:", errorMsg, "- using direct schema check");
       }
 
-      // Strategy 2: Direct schema check (for Easypanel/self-hosted)
+      // Strategy 2: Direct schema check (for Easypanel/self-hosted or timeout)
       const directStatus = await checkSchemaDirectly();
       setSchemaStatus(directStatus);
 
