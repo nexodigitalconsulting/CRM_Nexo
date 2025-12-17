@@ -3,10 +3,28 @@ import { useNavigate } from "react-router-dom";
 import { supabase, getSupabaseConfig } from "@/integrations/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { CheckCircle, XCircle, Loader2, Database, Shield, AlertTriangle, Copy, ExternalLink, RefreshCw } from "lucide-react";
+import {
+  CheckCircle,
+  XCircle,
+  Loader2,
+  Database,
+  Shield,
+  AlertTriangle,
+  Copy,
+  ExternalLink,
+  RefreshCw,
+  PlugZap,
+  Terminal,
+} from "lucide-react";
 import { toast } from "sonner";
 
 type SetupStep = "checking" | "config-error" | "needs-admin" | "has-admin";
+
+type EdgeCheckStatus =
+  | { state: "idle" }
+  | { state: "checking" }
+  | { state: "ok"; message: string }
+  | { state: "error"; message: string };
 
 interface CheckResult {
   supabaseConnection: "pending" | "success" | "error";
@@ -28,6 +46,8 @@ const REQUIRED_TABLES = [
   "expenses",
 ];
 
+const PROJECT_REF = "honfwrfkiukckyoelsdm";
+
 export default function Setup() {
   const navigate = useNavigate();
   const [currentStep, setCurrentStep] = useState<SetupStep>("checking");
@@ -37,6 +57,8 @@ export default function Setup() {
     adminExists: "pending",
   });
 
+  const [edgeCheck, setEdgeCheck] = useState<EdgeCheckStatus>({ state: "idle" });
+
   const supabaseConfig = getSupabaseConfig();
 
   useEffect(() => {
@@ -45,6 +67,7 @@ export default function Setup() {
       return;
     }
     runChecks();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const runChecks = async () => {
@@ -58,9 +81,9 @@ export default function Setup() {
     try {
       // Check 1: Supabase connection
       const { error: connError } = await supabase.from("company_settings").select("id").limit(1);
-      
+
       if (connError && !connError.message.includes("permission denied")) {
-        setCheckResult(prev => ({
+        setCheckResult((prev) => ({
           ...prev,
           supabaseConnection: "error",
           errorMessage: `Conexión fallida: ${connError.message}`,
@@ -69,7 +92,7 @@ export default function Setup() {
         return;
       }
 
-      setCheckResult(prev => ({ ...prev, supabaseConnection: "success" }));
+      setCheckResult((prev) => ({ ...prev, supabaseConnection: "success" }));
 
       // Check 2: Schema validation
       let missingTables: string[] = [];
@@ -81,7 +104,7 @@ export default function Setup() {
       }
 
       if (missingTables.length > 0) {
-        setCheckResult(prev => ({
+        setCheckResult((prev) => ({
           ...prev,
           schemaValid: "error",
           errorMessage: `Tablas faltantes: ${missingTables.join(", ")}`,
@@ -90,7 +113,7 @@ export default function Setup() {
         return;
       }
 
-      setCheckResult(prev => ({ ...prev, schemaValid: "success" }));
+      setCheckResult((prev) => ({ ...prev, schemaValid: "success" }));
 
       // Check 3: Admin exists
       const { data: adminData, error: adminError } = await supabase
@@ -101,25 +124,41 @@ export default function Setup() {
 
       if (adminError) {
         // RLS might block this query - that's OK, we'll assume no admin
-        setCheckResult(prev => ({ ...prev, adminExists: "no" }));
+        setCheckResult((prev) => ({ ...prev, adminExists: "no" }));
         setCurrentStep("needs-admin");
         return;
       }
 
       if (adminData && adminData.length > 0) {
-        setCheckResult(prev => ({ ...prev, adminExists: "yes" }));
+        setCheckResult((prev) => ({ ...prev, adminExists: "yes" }));
         setCurrentStep("has-admin");
       } else {
-        setCheckResult(prev => ({ ...prev, adminExists: "no" }));
+        setCheckResult((prev) => ({ ...prev, adminExists: "no" }));
         setCurrentStep("needs-admin");
       }
     } catch (error: any) {
-      setCheckResult(prev => ({
+      setCheckResult((prev) => ({
         ...prev,
         supabaseConnection: "error",
         errorMessage: error.message,
       }));
       setCurrentStep("config-error");
+    }
+  };
+
+  const runEdgeFunctionsCheck = async () => {
+    setEdgeCheck({ state: "checking" });
+
+    try {
+      const { data, error } = await supabase.functions.invoke("ping");
+      if (error) {
+        setEdgeCheck({ state: "error", message: error.message });
+        return;
+      }
+      const msg = typeof data === "object" ? JSON.stringify(data) : String(data ?? "OK");
+      setEdgeCheck({ state: "ok", message: msg });
+    } catch (e: any) {
+      setEdgeCheck({ state: "error", message: e?.message || "Error desconocido" });
     }
   };
 
@@ -141,6 +180,13 @@ export default function Setup() {
     }
   };
 
+  const edgeCheckIcon = () => {
+    if (edgeCheck.state === "checking") return <Loader2 className="h-4 w-4 animate-spin" />;
+    if (edgeCheck.state === "ok") return <CheckCircle className="h-4 w-4 text-green-500" />;
+    if (edgeCheck.state === "error") return <XCircle className="h-4 w-4 text-red-500" />;
+    return <PlugZap className="h-4 w-4 text-muted-foreground" />;
+  };
+
   const sqlCreateAdmin = `-- 1. Primero crea un usuario en Supabase Studio → Authentication → Add user
 -- 2. Copia el UUID del usuario creado
 -- 3. Ejecuta este SQL reemplazando los valores:
@@ -159,6 +205,24 @@ INSERT INTO public.user_roles (user_id, role)
 VALUES ('PEGA_UUID_AQUI', 'admin')
 ON CONFLICT (user_id, role) DO NOTHING;`;
 
+  const syncFunctionsInstructions = `# Actualizar Edge Functions (Self-hosted)
+
+# 1) Asegura variables en el servicio CRM (Easypanel):
+#   - SUPABASE_FUNCTIONS_VOLUME=/mnt/supabase-functions
+#   - CRM_FUNCTIONS_DIR=/app/supabase/functions (opcional)
+
+# 2) Asegura que el mismo volumen está montado en:
+#   - CRM: /mnt/supabase-functions
+#   - Supabase edge-runtime: (la carpeta de funciones de tu instalación)
+
+# 3) Reinicia el servicio CRM (para que ejecute el copiado)
+# 4) Reinicia edge-runtime para recargar funciones:
+#   docker restart supabase-edge-functions
+`;
+
+  const functionsDashboardUrl = `https://supabase.com/dashboard/project/${PROJECT_REF}/functions`;
+  const pingLogsUrl = `https://supabase.com/dashboard/project/${PROJECT_REF}/functions/ping/logs`;
+
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
       <Card className="w-full max-w-2xl">
@@ -167,9 +231,7 @@ ON CONFLICT (user_id, role) DO NOTHING;`;
             <Shield className="h-6 w-6 text-primary" />
           </div>
           <CardTitle className="text-2xl">Configuración Inicial - CRM</CardTitle>
-          <CardDescription>
-            Supabase Autoalojado + Easypanel
-          </CardDescription>
+          <CardDescription>Supabase Autoalojado + Easypanel</CardDescription>
         </CardHeader>
 
         <CardContent className="space-y-6">
@@ -189,6 +251,48 @@ ON CONFLICT (user_id, role) DO NOTHING;`;
             </div>
           </div>
 
+          {/* Edge Functions */}
+          <div className="rounded-lg border bg-card p-4 space-y-3">
+            <div className="flex items-center gap-2">
+              <Terminal className="h-4 w-4 text-primary" />
+              <h3 className="font-medium">Actualizar funciones</h3>
+            </div>
+            <p className="text-sm text-muted-foreground">
+              En self-hosted, la UI no puede eliminar/copiar ficheros en el servidor: esto ocurre al arrancar el CRM (copia al
+              volumen) y se activa al reiniciar el edge-runtime.
+            </p>
+
+            <div className="flex flex-wrap gap-2">
+              <Button variant="secondary" onClick={runEdgeFunctionsCheck} disabled={edgeCheck.state === "checking"}>
+                {edgeCheckIcon()}
+                <span className="ml-2">Probar función (ping)</span>
+              </Button>
+              <Button variant="outline" onClick={() => copyToClipboard(syncFunctionsInstructions)}>
+                <Copy className="h-4 w-4 mr-2" />
+                Copiar pasos
+              </Button>
+              <Button variant="outline" onClick={() => window.open(functionsDashboardUrl, "_blank")}>
+                <ExternalLink className="h-4 w-4 mr-2" />
+                Abrir panel
+              </Button>
+              <Button variant="outline" onClick={() => window.open(pingLogsUrl, "_blank")}>
+                <ExternalLink className="h-4 w-4 mr-2" />
+                Ver logs (ping)
+              </Button>
+            </div>
+
+            {edgeCheck.state === "ok" && (
+              <div className="text-xs font-mono bg-muted/50 rounded p-3 whitespace-pre-wrap break-words">
+                OK: {edgeCheck.message}
+              </div>
+            )}
+            {edgeCheck.state === "error" && (
+              <div className="text-xs font-mono bg-destructive/10 border border-destructive/20 rounded p-3 whitespace-pre-wrap break-words">
+                ERROR: {edgeCheck.message}
+              </div>
+            )}
+          </div>
+
           {/* Config Error */}
           {currentStep === "config-error" && (
             <div className="space-y-4">
@@ -198,7 +302,8 @@ ON CONFLICT (user_id, role) DO NOTHING;`;
                   <div>
                     <p className="font-medium text-destructive">Error de configuración</p>
                     <p className="text-sm text-muted-foreground mt-1">
-                      {checkResult.errorMessage || "Verifica las variables de entorno VITE_SUPABASE_URL y VITE_SUPABASE_ANON_KEY"}
+                      {checkResult.errorMessage ||
+                        "Verifica las variables de entorno VITE_SUPABASE_URL y VITE_SUPABASE_ANON_KEY"}
                     </p>
                   </div>
                 </div>
@@ -230,19 +335,25 @@ ON CONFLICT (user_id, role) DO NOTHING;`;
                   <Database className="h-4 w-4" />
                   Pasos para crear el administrador:
                 </h4>
-                
+
                 <ol className="list-decimal list-inside space-y-2 text-sm text-muted-foreground">
-                  <li>Ve a <strong>Supabase Studio → Authentication → Users</strong></li>
-                  <li>Haz clic en <strong>"Add user"</strong></li>
+                  <li>
+                    Ve a <strong>Supabase Studio → Authentication → Users</strong>
+                  </li>
+                  <li>
+                    Haz clic en <strong>"Add user"</strong>
+                  </li>
                   <li>Crea un usuario con email y contraseña</li>
-                  <li>Copia el <strong>UUID</strong> del usuario creado</li>
-                  <li>Ve a <strong>SQL Editor</strong> y ejecuta el SQL de abajo</li>
+                  <li>
+                    Copia el <strong>UUID</strong> del usuario creado
+                  </li>
+                  <li>
+                    Ve a <strong>SQL Editor</strong> y ejecuta el SQL de abajo
+                  </li>
                 </ol>
 
                 <div className="relative">
-                  <pre className="p-4 rounded-lg bg-muted text-xs overflow-x-auto max-h-64">
-                    {sqlCreateAdmin}
-                  </pre>
+                  <pre className="p-4 rounded-lg bg-muted text-xs overflow-x-auto max-h-64">{sqlCreateAdmin}</pre>
                   <Button
                     size="sm"
                     variant="secondary"
@@ -260,9 +371,14 @@ ON CONFLICT (user_id, role) DO NOTHING;`;
                   <RefreshCw className="h-4 w-4 mr-2" />
                   Verificar de nuevo
                 </Button>
-                <Button 
+                <Button
                   variant="secondary"
-                  onClick={() => window.open(`${supabaseConfig.url?.replace('/rest/v1', '')}/project/default/auth/users`, '_blank')}
+                  onClick={() =>
+                    window.open(
+                      `${supabaseConfig.url?.replace("/rest/v1", "")}/project/default/auth/users`,
+                      "_blank"
+                    )
+                  }
                 >
                   <ExternalLink className="h-4 w-4 mr-2" />
                   Abrir Supabase
