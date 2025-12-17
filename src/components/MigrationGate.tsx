@@ -169,7 +169,9 @@ export function MigrationGate({ children }: MigrationGateProps) {
             {result?.logs && (
               <div className="bg-muted/50 rounded p-3 text-xs font-mono max-h-40 overflow-auto">
                 {result.logs.map((log, i) => (
-                  <div key={i} className="text-muted-foreground">{log}</div>
+                  <div key={i} className="text-muted-foreground">
+                    {log}
+                  </div>
                 ))}
               </div>
             )}
@@ -203,15 +205,48 @@ export function MigrationGate({ children }: MigrationGateProps) {
               <li>Es una instalación nueva</li>
               <li>Falta ejecutar el schema inicial</li>
             </ul>
-            
+
             <div className="bg-muted/50 rounded p-3 space-y-2">
               <p className="text-sm font-medium">Para Easypanel/Self-hosted:</p>
               <ol className="text-xs text-muted-foreground list-decimal list-inside space-y-1">
                 <li>Abre Supabase SQL Editor</li>
-                <li>Ejecuta: <code className="bg-muted px-1">easypanel/init-scripts/full-schema.sql</code></li>
+                <li>
+                  Ejecuta: <code className="bg-muted px-1">easypanel/init-scripts/full-schema.sql</code>
+                </li>
                 <li>Crea el usuario admin (ver README)</li>
                 <li>Refresca esta página</li>
               </ol>
+            </div>
+
+            <div className="bg-muted/30 rounded p-3 space-y-2">
+              <p className="text-sm font-medium">Edge Functions (self-hosted)</p>
+              <p className="text-xs text-muted-foreground">
+                Se sincronizan al arrancar el servicio CRM (volumen compartido) y se cargan al reiniciar el edge-runtime.
+              </p>
+              <div className="flex flex-wrap gap-2">
+                <a
+                  href={`https://supabase.com/dashboard/project/honfwrfkiukckyoelsdm/functions`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-2 px-3 py-2 bg-secondary text-secondary-foreground rounded text-xs hover:bg-secondary/90"
+                >
+                  <ExternalLink className="h-4 w-4" />
+                  Ver funciones / logs
+                </a>
+                <button
+                  onClick={() => {
+                    navigator.clipboard.writeText(
+                      "docker restart supabase-edge-functions\n# (antes: reinicia el servicio CRM para copiar funciones al volumen)"
+                    );
+                    setCopied(true);
+                    setTimeout(() => setCopied(false), 1500);
+                  }}
+                  className="inline-flex items-center gap-2 px-3 py-2 bg-secondary text-secondary-foreground rounded text-xs hover:bg-secondary/90"
+                >
+                  <Copy className="h-4 w-4" />
+                  {copied ? "¡Copiado!" : "Copiar comando reinicio"}
+                </button>
+              </div>
             </div>
 
             <div className="flex gap-2 pt-2">
@@ -237,7 +272,7 @@ export function MigrationGate({ children }: MigrationGateProps) {
               <AlertCircle className="h-5 w-5" />
               <span>Actualización de base de datos requerida</span>
             </div>
-            
+
             <div className="bg-muted/30 rounded p-3 space-y-2">
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">Versión actual:</span>
@@ -266,13 +301,31 @@ export function MigrationGate({ children }: MigrationGateProps) {
               </p>
               <ol className="text-xs text-blue-700 dark:text-blue-300 list-decimal list-inside space-y-1">
                 <li>Abre Supabase SQL Editor</li>
-                <li>Ejecuta el contenido de:
+                <li>
+                  Ejecuta el contenido de:
                   <code className="block bg-blue-100 dark:bg-blue-900/50 px-2 py-1 mt-1 rounded">
                     easypanel/init-scripts/migrations/apply_all.sql
                   </code>
                 </li>
                 <li>Refresca esta página</li>
               </ol>
+            </div>
+
+            <div className="bg-muted/30 rounded p-3 space-y-2">
+              <p className="text-sm font-medium">Edge Functions (logs)</p>
+              <p className="text-xs text-muted-foreground">
+                Si la versión ya carga pero faltan funciones, revisa logs del edge-runtime y confirma que el volumen de
+                funciones está montado.
+              </p>
+              <a
+                href={`https://supabase.com/dashboard/project/honfwrfkiukckyoelsdm/functions`}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-2 px-3 py-2 bg-secondary text-secondary-foreground rounded text-xs hover:bg-secondary/90"
+              >
+                <ExternalLink className="h-4 w-4" />
+                Abrir funciones / logs
+              </a>
             </div>
 
             <div className="flex flex-wrap gap-2 pt-2">
@@ -306,22 +359,24 @@ export function MigrationGate({ children }: MigrationGateProps) {
               <span>Error en la verificación</span>
             </div>
             <p className="text-sm text-muted-foreground">{result?.error}</p>
-            
+
             <button
               onClick={() => setShowDetails(!showDetails)}
               className="text-xs text-primary hover:underline"
             >
               {showDetails ? "Ocultar detalles" : "Ver detalles"}
             </button>
-            
+
             {showDetails && result?.logs && (
               <div className="bg-muted/50 rounded p-3 text-xs font-mono max-h-40 overflow-auto">
                 {result.logs.map((log, i) => (
-                  <div key={i} className="text-muted-foreground">{log}</div>
+                  <div key={i} className="text-muted-foreground">
+                    {log}
+                  </div>
                 ))}
               </div>
             )}
-            
+
             <div className="flex gap-2 pt-2">
               <button
                 onClick={checkAndMigrate}
