@@ -29,3 +29,6 @@ verify_jwt = false
 
 [functions.ping]
 verify_jwt = false
+
+[functions.db-migrate]
+verify_jwt = false

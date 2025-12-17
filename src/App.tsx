@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/hooks/useAuth";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
+import { MigrationGate } from "@/components/MigrationGate";
 import { MainLayout } from "@/components/layout/MainLayout";
 import Dashboard from "./pages/Dashboard";
 import Contacts from "./pages/Contacts";
@@ -30,50 +31,52 @@ const queryClient = new QueryClient();
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
-      <Toaster />
-      <Sonner />
-      <BrowserRouter>
-        <AuthProvider>
-          <Routes>
-            <Route path="/auth" element={<Auth />} />
-            <Route path="/setup" element={<Setup />} />
-            <Route
-              path="/*"
-              element={
-                <ProtectedRoute>
-                  <MainLayout>
-                    <Routes>
-                      <Route path="/" element={<Dashboard />} />
-                      <Route path="/campaigns" element={<Campaigns />} />
-                      <Route path="/contacts" element={<Contacts />} />
-                      <Route path="/clients" element={<Clients />} />
-                      <Route path="/services" element={<Services />} />
-                      <Route path="/quotes" element={<Quotes />} />
-                      <Route path="/contracts" element={<Contracts />} />
-                      <Route path="/invoices" element={<Invoices />} />
-                      <Route path="/remittances" element={<Remittances />} />
-                      <Route path="/expenses" element={<Expenses />} />
-                      <Route path="/product-analysis" element={<ProductAnalysis />} />
-                      <Route path="/flows" element={<Flows />} />
-                      <Route path="/calendar" element={<Calendar />} />
-                      <Route path="/profile" element={<Profile />} />
-                      <Route 
-                        path="/settings" 
-                        element={
-                          <ProtectedRoute requiredRole="admin">
-                            <Settings />
-                          </ProtectedRoute>
-                        } 
-                      />
-                      <Route path="*" element={<NotFound />} />
-                    </Routes>
-                  </MainLayout>
-                </ProtectedRoute>
-              }
-            />
-          </Routes>
-        </AuthProvider>
-      </BrowserRouter>
+      <MigrationGate>
+        <Toaster />
+        <Sonner />
+        <BrowserRouter>
+          <AuthProvider>
+            <Routes>
+              <Route path="/auth" element={<Auth />} />
+              <Route path="/setup" element={<Setup />} />
+              <Route
+                path="/*"
+                element={
+                  <ProtectedRoute>
+                    <MainLayout>
+                      <Routes>
+                        <Route path="/" element={<Dashboard />} />
+                        <Route path="/campaigns" element={<Campaigns />} />
+                        <Route path="/contacts" element={<Contacts />} />
+                        <Route path="/clients" element={<Clients />} />
+                        <Route path="/services" element={<Services />} />
+                        <Route path="/quotes" element={<Quotes />} />
+                        <Route path="/contracts" element={<Contracts />} />
+                        <Route path="/invoices" element={<Invoices />} />
+                        <Route path="/remittances" element={<Remittances />} />
+                        <Route path="/expenses" element={<Expenses />} />
+                        <Route path="/product-analysis" element={<ProductAnalysis />} />
+                        <Route path="/flows" element={<Flows />} />
+                        <Route path="/calendar" element={<Calendar />} />
+                        <Route path="/profile" element={<Profile />} />
+                        <Route 
+                          path="/settings" 
+                          element={
+                            <ProtectedRoute requiredRole="admin">
+                              <Settings />
+                            </ProtectedRoute>
+                          } 
+                        />
+                        <Route path="*" element={<NotFound />} />
+                      </Routes>
+                    </MainLayout>
+                  </ProtectedRoute>
+                }
+              />
+            </Routes>
+          </AuthProvider>
+        </BrowserRouter>
+      </MigrationGate>
     </TooltipProvider>
   </QueryClientProvider>
 );
