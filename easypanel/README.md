@@ -127,7 +127,10 @@ En Easypanel, ve a la configuración del servicio CRM:
 
 ---
 
-## Paso 6: Configurar Edge Functions
+## Paso 6: Configurar Edge Functions (CRÍTICO)
+
+> ⚠️ **IMPORTANTE**: Las Edge Functions NO se despliegan automáticamente a Supabase self-hosted.
+> Debes configurar un volumen compartido para sincronizarlas.
 
 Las Edge Functions se sincronizan automáticamente durante el deploy si configuras el volumen.
 

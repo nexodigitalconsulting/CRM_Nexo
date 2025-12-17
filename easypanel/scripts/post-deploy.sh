@@ -87,7 +87,7 @@ echo "   Versión actual: $CURRENT_VERSION"
 echo ""
 
 # Versión objetivo
-TARGET_VERSION="v1.2.0"
+TARGET_VERSION="v1.3.0"
 echo "   Versión objetivo: $TARGET_VERSION"
 echo ""
 
