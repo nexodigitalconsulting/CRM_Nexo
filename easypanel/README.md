@@ -2,6 +2,17 @@
 
 Guía completa para desplegar el CRM con Supabase self-hosted en Easypanel.
 
+## Arquitectura Híbrida
+
+Este CRM soporta dos modos de operación:
+
+| Modo | Edge Functions | Migraciones | Uso |
+|------|---------------|-------------|-----|
+| **Lovable Cloud** | ✅ Automáticas | ✅ Automáticas | Desarrollo en Lovable |
+| **Easypanel/VPS** | ❌ No disponibles | 📋 Manuales o Script | Producción self-hosted |
+
+El sistema detecta automáticamente el entorno y se adapta.
+
 ## Prerequisitos
 
 1. **Easypanel** instalado en tu VPS
