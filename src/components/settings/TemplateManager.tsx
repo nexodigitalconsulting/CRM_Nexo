@@ -426,9 +426,9 @@ export function TemplateManager() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h3 className="text-lg font-semibold">Plantillas de Documentos</h3>
+          <h3 className="text-lg font-semibold">Plantillas para Impresión (Navegador)</h3>
           <p className="text-sm text-muted-foreground">
-            Diseña y gestiona las plantillas para tus documentos PDF
+            Plantillas HTML para imprimir con Ctrl+P. Los PDFs adjuntos en emails usan diseño fijo (ver pestaña "PDFs").
           </p>
         </div>
         <Button onClick={handleNewTemplate} className="gap-2">

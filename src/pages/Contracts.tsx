@@ -11,7 +11,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Plus, Filter, Calendar, Edit, Trash2, Printer, Mail } from "lucide-react";
+import { Plus, Filter, Calendar, Edit, Trash2, Printer, Mail, Download } from "lucide-react";
 import { ExportDropdown } from "@/components/common/ExportDropdown";
 import { TableViewManager, ColumnConfig } from "@/components/common/TableViewManager";
 import { useDefaultTableView } from "@/hooks/useTableViews";
@@ -19,7 +19,8 @@ import { entityExportConfigs } from "@/lib/exportUtils";
 import { useContracts, useDeleteContract, useContract, useMarkContractAsSent, ContractWithDetails } from "@/hooks/useContracts";
 import { useDefaultTemplate } from "@/hooks/useTemplates";
 import { useCompanySettings } from "@/hooks/useCompanySettings";
-import { printDocument, formatContractData } from "@/lib/pdfGenerator";
+import { printDocument, formatContractData } from "@/lib/printUtils";
+import { downloadContractPdf } from "@/lib/pdf/contractPdf";
 import { toast } from "sonner";
 import { ContractFormDialog } from "@/components/contracts/ContractFormDialog";
 import { SendEmailDialog } from "@/components/common/SendEmailDialog";
@@ -301,6 +302,38 @@ export default function Contracts() {
       render: (contract: ContractWithDetails) => (
         <TooltipProvider>
           <div className="flex items-center gap-1">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={async () => {
+                    try {
+                      const contractData = {
+                        contract_number: contract.contract_number,
+                        name: contract.name,
+                        start_date: contract.start_date,
+                        end_date: contract.end_date,
+                        billing_period: contract.billing_period,
+                        subtotal: contract.subtotal,
+                        iva_total: contract.iva_total,
+                        total: contract.total,
+                        notes: contract.notes,
+                        status: contract.status,
+                        client: contract.client,
+                      };
+                      await downloadContractPdf(contractData as any, companySettings as any);
+                      toast.success("PDF descargado");
+                    } catch (error) {
+                      toast.error("Error al descargar PDF");
+                    }
+                  }}
+                >
+                  <Download className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Descargar PDF</TooltipContent>
+            </Tooltip>
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button

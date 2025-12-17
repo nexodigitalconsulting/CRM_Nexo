@@ -11,7 +11,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Plus, Filter, FileText, Edit, Trash2, Printer, Mail } from "lucide-react";
+import { Plus, Filter, FileText, Edit, Trash2, Printer, Mail, Download } from "lucide-react";
 import { ExportDropdown } from "@/components/common/ExportDropdown";
 import { TableViewManager, ColumnConfig } from "@/components/common/TableViewManager";
 import { useDefaultTableView } from "@/hooks/useTableViews";
@@ -39,7 +39,8 @@ import {
 } from "@/components/ui/dialog";
 import { useDefaultTemplate } from "@/hooks/useTemplates";
 import { useCompanySettings } from "@/hooks/useCompanySettings";
-import { printDocument, formatInvoiceData, generatePrintableHTML } from "@/lib/pdfGenerator";
+import { printDocument, formatInvoiceData, generatePrintableHTML } from "@/lib/printUtils";
+import { downloadInvoicePdf } from "@/lib/pdf/invoicePdf";
 import { SendEmailDialog } from "@/components/common/SendEmailDialog";
 import { toast } from "sonner";
 
@@ -274,6 +275,31 @@ export default function Invoices() {
           <Button
             variant="ghost"
             size="icon"
+            onClick={async () => {
+              try {
+                const invoiceData = {
+                  invoice_number: invoice.invoice_number,
+                  issue_date: invoice.issue_date,
+                  due_date: invoice.due_date,
+                  subtotal: invoice.subtotal,
+                  iva_amount: invoice.iva_amount,
+                  total: invoice.total,
+                  notes: invoice.notes,
+                  client: invoice.client,
+                };
+                await downloadInvoicePdf(invoiceData as any, companySettings as any);
+                toast.success("PDF descargado");
+              } catch (error) {
+                toast.error("Error al descargar PDF");
+              }
+            }}
+            title="Descargar PDF"
+          >
+            <Download className="h-4 w-4" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
             onClick={() => {
               if (!invoiceTemplate) {
                 toast.error("No hay plantilla de factura configurada");
@@ -289,11 +315,6 @@ export default function Invoices() {
             variant="ghost"
             size="icon"
             onClick={() => {
-              if (!invoiceTemplate) {
-                toast.error("No hay plantilla de factura configurada");
-                return;
-              }
-              // Set the invoice ID to fetch full details
               setEmailInvoiceId(invoice.id);
               setEmailDialogOpen(true);
             }}
