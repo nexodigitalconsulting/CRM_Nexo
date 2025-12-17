@@ -11,7 +11,6 @@ import {
   Shield,
   AlertTriangle,
   Copy,
-  ExternalLink,
   RefreshCw,
   PlugZap,
   Terminal,
@@ -220,8 +219,8 @@ ON CONFLICT (user_id, role) DO NOTHING;`;
 #   docker restart supabase-edge-functions
 `;
 
-  const functionsDashboardUrl = `https://supabase.com/dashboard/project/${PROJECT_REF}/functions`;
-  const pingLogsUrl = `https://supabase.com/dashboard/project/${PROJECT_REF}/functions/ping/logs`;
+  const apiBaseUrl = (supabaseConfig.url || "").replace("/rest/v1", "");
+  const functionsBaseUrl = apiBaseUrl ? `${apiBaseUrl}/functions/v1` : "";
 
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
@@ -262,23 +261,32 @@ ON CONFLICT (user_id, role) DO NOTHING;`;
               volumen) y se activa al reiniciar el edge-runtime.
             </p>
 
-            <div className="flex flex-wrap gap-2">
-              <Button variant="secondary" onClick={runEdgeFunctionsCheck} disabled={edgeCheck.state === "checking"}>
-                {edgeCheckIcon()}
-                <span className="ml-2">Probar función (ping)</span>
-              </Button>
-              <Button variant="outline" onClick={() => copyToClipboard(syncFunctionsInstructions)}>
-                <Copy className="h-4 w-4 mr-2" />
-                Copiar pasos
-              </Button>
-              <Button variant="outline" onClick={() => window.open(functionsDashboardUrl, "_blank")}>
-                <ExternalLink className="h-4 w-4 mr-2" />
-                Abrir panel
-              </Button>
-              <Button variant="outline" onClick={() => window.open(pingLogsUrl, "_blank")}>
-                <ExternalLink className="h-4 w-4 mr-2" />
-                Ver logs (ping)
-              </Button>
+            <div className="space-y-3">
+              <div className="text-xs text-muted-foreground">
+                <div className="flex justify-between gap-3">
+                  <span>API detectada:</span>
+                  <span className="font-mono truncate">{apiBaseUrl || "(no configurada)"}</span>
+                </div>
+                <div className="flex justify-between gap-3">
+                  <span>Functions endpoint:</span>
+                  <span className="font-mono truncate">{functionsBaseUrl || "(no disponible)"}</span>
+                </div>
+              </div>
+
+              <div className="flex flex-wrap gap-2">
+                <Button variant="secondary" onClick={runEdgeFunctionsCheck} disabled={edgeCheck.state === "checking"}>
+                  {edgeCheckIcon()}
+                  <span className="ml-2">Probar función (ping)</span>
+                </Button>
+                <Button variant="outline" onClick={() => copyToClipboard(syncFunctionsInstructions)}>
+                  <Copy className="h-4 w-4 mr-2" />
+                  Copiar pasos
+                </Button>
+                <Button variant="outline" onClick={() => copyToClipboard(functionsBaseUrl || "") } disabled={!functionsBaseUrl}>
+                  <Copy className="h-4 w-4 mr-2" />
+                  Copiar URL Functions
+                </Button>
+              </div>
             </div>
 
             {edgeCheck.state === "ok" && (
@@ -373,15 +381,11 @@ ON CONFLICT (user_id, role) DO NOTHING;`;
                 </Button>
                 <Button
                   variant="secondary"
-                  onClick={() =>
-                    window.open(
-                      `${supabaseConfig.url?.replace("/rest/v1", "")}/project/default/auth/users`,
-                      "_blank"
-                    )
-                  }
+                  onClick={() => copyToClipboard(apiBaseUrl || supabaseConfig.url || "")}
+                  disabled={!apiBaseUrl && !supabaseConfig.url}
                 >
-                  <ExternalLink className="h-4 w-4 mr-2" />
-                  Abrir Supabase
+                  <Copy className="h-4 w-4 mr-2" />
+                  Copiar URL API
                 </Button>
               </div>
             </div>

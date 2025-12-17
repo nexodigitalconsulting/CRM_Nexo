@@ -257,15 +257,19 @@ export function MigrationGate({ children }: MigrationGateProps) {
                   )}
                   Probar función (ping)
                 </button>
-                <a
-                  href="https://supabase.com/dashboard/project/honfwrfkiukckyoelsdm/functions"
-                  target="_blank"
-                  rel="noreferrer"
+                <button
+                  onClick={() => {
+                    navigator.clipboard.writeText(
+                      "docker restart supabase-edge-functions\n# (antes: reinicia el servicio CRM para copiar funciones al volumen)"
+                    );
+                    setCopied(true);
+                    setTimeout(() => setCopied(false), 1500);
+                  }}
                   className="inline-flex items-center gap-2 px-3 py-2 bg-secondary text-secondary-foreground rounded text-xs hover:bg-secondary/90"
                 >
-                  <ExternalLink className="h-4 w-4" />
-                  Ver panel / logs
-                </a>
+                  <Copy className="h-4 w-4" />
+                  {copied ? "¡Copiado!" : "Copiar comando reinicio"}
+                </button>
               </div>
 
               {edgeFnCheck.state === "ok" && (
@@ -332,15 +336,6 @@ export function MigrationGate({ children }: MigrationGateProps) {
                 Se sincronizan al arrancar el servicio CRM (volumen compartido) y se cargan al reiniciar el edge-runtime.
               </p>
               <div className="flex flex-wrap gap-2">
-                <a
-                  href={`https://supabase.com/dashboard/project/honfwrfkiukckyoelsdm/functions`}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="inline-flex items-center gap-2 px-3 py-2 bg-secondary text-secondary-foreground rounded text-xs hover:bg-secondary/90"
-                >
-                  <ExternalLink className="h-4 w-4" />
-                  Ver funciones / logs
-                </a>
                 <button
                   onClick={() => {
                     navigator.clipboard.writeText(
@@ -422,18 +417,22 @@ export function MigrationGate({ children }: MigrationGateProps) {
             <div className="bg-muted/30 rounded p-3 space-y-2">
               <p className="text-sm font-medium">Edge Functions (logs)</p>
               <p className="text-xs text-muted-foreground">
-                Si la versión ya carga pero faltan funciones, revisa logs del edge-runtime y confirma que el volumen de
+                Si la versión ya carga pero faltan funciones, revisa logs del edge-runtime en tu servidor/Easypanel y confirma que el volumen de
                 funciones está montado.
               </p>
-              <a
-                href={`https://supabase.com/dashboard/project/honfwrfkiukckyoelsdm/functions`}
-                target="_blank"
-                rel="noreferrer"
+              <button
+                onClick={() => {
+                  navigator.clipboard.writeText(
+                    "docker logs -f supabase-edge-functions\n# o revisa logs en Easypanel del servicio edge-functions"
+                  );
+                  setCopied(true);
+                  setTimeout(() => setCopied(false), 1500);
+                }}
                 className="inline-flex items-center gap-2 px-3 py-2 bg-secondary text-secondary-foreground rounded text-xs hover:bg-secondary/90"
               >
-                <ExternalLink className="h-4 w-4" />
-                Abrir funciones / logs
-              </a>
+                <Copy className="h-4 w-4" />
+                {copied ? "¡Copiado!" : "Copiar comando logs"}
+              </button>
             </div>
 
             <div className="flex flex-wrap gap-2 pt-2">
