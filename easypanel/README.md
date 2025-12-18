@@ -1,32 +1,51 @@
-# Despliegue CRM Web en Easypanel
+# Despliegue CRM en Easypanel
 
-Guía completa para desplegar el CRM con Supabase self-hosted en Easypanel.
+Guía simplificada para desplegar el CRM con Supabase self-hosted.
 
-## Arquitectura Híbrida
+## Instalación Rápida (2 pasos)
 
-Este CRM soporta dos modos de operación:
+### Paso 1: Base de Datos
 
-| Modo | Edge Functions | Migraciones | Uso |
-|------|---------------|-------------|-----|
-| **Lovable Cloud** | ✅ Automáticas | ✅ Automáticas | Desarrollo en Lovable |
-| **Easypanel/VPS** | ❌ No disponibles | 📋 Manuales o Script | Producción self-hosted |
+```sql
+-- En Supabase SQL Editor, ejecutar:
+-- Archivo: easypanel/init-scripts/INSTALL.sql
+```
 
-El sistema detecta automáticamente el entorno y se adapta.
+### Paso 2: Edge Functions (en VPS)
 
-## Prerequisitos
+```bash
+# Encontrar contenedores
+CRM=$(docker ps --format "{{.Names}}" | grep -i crm | head -1)
+EDGE=$(docker ps --format "{{.Names}}" | grep -i functions | head -1)
 
-1. **Easypanel** instalado en tu VPS
-2. **Supabase** desplegado en Easypanel (template oficial)
-3. **PostgreSQL** configurado (viene con Supabase)
+# Copiar funciones
+docker cp $CRM:/app/supabase/functions/. /tmp/edge-functions/
+docker cp /tmp/edge-functions/. $EDGE:/home/deno/functions/
+docker restart $EDGE
 
-## Arquitectura
+# Verificar
+curl https://tu-supabase.dominio.com/functions/v1/ping
+```
+
+¡Listo! Accede a `/auth` y crea tu usuario admin.
+
+---
+
+## Guía Completa
+
+### Prerequisitos
+
+1. **Easypanel** instalado en VPS
+2. **Supabase** desplegado en Easypanel
+3. **PostgreSQL** (viene con Supabase)
+
+### Arquitectura
 
 ```
 ┌─────────────────────────────────────────────────────┐
 │                    EASYPANEL                        │
 │  ┌─────────────┐    ┌─────────────┐                │
 │  │   CRM Web   │───▶│  Supabase   │                │
-│  │  (Docker)   │    │  (Kong API) │                │
 │  │   :80       │    │   :8000     │                │
 │  └─────────────┘    └──────┬──────┘                │
 │                            │                        │
@@ -39,336 +58,159 @@ El sistema detecta automáticamente el entorno y se adapta.
 
 ---
 
-## Paso 1: Crear Schema en Supabase
+## 1. Crear Schema en Supabase
 
-**IMPORTANTE**: El schema NO se crea automáticamente. Debes ejecutarlo manualmente.
+1. Abre **Supabase Studio → SQL Editor**
+2. Copia el contenido de `easypanel/init-scripts/INSTALL.sql`
+3. Ejecuta (F5)
 
-1. Abre Supabase Studio en Easypanel
-2. Ve a **SQL Editor**
-3. Copia el contenido de `easypanel/init-scripts/full-schema.sql`
-4. Ejecuta el SQL (F5 o botón Run)
+El script:
+- ✅ Detecta componentes existentes
+- ✅ Solo añade lo que falta
+- ✅ Configura RLS automáticamente
+- ✅ Crea datos iniciales
 
 ---
 
-## Paso 2: Crear Usuario Administrador
+## 2. Crear Usuario Administrador
 
-En Supabase self-hosted, la confirmación de email no está disponible por defecto. Debes crear el admin manualmente.
+### En Supabase Studio
 
-### 2.1 Crear usuario en Supabase Studio
+1. **Authentication → Users → Add user**
+2. Email: `admin@tuempresa.com`
+3. Password: `tu_contraseña_segura`
+4. ✅ Marca **Auto Confirm User**
+5. Copia el **UUID** del usuario
 
-1. Abre **Supabase Studio** → **Authentication** → **Users**
-2. Click en **Add user** → **Create new user**
-3. Introduce:
-   - Email: `admin@tuempresa.com`
-   - Password: `tu_contraseña_segura`
-   - ✅ Marca "Auto Confirm User"
-4. Click **Create user**
-5. **Copia el UUID** del usuario creado (columna `UID`)
-
-### 2.2 Asignar rol de administrador
-
-1. Ve a **SQL Editor** en Supabase Studio
-2. Ejecuta el siguiente SQL (reemplaza el UUID):
+### Asignar rol admin (SQL Editor)
 
 ```sql
--- Reemplaza 'TU_UUID_AQUI' con el UUID del usuario creado
--- Ejemplo: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890'
-
--- Crear perfil
-INSERT INTO public.profiles (user_id, email, full_name)
-VALUES ('TU_UUID_AQUI', 'admin@tuempresa.com', 'Administrador')
-ON CONFLICT (user_id) DO NOTHING;
-
--- Asignar rol admin
+-- Reemplaza TU_UUID con el UUID copiado
 INSERT INTO public.user_roles (user_id, role)
-VALUES ('TU_UUID_AQUI', 'admin')
-ON CONFLICT (user_id, role) DO NOTHING;
+VALUES ('TU_UUID', 'admin');
 ```
 
-3. Ejecuta el SQL (F5)
-4. ✅ Ya tienes tu usuario administrador
+---
+
+## 3. Configurar CRM en Easypanel
+
+### Build Arguments (requeridos)
+
+| Variable | Valor |
+|----------|-------|
+| `VITE_SUPABASE_URL` | `https://tu-supabase.dominio.com` |
+| `VITE_SUPABASE_ANON_KEY` | `eyJhbGc...` (de Supabase → Settings → API) |
+
+> ⚠️ Después de cambiar Build Args, hacer **Rebuild**
 
 ---
 
-## Paso 3: Crear Servicio CRM en Easypanel
+## 4. Sincronizar Edge Functions
 
-1. En Easypanel, crea un nuevo **App** → **GitHub**
-2. Conecta tu repositorio del CRM
-3. Selecciona la rama principal (main/master)
+Las Edge Functions NO se sincronizan automáticamente. Hay 3 métodos:
 
----
+### Método A: Comandos Manuales (Recomendado)
 
-## Paso 4: Configurar Build Args
-
-En Easypanel, ve a la configuración del servicio CRM:
-
-**Settings → Build → Build Arguments**
-
-| Variable | Valor | Requerido |
-|----------|-------|-----------|
-| `VITE_SUPABASE_URL` | `https://tu-supabase.dominio.com` | ✅ Sí |
-| `VITE_SUPABASE_ANON_KEY` | `eyJhbGc...` | ✅ Sí |
-
-### ¿Dónde encontrar estos valores?
-
-- **VITE_SUPABASE_URL**: La URL de tu Supabase en Easypanel (normalmente el dominio configurado para el servicio Supabase)
-- **VITE_SUPABASE_ANON_KEY**: En Supabase Studio → Settings → API → `anon` public key
-
-> ⚠️ **Importante**: Estas variables se inyectan en BUILD TIME, no en runtime. Después de cambiarlas, debes hacer rebuild.
-
----
-
-## Paso 5: Configurar Dominio
-
-1. En la configuración del CRM en Easypanel
-2. Ve a **Domains**
-3. Añade tu dominio (ej: `crm.tudominio.com`)
-4. Puerto interno: `80`
-
----
-
-## Paso 6: Configurar Edge Functions (DEFINITIVO)
-
-> ✅ **Sincronización Automática**: Las Edge Functions se sincronizan automáticamente 
-> en cada deploy del CRM. Soporta dos métodos: volumen directo o Docker socket.
-
-### 6.1 Método 1: Volumen Directo (Recomendado)
-
-Este método es más rápido y no requiere reiniciar edge-runtime.
-
-#### Variables de Entorno
-
-| Variable | Valor | Descripción |
-|----------|-------|-------------|
-| `EDGE_FUNCTIONS_VOLUME` | `/etc/easypanel/projects/PROYECTO/supabase/code/supabase/code/volumes/functions` | Ruta al volumen de funciones |
-
-> 💡 Reemplaza `PROYECTO` con el nombre de tu proyecto en EasyPanel.
-
-#### ¿Cómo encontrar la ruta del volumen?
+Ejecutar en el VPS después de cada deploy:
 
 ```bash
-# En tu VPS, busca el volumen de functions
-find /etc/easypanel -name "functions" -type d 2>/dev/null | grep volumes
-```
+# 1. Identificar contenedores
+CRM=$(docker ps --format "{{.Names}}" | grep -i crm | head -1)
+EDGE=$(docker ps --format "{{.Names}}" | grep -i functions | head -1)
 
-### 6.2 Método 2: Docker Socket (Alternativo)
+echo "CRM: $CRM"
+echo "Edge: $EDGE"
 
-Si no puedes montar el volumen directamente, usa el Docker socket.
+# 2. Copiar funciones
+docker cp $CRM:/app/supabase/functions/. /tmp/edge-functions/
+docker cp /tmp/edge-functions/. $EDGE:/home/deno/functions/
 
-#### Mounts (Advanced → Mounts)
+# 3. Reiniciar edge-runtime
+docker restart $EDGE
 
-| Host Path | Container Path | Descripción |
-|-----------|----------------|-------------|
-| `/var/run/docker.sock` | `/var/run/docker.sock` | Docker socket |
-
-#### Variables de Entorno
-
-| Variable | Valor | Descripción |
-|----------|-------|-------------|
-| `EDGE_RUNTIME_CONTAINER` | `proyecto_supabase-functions-1` | Nombre del contenedor edge-runtime |
-
-> ⚠️ Para encontrar el nombre del contenedor: `docker ps | grep functions`
-
-### 6.3 Funcionamiento Automático
-
-Al hacer deploy del CRM:
-
-1. ✅ `startup.sh` verifica conexión PostgreSQL
-2. ✅ Compara versión de schema (BD vs código)
-3. ✅ Lista migraciones SQL pendientes
-4. ✅ Sincroniza Edge Functions automáticamente
-5. ✅ Verifica que las funciones coinciden con el repositorio
-6. ✅ Muestra resumen completo en logs
-
-#### Logs de ejemplo:
-
-```
-==========================================
-  CRM Web - Verificación e Inicio
-==========================================
-
---- PostgreSQL ---
-ℹ️  Host: supabase-db:5432
-ℹ️  Base de datos: postgres
-✅ Conexión PostgreSQL OK
-ℹ️  Versión en BD: v1.2.0
-ℹ️  Versión en código: v1.4.0
-⚠️  Migraciones pendientes
-   Ejecutar: easypanel/init-scripts/migrations/apply_all.sql
-
---- Edge Functions ---
-ℹ️  Método: Volumen Directo
-✅ Sincronización: 10 funciones copiadas
-✅ Verificación OK
-
-==========================================
-  Resumen de Verificación
-==========================================
-
-PostgreSQL:     ✅ Configurado
-Schema:         ⚠️  Pendiente (BD: v1.2.0 → Código: v1.4.0)
-Edge Functions: ✅ Volumen directo
-```
-
-### 6.4 Sincronización Manual (desde el VPS)
-
-Si necesitas sincronizar manualmente:
-
-```bash
-# Método 1: Volumen directo
-cp -r /ruta/crm/supabase/functions/* $EDGE_FUNCTIONS_VOLUME/
-
-# Método 2: Docker
-CRM_CONTAINER=$(docker ps --format "{{.Names}}" | grep -i crm | head -1)
-docker cp $CRM_CONTAINER:/app/supabase/functions/. /ruta/volumen/functions/
-docker restart EDGE_RUNTIME_CONTAINER
-```
-
-### 6.5 Verificar funciones disponibles
-
-```bash
+# 4. Verificar
+sleep 5
 curl https://tu-supabase.dominio.com/functions/v1/ping
 ```
 
-Respuesta esperada:
-```json
-{"ok":true,"version":"1.4.0","environment":"hybrid"}
+### Método B: Variable de Entorno (Automático)
+
+Añade en Easypanel → CRM → Environment Variables:
+
+```
+EDGE_FUNCTIONS_VOLUME=/etc/easypanel/projects/PROYECTO/supabase/.../volumes/functions
 ```
 
-### 6.6 Lista de Edge Functions
+Para encontrar la ruta:
+```bash
+find /etc/easypanel -name "functions" -type d 2>/dev/null | grep volumes
+```
 
-| Función | Descripción |
-|---------|-------------|
-| `ping` | Health check y versión |
-| `send-email` | Envío de emails SMTP |
-| `db-migrate` | Verificación de migraciones |
-| `process-notifications` | Procesamiento de notificaciones |
-| `calendar-ical` | Exportación calendario iCal |
-| `setup-database` | Setup inicial |
-| `bootstrap-admin` | Creación de admin |
-| `google-calendar-auth` | Auth Google Calendar |
-| `google-calendar-callback` | Callback OAuth |
-| `google-calendar-events` | Eventos Google Calendar |
-| `_main` | Healthcheck (auto-generado) |
+### Método C: Docker Socket (Automático)
 
----
+1. En Easypanel → CRM → Mounts:
+   - Host: `/var/run/docker.sock`
+   - Container: `/var/run/docker.sock`
 
-## Paso 7: Deploy
-
-1. Guarda la configuración
-2. Haz click en **Deploy**
-3. Espera a que se complete el build
-4. El script post-deploy sincroniza automáticamente:
-   - ✅ Migraciones de base de datos
-   - ✅ Edge Functions (si `SUPABASE_FUNCTIONS_VOLUME` está configurado)
+2. Environment Variables:
+   ```
+   EDGE_RUNTIME_CONTAINER=proyecto_supabase-functions-1
+   ```
 
 ---
 
-## Paso 8: Acceder al CRM
-
-1. Accede a `https://tu-crm.dominio.com/auth`
-2. Inicia sesión con el usuario admin creado en el Paso 2
-3. ¡Listo!
-
-> 💡 La página `/setup` ya no es necesaria para crear el admin, solo verifica la conexión y el schema.
-
----
-
-## Verificación Post-Deploy
+## 5. Verificación
 
 ### Checklist
 
-- [ ] CRM accesible en el dominio configurado
-- [ ] Página `/auth` carga correctamente
-- [ ] Login con usuario admin funciona
-- [ ] Dashboard se muestra correctamente
-- [ ] Conexión con Supabase funciona
+- [ ] CRM accesible en tu dominio
+- [ ] `/auth` carga correctamente
+- [ ] Login con admin funciona
+- [ ] Edge Functions responden:
 
-### Tablas que deben existir
+```bash
+# Ping
+curl https://supabase.dominio.com/functions/v1/ping
 
+# Respuesta esperada
+{"ok":true,"version":"1.4.0"}
 ```
-profiles, user_roles, company_settings, contacts, clients,
-services, quotes, quote_services, contracts, contract_services,
-invoices, invoice_services, expenses, remittances, campaigns,
-calendar_categories, calendar_events, user_availability,
-email_settings, email_templates, notification_rules, notification_queue,
-pdf_settings, schema_versions
-```
+
+### Edge Functions disponibles
+
+| Función | Descripción |
+|---------|-------------|
+| `ping` | Health check |
+| `db-migrate` | Estado de migraciones |
+| `send-email` | Envío emails SMTP |
+| `bootstrap-admin` | Crear admin |
+| `google-calendar-*` | Integración Google |
+| `main` | Dispatcher (auto) |
 
 ---
 
-## Actualización de Instalaciones Existentes
+## Actualizar Instalación Existente
 
-Si tienes una instalación anterior y necesitas actualizar a la última versión:
-
-### Método 1: Aplicador Automático (Recomendado)
-
-1. Abre **Supabase SQL Editor** o tu cliente PostgreSQL
-2. Ejecuta el contenido de `easypanel/init-scripts/migrations/apply_all.sql`
-3. El script:
-   - Detecta automáticamente la versión actual
-   - Aplica solo las migraciones pendientes
-   - Muestra logs detallados con timestamps
-   - Verifica todos los componentes al final
-
-### Método 2: Sincronización de Emergencia
-
-Si tienes una instalación con problemas o versiones inconsistentes:
+### Actualizar Base de Datos
 
 ```sql
--- Ejecutar: easypanel/init-scripts/migrations/sync_to_latest.sql
+-- En SQL Editor, ejecutar:
+-- easypanel/init-scripts/INSTALL.sql
+
+-- El script detecta lo que ya existe y solo añade lo nuevo
 ```
 
-Este script:
-- Detecta automáticamente qué componentes faltan
-- Añade las columnas necesarias sin afectar datos existentes
-- Registra todas las versiones correctamente
-- Muestra verificación completa al final
+### Actualizar Edge Functions
 
-### Método 3: Migraciones Individuales
+```bash
+# Después de pull/deploy del CRM
+CRM=$(docker ps --format "{{.Names}}" | grep -i crm | head -1)
+EDGE=$(docker ps --format "{{.Names}}" | grep -i functions | head -1)
 
-Si prefieres control granular:
-
-1. Verifica tu versión actual:
-```sql
-SELECT get_current_schema_version();
+docker cp $CRM:/app/supabase/functions/. /tmp/edge-functions/
+docker cp /tmp/edge-functions/. $EDGE:/home/deno/functions/
+docker restart $EDGE
 ```
-
-2. Ejecuta las migraciones pendientes en orden:
-   - `v1.1.0_2024-12-17_pdf_settings.sql`
-   - `v1.2.0_2024-12-17_email_signature.sql`
-   - `v1.3.0_2024-12-17_rls_schema_versions.sql`
-   - `v1.4.0_2024-12-18_sent_columns.sql`
-
-### Verificar versión instalada
-
-```sql
-SELECT version, description, applied_at 
-FROM schema_versions 
-ORDER BY applied_at;
-```
-
-### Verificar componentes v1.4.0
-
-```sql
--- Debe devolver 6 filas (is_sent y sent_at para invoices, quotes, contracts)
-SELECT table_name, column_name 
-FROM information_schema.columns 
-WHERE table_schema = 'public' 
-  AND table_name IN ('invoices', 'quotes', 'contracts')
-  AND column_name IN ('is_sent', 'sent_at')
-ORDER BY table_name, column_name;
-```
-
-> 📚 Ver documentación completa en `README-migrations.md`
-
----
-
-## Configuración de Email (Opcional)
-
-Para habilitar notificaciones por email, configura SMTP en **Settings → Email** dentro del CRM.
-
-> ⚠️ En Supabase self-hosted, la confirmación de email para nuevos usuarios NO está disponible a menos que configures SMTP en Supabase Auth.
 
 ---
 
@@ -376,35 +218,31 @@ Para habilitar notificaciones por email, configura SMTP en **Settings → Email*
 
 ### "Error de conexión con Supabase"
 
-1. Verifica que `VITE_SUPABASE_URL` es correcta
-2. Verifica que `VITE_SUPABASE_ANON_KEY` es correcta
-3. Asegúrate de haber hecho rebuild después de cambiar Build Args
-4. Comprueba que Supabase está corriendo en Easypanel
+1. Verificar `VITE_SUPABASE_URL` y `VITE_SUPABASE_ANON_KEY`
+2. Hacer Rebuild después de cambiar Build Args
+3. Verificar que Supabase está corriendo
 
-### "Las tablas no se detectan"
+### "Edge Functions no responden"
 
-1. Ejecuta `easypanel/init-scripts/full-schema.sql` en Supabase SQL Editor
-2. Verifica que no hubo errores en la ejecución
-3. Refresca la página del CRM
+1. Verificar que el contenedor edge-functions está corriendo:
+   ```bash
+   docker ps | grep functions
+   ```
+
+2. Copiar funciones manualmente (ver Método A arriba)
+
+3. Ver logs:
+   ```bash
+   docker logs $(docker ps -q --filter "name=functions") --tail 50
+   ```
+
+### "Las tablas no existen"
+
+Ejecutar `INSTALL.sql` en Supabase SQL Editor
 
 ### "No puedo crear usuario admin"
 
-En Supabase self-hosted:
-1. Usa **Add user** → **Create new user** en Authentication
-2. Marca **Auto Confirm User**
-3. Ejecuta el SQL para asignar rol admin
-
-### "Build lento o falla"
-
-1. Verifica que las Build Args están configuradas
-2. Revisa los logs del build en Easypanel
-3. Asegúrate de que el Dockerfile está actualizado
-
-### "CORS errors"
-
-Verifica la configuración de Supabase:
-- API URL debe ser accesible públicamente
-- CORS debe permitir tu dominio del CRM
+En Supabase self-hosted, marcar **Auto Confirm User** al crear el usuario
 
 ---
 
@@ -412,270 +250,33 @@ Verifica la configuración de Supabase:
 
 | Archivo | Descripción |
 |---------|-------------|
-| `easypanel/init-scripts/full-schema.sql` | Schema completo de la base de datos |
-| `Dockerfile` | Configuración del contenedor |
-| `src/integrations/supabase/client.ts` | Cliente de Supabase |
+| `easypanel/init-scripts/INSTALL.sql` | Schema completo (TODO EN UNO) |
+| `supabase/functions/main/index.ts` | Dispatcher Edge Functions |
+| `Dockerfile` | Configuración contenedor |
 
 ---
 
-## Replicar a Otro Proyecto
-
-Para clonar el CRM a otro servidor:
-
-1. Fork/clone el repositorio
-2. En Easypanel del nuevo servidor:
-   - Despliega Supabase
-   - Ejecuta `full-schema.sql`
-   - Crea usuario admin manualmente (Paso 2)
-   - Crea el servicio CRM con Build Args
-3. Accede a `/auth` e inicia sesión
-
----
-
-## Resumen Rápido
+## Resumen de Comandos
 
 ```bash
-# 1. En Supabase SQL Editor
-→ Ejecutar: easypanel/init-scripts/full-schema.sql
+# === INSTALACIÓN INICIAL ===
 
-# 2. En Supabase Studio → Authentication → Users
-→ Add user → Create new user
-→ Email: admin@tuempresa.com
-→ Password: ****
-→ ✅ Auto Confirm User
-→ Copiar UUID
+# 1. SQL (en Supabase SQL Editor)
+# → Ejecutar: easypanel/init-scripts/INSTALL.sql
 
-# 3. En Supabase SQL Editor
-→ Ejecutar SQL para crear perfil y asignar rol admin
+# 2. Edge Functions (en VPS)
+CRM=$(docker ps --format "{{.Names}}" | grep -i crm | head -1)
+EDGE=$(docker ps --format "{{.Names}}" | grep -i functions | head -1)
+docker cp $CRM:/app/supabase/functions/. /tmp/ef/
+docker cp /tmp/ef/. $EDGE:/home/deno/functions/
+docker restart $EDGE
 
-# 4. En Easypanel CRM Service
-→ Build Args:
-   VITE_SUPABASE_URL=https://supabase.tudominio.com
-   VITE_SUPABASE_ANON_KEY=eyJhbGciOiJI...
+# 3. Crear admin (en Supabase SQL Editor)
+INSERT INTO user_roles (user_id, role)
+SELECT id, 'admin' FROM auth.users WHERE email = 'tu@email.com';
 
-# 5. Deploy y acceder a /auth
+# === ACTUALIZACIONES ===
+
+# Re-ejecutar INSTALL.sql (es idempotente)
+# Copiar funciones de nuevo con los comandos del paso 2
 ```
-
----
-
-## Anexo A: Acceso Externo a PostgreSQL
-
-Para conectar herramientas externas como **n8n**, **DBeaver**, o cualquier cliente PostgreSQL a la base de datos de Supabase en Easypanel:
-
-### A.1 Obtener el nombre correcto de la red Docker
-
-Ejecuta este comando para ver las redes disponibles:
-
-```bash
-docker network ls
-```
-
-Luego, para saber a qué red está conectado tu contenedor `nexo_n8n_supabase-db-1`, ejecuta:
-
-```bash
-docker inspect -f '{{range $k,$v := .NetworkSettings.Networks}}{{$k}}{{end}}' nexo_n8n_supabase-db-1
-```
-
-El resultado será el nombre de la red que debes usar en lugar de `NETWORK`.
-
-### A.2 Crear el contenedor socat
-
-Si el comando anterior te devuelve, por ejemplo, `bridge`, entonces el comando correcto será:
-
-```bash
-docker run -d --name nexo_supabase_crm --network bridge -p 5460:5460 alpine/socat TCP-LISTEN:5460,fork,reuseaddr TCP:nexo_n8n_supabase-db-1:5432
-```
-
-### A.3 Abrir el puerto en el VPS
-
-Dependiendo de tu firewall:
-
-**UFW (Ubuntu/Debian):**
-```bash
-sudo ufw allow 5460/tcp
-sudo ufw reload
-```
-
-**firewalld (CentOS/RHEL):**
-```bash
-sudo firewall-cmd --permanent --add-port=5460/tcp
-sudo firewall-cmd --reload
-```
-
-**iptables:**
-```bash
-sudo iptables -A INPUT -p tcp --dport 5460 -j ACCEPT
-sudo iptables-save
-```
-
-### A.4 Datos de conexión
-
-| Parámetro | Valor |
-|-----------|-------|
-| **Host** | `tu-servidor.com` o IP del VPS |
-| **Port** | `5460` (el puerto expuesto por socat) |
-| **Database** | `postgres` |
-| **User** | `postgres` |
-| **Password** | La contraseña configurada en Supabase |
-
-### A.5 Ejemplo conexión n8n
-
-En n8n, crea una credencial **Postgres**:
-
-```
-Host: tu-servidor.com
-Port: 5460
-Database: postgres
-User: postgres
-Password: tu_password_de_supabase
-SSL: Disable (si es red interna) o Require (si es externa)
-```
-
-### A.6 Seguridad
-
-> ⚠️ **IMPORTANTE**: Exponer PostgreSQL a internet tiene riesgos de seguridad.
-
-Recomendaciones:
-- Usa contraseñas fuertes
-- Configura firewall para permitir solo IPs conocidas
-- Considera usar túnel SSH o VPN
-- No uses el puerto estándar 5432 (usa uno diferente como 5460)
-
----
-
-## Anexo B: Variables de Entorno
-
-### Variables del CRM (Build Args)
-
-| Variable | Descripción | Ejemplo |
-|----------|-------------|---------|
-| `VITE_SUPABASE_URL` | URL de la API de Supabase | `https://supabase.tudominio.com` |
-| `VITE_SUPABASE_ANON_KEY` | Clave anónima de Supabase | `eyJhbGciOiJI...` |
-
-### Variables de Entorno (Runtime)
-
-| Variable | Descripción | Ejemplo |
-|----------|-------------|---------|
-| `EXTERNAL_POSTGRES_HOST` | Host PostgreSQL para migraciones | `supabase-db` |
-| `EXTERNAL_POSTGRES_PORT` | Puerto PostgreSQL | `5432` |
-| `EXTERNAL_POSTGRES_DB` | Base de datos | `postgres` |
-| `EXTERNAL_POSTGRES_USER` | Usuario PostgreSQL | `postgres` |
-| `EXTERNAL_POSTGRES_PASSWORD` | Contraseña PostgreSQL | `tu_password` |
-| `EDGE_FUNCTIONS_VOLUME` | **Método 1**: Ruta al volumen de funciones | `/etc/easypanel/.../volumes/functions` |
-| `EDGE_RUNTIME_CONTAINER` | **Método 2**: Nombre contenedor edge-runtime | `proyecto_supabase-functions-1` |
-
-### Variables de Supabase (si necesitas personalizarlas)
-
-| Variable | Descripción |
-|----------|-------------|
-| `POSTGRES_PASSWORD` | Contraseña de PostgreSQL |
-| `JWT_SECRET` | Secreto para tokens JWT |
-| `ANON_KEY` | Clave pública anónima |
-| `SERVICE_ROLE_KEY` | Clave de servicio (privilegiada) |
-
----
-
-## Anexo C: Scripts de Deployment
-
-### Scripts disponibles
-
-| Script | Descripción | Uso |
-|--------|-------------|-----|
-| `post-deploy.sh` | Migraciones + sync funciones | Automático en post-deploy |
-| `deploy-functions.sh` | Solo sync de Edge Functions | Manual si es necesario |
-| `verify-deployment.sh` | Verificación completa | Diagnóstico |
-
-### Ejecución manual
-
-```bash
-# Verificar deployment
-/app/easypanel/scripts/verify-deployment.sh
-
-# Deploy solo funciones
-/app/easypanel/scripts/deploy-functions.sh
-
-# Después de deploy funciones, reiniciar edge-runtime
-docker restart supabase-edge-functions
-```
-
----
-
-## Anexo D: Comandos de Emergencia
-
-### Sincronización rápida de versiones
-
-Si tu instalación muestra versión incorrecta en el panel:
-
-```sql
--- Ejecutar en Supabase SQL Editor
--- Sincroniza cualquier instalación a v1.4.0
-\i easypanel/init-scripts/migrations/sync_to_latest.sql
-
--- O copiar/pegar el contenido directamente
-```
-
-### Copiar Edge Functions manualmente
-
-```bash
-# 1. Encontrar el contenedor CRM
-CRM_CONTAINER=$(docker ps --format "{{.Names}}" | grep -i crm | head -1)
-echo "Contenedor CRM: $CRM_CONTAINER"
-
-# 2. Copiar funciones al volumen
-docker cp $CRM_CONTAINER:/app/supabase/functions/. \
-  /etc/easypanel/projects/nexo_n8n/supabase/code/supabase/code/volumes/functions/
-
-# 3. Reiniciar edge-runtime
-docker restart nexo_n8n_supabase-functions-1
-
-# 4. Verificar
-curl https://nexo-n8n-supabase.cwye4h.easypanel.host/functions/v1/ping
-```
-
-### Verificar estado de la base de datos
-
-```sql
--- Ver versión actual
-SELECT get_current_schema_version();
-
--- Ver historial de migraciones
-SELECT version, description, applied_at 
-FROM schema_versions 
-ORDER BY applied_at;
-
--- Verificar componentes v1.4.0
-SELECT table_name, column_name 
-FROM information_schema.columns 
-WHERE table_schema = 'public' 
-  AND table_name IN ('invoices', 'quotes', 'contracts')
-  AND column_name IN ('is_sent', 'sent_at')
-ORDER BY table_name, column_name;
-```
-
-### Lista completa de Edge Functions
-
-| Función | Archivo | Descripción |
-|---------|---------|-------------|
-| `ping` | `ping/index.ts` | Health check y versión |
-| `send-email` | `send-email/index.ts` | Envío de emails SMTP |
-| `db-migrate` | `db-migrate/index.ts` | Verificación de migraciones |
-| `process-notifications` | `process-notifications/index.ts` | Cola de notificaciones |
-| `calendar-ical` | `calendar-ical/index.ts` | Exportación calendario iCal |
-| `setup-database` | `setup-database/index.ts` | Setup inicial |
-| `bootstrap-admin` | `bootstrap-admin/index.ts` | Creación de admin |
-| `google-calendar-auth` | `google-calendar-auth/index.ts` | Auth Google Calendar |
-| `google-calendar-callback` | `google-calendar-callback/index.ts` | Callback OAuth |
-| `google-calendar-events` | `google-calendar-events/index.ts` | Eventos Google Calendar |
-
----
-
-## Soporte
-
-Si tienes problemas:
-1. Ejecuta `/app/easypanel/scripts/verify-deployment.sh` para diagnóstico
-2. Revisa los logs en Easypanel
-3. Verifica la conexión con Supabase
-4. Comprueba que el schema está correctamente instalado
-5. Asegúrate de que el usuario admin tiene el rol correcto
-6. Si las Edge Functions no funcionan, verifica `EDGE_FUNCTIONS_VOLUME`
-7. **Para sincronizar versiones**: Ejecuta `sync_to_latest.sql`
