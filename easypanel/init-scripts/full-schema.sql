@@ -294,6 +294,8 @@ CREATE TABLE IF NOT EXISTS public.quotes (
   total numeric DEFAULT 0,
   notes text,
   document_url text,
+  is_sent boolean DEFAULT false,
+  sent_at timestamptz,
   created_by uuid,
   created_at timestamptz DEFAULT now(),
   updated_at timestamptz DEFAULT now()
@@ -334,6 +336,8 @@ CREATE TABLE IF NOT EXISTS public.contracts (
   total numeric DEFAULT 0,
   notes text,
   document_url text,
+  is_sent boolean DEFAULT false,
+  sent_at timestamptz,
   created_by uuid,
   created_at timestamptz DEFAULT now(),
   updated_at timestamptz DEFAULT now()
@@ -392,6 +396,8 @@ CREATE TABLE IF NOT EXISTS public.invoices (
   total numeric DEFAULT 0,
   notes text,
   document_url text,
+  is_sent boolean DEFAULT false,
+  sent_at timestamptz,
   created_by uuid,
   created_at timestamptz DEFAULT now(),
   updated_at timestamptz DEFAULT now()
@@ -1073,30 +1079,62 @@ INSERT INTO public.pdf_settings (id)
 SELECT gen_random_uuid()
 WHERE NOT EXISTS (SELECT 1 FROM public.pdf_settings LIMIT 1);
 
--- Registrar versión del schema
+-- Registrar versiones del schema
 INSERT INTO public.schema_versions (version, description, applied_at)
-VALUES ('v1.2.0', 'Schema completo con pdf_settings y signature_html', now())
+VALUES 
+  ('v1.0.0', 'Schema base del CRM', now()),
+  ('v1.1.0', 'Tabla pdf_settings para personalización de documentos', now()),
+  ('v1.2.0', 'Columna signature_html en email_settings', now()),
+  ('v1.3.0', 'RLS para schema_versions - lectura pública', now()),
+  ('v1.4.0', 'Columnas is_sent y sent_at en invoices, quotes, contracts', now())
 ON CONFLICT (version) DO NOTHING;
 
 -- ============================================
--- ✅ SCHEMA COMPLETO INSTALADO - v1.2.0
+-- ✅ SCHEMA COMPLETO INSTALADO - v1.4.0
 -- ============================================
 
 DO $$
+DECLARE
+  v_invoices_ok boolean;
+  v_quotes_ok boolean;
+  v_contracts_ok boolean;
 BEGIN
+  -- Verificar componentes v1.4.0
+  SELECT EXISTS (
+    SELECT 1 FROM information_schema.columns 
+    WHERE table_name = 'invoices' AND column_name = 'is_sent'
+  ) INTO v_invoices_ok;
+  
+  SELECT EXISTS (
+    SELECT 1 FROM information_schema.columns 
+    WHERE table_name = 'quotes' AND column_name = 'is_sent'
+  ) INTO v_quotes_ok;
+  
+  SELECT EXISTS (
+    SELECT 1 FROM information_schema.columns 
+    WHERE table_name = 'contracts' AND column_name = 'is_sent'
+  ) INTO v_contracts_ok;
+
   RAISE NOTICE '';
-  RAISE NOTICE '╔═══════════════════════════════════════════╗';
-  RAISE NOTICE '║  ✅ CRM Schema v1.2.0 instalado           ║';
-  RAISE NOTICE '╠═══════════════════════════════════════════╣';
-  RAISE NOTICE '║  Tablas creadas: 28                       ║';
-  RAISE NOTICE '║  Políticas RLS: 50+                       ║';
-  RAISE NOTICE '║  Triggers: 13                             ║';
-  RAISE NOTICE '║  Datos iniciales: Sí                      ║';
-  RAISE NOTICE '╚═══════════════════════════════════════════╝';
+  RAISE NOTICE '[%] ════════════════════════════════════════════', clock_timestamp();
+  RAISE NOTICE '║  ✅ CRM Schema v1.4.0 instalado correctamente  ║';
+  RAISE NOTICE '════════════════════════════════════════════════════';
   RAISE NOTICE '';
-  RAISE NOTICE 'Siguiente paso: Registra un usuario y asígnale rol admin:';
+  RAISE NOTICE '[%] VERIFICACIÓN DE COMPONENTES:', clock_timestamp();
+  RAISE NOTICE '  • invoices.is_sent/sent_at:  %', CASE WHEN v_invoices_ok THEN '✓ OK' ELSE '✗ FALTA' END;
+  RAISE NOTICE '  • quotes.is_sent/sent_at:    %', CASE WHEN v_quotes_ok THEN '✓ OK' ELSE '✗ FALTA' END;
+  RAISE NOTICE '  • contracts.is_sent/sent_at: %', CASE WHEN v_contracts_ok THEN '✓ OK' ELSE '✗ FALTA' END;
   RAISE NOTICE '';
-  RAISE NOTICE 'INSERT INTO public.user_roles (user_id, role)';
-  RAISE NOTICE 'SELECT id, ''admin'' FROM auth.users WHERE email = ''tu@email.com'';';
+  RAISE NOTICE '[%] ESTADÍSTICAS:', clock_timestamp();
+  RAISE NOTICE '  • Tablas creadas: 28';
+  RAISE NOTICE '  • Políticas RLS: 50+';
+  RAISE NOTICE '  • Triggers: 13';
+  RAISE NOTICE '  • Datos iniciales: Sí';
+  RAISE NOTICE '';
+  RAISE NOTICE '[%] SIGUIENTE PASO:', clock_timestamp();
+  RAISE NOTICE '  Registra un usuario y asígnale rol admin:';
+  RAISE NOTICE '';
+  RAISE NOTICE '  INSERT INTO public.user_roles (user_id, role)';
+  RAISE NOTICE '  SELECT id, ''admin'' FROM auth.users WHERE email = ''tu@email.com'';';
   RAISE NOTICE '';
 END $$;

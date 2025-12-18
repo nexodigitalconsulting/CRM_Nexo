@@ -308,9 +308,24 @@ Si tienes una instalación anterior y necesitas actualizar a la última versión
 3. El script:
    - Detecta automáticamente la versión actual
    - Aplica solo las migraciones pendientes
-   - Muestra un resumen de cambios
+   - Muestra logs detallados con timestamps
+   - Verifica todos los componentes al final
 
-### Método 2: Migraciones Individuales
+### Método 2: Sincronización de Emergencia
+
+Si tienes una instalación con problemas o versiones inconsistentes:
+
+```sql
+-- Ejecutar: easypanel/init-scripts/migrations/sync_to_latest.sql
+```
+
+Este script:
+- Detecta automáticamente qué componentes faltan
+- Añade las columnas necesarias sin afectar datos existentes
+- Registra todas las versiones correctamente
+- Muestra verificación completa al final
+
+### Método 3: Migraciones Individuales
 
 Si prefieres control granular:
 
@@ -322,6 +337,8 @@ SELECT get_current_schema_version();
 2. Ejecuta las migraciones pendientes en orden:
    - `v1.1.0_2024-12-17_pdf_settings.sql`
    - `v1.2.0_2024-12-17_email_signature.sql`
+   - `v1.3.0_2024-12-17_rls_schema_versions.sql`
+   - `v1.4.0_2024-12-18_sent_columns.sql`
 
 ### Verificar versión instalada
 
@@ -329,6 +346,18 @@ SELECT get_current_schema_version();
 SELECT version, description, applied_at 
 FROM schema_versions 
 ORDER BY applied_at;
+```
+
+### Verificar componentes v1.4.0
+
+```sql
+-- Debe devolver 6 filas (is_sent y sent_at para invoices, quotes, contracts)
+SELECT table_name, column_name 
+FROM information_schema.columns 
+WHERE table_schema = 'public' 
+  AND table_name IN ('invoices', 'quotes', 'contracts')
+  AND column_name IN ('is_sent', 'sent_at')
+ORDER BY table_name, column_name;
 ```
 
 > 📚 Ver documentación completa en `README-migrations.md`
@@ -571,6 +600,75 @@ docker restart supabase-edge-functions
 
 ---
 
+## Anexo D: Comandos de Emergencia
+
+### Sincronización rápida de versiones
+
+Si tu instalación muestra versión incorrecta en el panel:
+
+```sql
+-- Ejecutar en Supabase SQL Editor
+-- Sincroniza cualquier instalación a v1.4.0
+\i easypanel/init-scripts/migrations/sync_to_latest.sql
+
+-- O copiar/pegar el contenido directamente
+```
+
+### Copiar Edge Functions manualmente
+
+```bash
+# 1. Encontrar el contenedor CRM
+CRM_CONTAINER=$(docker ps --format "{{.Names}}" | grep -i crm | head -1)
+echo "Contenedor CRM: $CRM_CONTAINER"
+
+# 2. Copiar funciones al volumen
+docker cp $CRM_CONTAINER:/app/supabase/functions/. \
+  /etc/easypanel/projects/nexo_n8n/supabase/code/supabase/code/volumes/functions/
+
+# 3. Reiniciar edge-runtime
+docker restart nexo_n8n_supabase-functions-1
+
+# 4. Verificar
+curl https://nexo-n8n-supabase.cwye4h.easypanel.host/functions/v1/ping
+```
+
+### Verificar estado de la base de datos
+
+```sql
+-- Ver versión actual
+SELECT get_current_schema_version();
+
+-- Ver historial de migraciones
+SELECT version, description, applied_at 
+FROM schema_versions 
+ORDER BY applied_at;
+
+-- Verificar componentes v1.4.0
+SELECT table_name, column_name 
+FROM information_schema.columns 
+WHERE table_schema = 'public' 
+  AND table_name IN ('invoices', 'quotes', 'contracts')
+  AND column_name IN ('is_sent', 'sent_at')
+ORDER BY table_name, column_name;
+```
+
+### Lista completa de Edge Functions
+
+| Función | Archivo | Descripción |
+|---------|---------|-------------|
+| `ping` | `ping/index.ts` | Health check y versión |
+| `send-email` | `send-email/index.ts` | Envío de emails SMTP |
+| `db-migrate` | `db-migrate/index.ts` | Verificación de migraciones |
+| `process-notifications` | `process-notifications/index.ts` | Cola de notificaciones |
+| `calendar-ical` | `calendar-ical/index.ts` | Exportación calendario iCal |
+| `setup-database` | `setup-database/index.ts` | Setup inicial |
+| `bootstrap-admin` | `bootstrap-admin/index.ts` | Creación de admin |
+| `google-calendar-auth` | `google-calendar-auth/index.ts` | Auth Google Calendar |
+| `google-calendar-callback` | `google-calendar-callback/index.ts` | Callback OAuth |
+| `google-calendar-events` | `google-calendar-events/index.ts` | Eventos Google Calendar |
+
+---
+
 ## Soporte
 
 Si tienes problemas:
@@ -579,4 +677,5 @@ Si tienes problemas:
 3. Verifica la conexión con Supabase
 4. Comprueba que el schema está correctamente instalado
 5. Asegúrate de que el usuario admin tiene el rol correcto
-6. Si las Edge Functions no funcionan, verifica `SUPABASE_FUNCTIONS_VOLUME`
+6. Si las Edge Functions no funcionan, verifica `EDGE_FUNCTIONS_VOLUME`
+7. **Para sincronizar versiones**: Ejecuta `sync_to_latest.sql`
