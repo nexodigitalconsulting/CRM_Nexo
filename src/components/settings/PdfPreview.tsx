@@ -88,6 +88,20 @@ const SAMPLE_DATA = {
 function replaceVariables(content: string, data: Record<string, unknown>): string {
   let result = content;
 
+  // Generate services_rows from services array
+  const services = data.services as Array<Record<string, unknown>>;
+  if (services && Array.isArray(services)) {
+    const servicesRows = services.map((service, index) => 
+      `<tr style="border-bottom: 1px solid #e5e7eb;${index % 2 === 1 ? 'background:#f9fafb;' : ''}">
+        <td style="padding: 12px; font-size: 13px;">${service.name || service.service_name || ''}</td>
+        <td style="padding: 12px; text-align: center; font-size: 13px;">${service.quantity || 1}</td>
+        <td style="padding: 12px; text-align: right; font-size: 13px;">${service.unit_price || service.service_price || ''}</td>
+        <td style="padding: 12px; text-align: right; font-size: 13px; font-weight: 500;">${service.total || ''}</td>
+      </tr>`
+    ).join('');
+    result = result.replace(/\{\{services_rows\}\}/g, servicesRows);
+  }
+
   // Replace simple variables {{variable}}
   Object.entries(data).forEach(([key, value]) => {
     if (typeof value === 'string') {
