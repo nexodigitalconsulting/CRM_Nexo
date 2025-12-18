@@ -32,6 +32,7 @@ export function PdfSettingsManager() {
   const updateSettings = useUpdatePdfSettings();
   
   const [selectedDocument, setSelectedDocument] = useState<DocumentType>('invoice');
+  const [activeTab, setActiveTab] = useState('colors');
   const [formData, setFormData] = useState<PdfSettingsUpdate>({
     primary_color: "#3366cc",
     secondary_color: "#666666",
@@ -123,10 +124,10 @@ export function PdfSettingsManager() {
         </CardContent>
       </Card>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className={`grid grid-cols-1 ${activeTab === 'visual-editor' ? '' : 'lg:grid-cols-3'} gap-6`}>
         {/* Settings Panel */}
-        <div className="lg:col-span-2 space-y-6">
-          <Tabs defaultValue="colors" className="w-full">
+        <div className={`${activeTab === 'visual-editor' ? '' : 'lg:col-span-2'} space-y-6`}>
+          <Tabs defaultValue="colors" className="w-full" onValueChange={(v) => setActiveTab(v)}>
             <TabsList className="grid w-full grid-cols-5">
               <TabsTrigger value="colors" className="gap-1">
                 <Palette className="h-4 w-4" />
@@ -465,7 +466,8 @@ export function PdfSettingsManager() {
           </Tabs>
         </div>
         
-        {/* Preview Panel */}
+        {/* Preview Panel - Hide when in visual editor tab */}
+        {activeTab !== 'visual-editor' && (
         <div className="lg:col-span-1">
           <Card className="sticky top-4">
             <CardHeader className="pb-3">
@@ -597,8 +599,9 @@ export function PdfSettingsManager() {
                 Vista previa simplificada. El PDF real incluirá todos los detalles.
               </p>
             </CardContent>
-          </Card>
+        </Card>
         </div>
+        )}
       </div>
     </div>
   );
