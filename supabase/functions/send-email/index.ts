@@ -139,25 +139,57 @@ serve(async (req) => {
     }
 
     // Send email
+    let emailStatus = 'sent';
+    let errorMessage = null;
+    
     try {
       await client.send(emailOptions);
       await client.close();
       console.log("Email sent successfully to:", body.to);
     } catch (sendError: unknown) {
       console.error("Error sending email:", sendError);
-      const errorMessage = sendError instanceof Error ? sendError.message : "Error desconocido";
-      throw new Error(`Error al enviar email: ${errorMessage}`);
+      emailStatus = 'failed';
+      errorMessage = sendError instanceof Error ? sendError.message : "Error desconocido";
     }
 
-    // Log the notification if it's entity-related
+    // Always log to email_logs table
+    const logEntry = {
+      recipient_email: body.to,
+      recipient_name: null,
+      sender_email: settings.from_email,
+      sender_name: settings.from_name || null,
+      subject: body.subject,
+      body_preview: body.html?.substring(0, 500) || null,
+      status: emailStatus,
+      provider: settings.provider || 'smtp',
+      entity_type: body.entityType || null,
+      entity_id: body.entityId || null,
+      attachment_count: body.attachPdf && body.pdfBase64 ? 1 : 0,
+      attachments: body.pdfFilename ? [{ name: body.pdfFilename, type: 'application/pdf' }] : null,
+      error_message: errorMessage,
+      sent_at: new Date().toISOString(),
+    };
+
+    const { error: logError } = await supabase.from("email_logs").insert(logEntry);
+    if (logError) {
+      console.error("Error logging email:", logError);
+    }
+
+    // Also log to notification_queue if entity-related
     if (body.entityType && body.entityId) {
       await supabase.from("notification_queue").insert({
         rule_type: "manual_send",
         entity_type: body.entityType,
         entity_id: body.entityId,
-        status: "sent",
+        status: emailStatus,
         sent_at: new Date().toISOString(),
+        error_message: errorMessage,
       });
+    }
+
+    // If email failed, throw error after logging
+    if (emailStatus === 'failed') {
+      throw new Error(`Error al enviar email: ${errorMessage}`);
     }
 
     return new Response(
