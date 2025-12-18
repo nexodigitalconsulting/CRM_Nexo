@@ -44,13 +44,27 @@ if [ ! -d "$FUNCTIONS_SOURCE" ]; then
     exit 1
 fi
 
-# === Auto-detectar contenedor edge-runtime ===
-log_info "Buscando contenedor edge-runtime..."
-EDGE_CONTAINER=$(docker ps --format '{{.Names}}' 2>/dev/null | grep -E "(edge-functions|supabase-functions|edge-runtime)" | head -1)
+# === Obtener nombre del contenedor edge-runtime ===
+if [ -n "$EDGE_RUNTIME_CONTAINER" ]; then
+    log_info "Usando contenedor configurado: $EDGE_RUNTIME_CONTAINER"
+    EDGE_CONTAINER="$EDGE_RUNTIME_CONTAINER"
+else
+    log_info "Buscando contenedor edge-runtime automáticamente..."
+    EDGE_CONTAINER=$(docker ps --format '{{.Names}}' 2>/dev/null | grep -E "(edge-functions|supabase-functions|edge-runtime)" | head -1)
+fi
 
 if [ -z "$EDGE_CONTAINER" ]; then
     log_warn "No se encontró contenedor edge-runtime"
-    log_info "Asegúrate de que Supabase está corriendo con edge-functions habilitado"
+    log_info "Configura EDGE_RUNTIME_CONTAINER con el nombre del contenedor"
+    log_info "Para encontrarlo: docker ps | grep functions"
+    exit 0
+fi
+
+# Verificar que el contenedor existe y está corriendo
+if ! docker ps --format '{{.Names}}' 2>/dev/null | grep -q "^${EDGE_CONTAINER}$"; then
+    log_error "El contenedor '$EDGE_CONTAINER' no existe o no está corriendo"
+    log_info "Contenedores disponibles:"
+    docker ps --format '{{.Names}}' 2>/dev/null | head -10
     exit 0
 fi
 
