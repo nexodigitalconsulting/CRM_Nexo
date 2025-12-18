@@ -1,9 +1,6 @@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Header } from "@/components/layout/Header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
   Building2,
@@ -14,6 +11,7 @@ import {
   Shield,
   FileText,
   Boxes,
+  History,
 } from "lucide-react";
 import { CompanySettings } from "@/components/settings/CompanySettings";
 import { EmailSettings } from "@/components/settings/EmailSettings";
@@ -21,6 +19,7 @@ import { NotificationRulesSettings } from "@/components/settings/NotificationRul
 import { PdfSettingsManager } from "@/components/settings/PdfSettingsManager";
 import { EntityConfigManager } from "@/components/settings/EntityConfigManager";
 import { DatabaseStatus } from "@/components/settings/DatabaseStatus";
+import { EmailLogsPanel } from "@/components/settings/EmailLogsPanel";
 
 export default function Settings() {
   return (
@@ -64,6 +63,10 @@ export default function Settings() {
             <TabsTrigger value="entities" className="gap-2">
               <Boxes className="h-4 w-4" />
               Entidades
+            </TabsTrigger>
+            <TabsTrigger value="email-logs" className="gap-2">
+              <History className="h-4 w-4" />
+              Logs Email
             </TabsTrigger>
           </TabsList>
 
@@ -141,6 +144,10 @@ export default function Settings() {
 
           <TabsContent value="entities">
             <EntityConfigManager />
+          </TabsContent>
+
+          <TabsContent value="email-logs">
+            <EmailLogsPanel />
           </TabsContent>
         </Tabs>
       </div>
