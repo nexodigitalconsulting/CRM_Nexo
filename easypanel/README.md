@@ -214,6 +214,84 @@ docker restart $EDGE
 
 ---
 
+## Acceso Externo a PostgreSQL
+
+Por defecto, PostgreSQL no está expuesto fuera de Docker. Para conectarte desde herramientas externas:
+
+### Paso 1: Averiguar la red Docker
+
+```bash
+docker inspect -f '{{range $k,$v := .NetworkSettings.Networks}}{{$k}}{{end}}' mangas_supabase-db-1
+```
+
+Esto devolverá el nombre de la red (normalmente `bridge` o un nombre personalizado).
+
+### Paso 2: Crear contenedor forwarder
+
+Reemplaza `NETWORK` por la red del paso anterior:
+
+```bash
+docker run -d --name pg-forward --network NETWORK -p 5450:5450 alpine/socat TCP-LISTEN:5450,fork,reuseaddr TCP:mangas_supabase-db-1:5432
+```
+
+**Explicación:**
+- El contenedor `pg-forward` escucha en el puerto 5450 del host
+- Reenvía las conexiones al contenedor `mangas_supabase-db-1` en su puerto 5432
+- No tocas el docker-compose.yml ni la configuración de EasyPanel
+- Puedes conectarte a la base de datos usando `IP_DEL_VPS:5450`
+
+### Paso 3: Abrir puerto en firewall
+
+```bash
+sudo ufw allow 5450/tcp
+```
+
+### Conexión desde cliente
+
+```
+Host: IP_DEL_VPS
+Puerto: 5450
+Usuario: postgres
+Password: (el configurado en Supabase)
+Base de datos: postgres
+```
+
+---
+
+## Comandos Docker Útiles
+
+### Copiar Edge Functions al contenedor
+
+```bash
+# Copiar directamente al contenedor edge-runtime
+docker cp /etc/easypanel/projects/mangas/supabase/code/supabase/code/volumes/functions/. mangas_supabase-functions-1:/home/deno/functions/
+
+# Reiniciar para cargar
+docker restart mangas_supabase-functions-1
+
+# Esperar y probar
+sleep 5
+docker logs mangas_supabase-functions-1 --tail 10
+```
+
+### Verificar contenedores
+
+```bash
+# Ver contenedor de functions
+docker ps | grep functions
+
+# Ver todos los contenedores de Supabase
+docker ps | grep supabase
+```
+
+### Ver logs de Edge Functions
+
+```bash
+docker logs mangas_supabase-functions-1 --tail 50 -f
+```
+
+---
+
 ## Troubleshooting
 
 ### "Error de conexión con Supabase"
