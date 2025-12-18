@@ -15,7 +15,8 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { usePdfSettings, useUpdatePdfSettings, PdfSettingsUpdate } from "@/hooks/usePdfSettings";
 import { useCompanySettings } from "@/hooks/useCompanySettings";
-import { Loader2, FileText, Palette, Eye, Save, Layout, Type, Image, CheckCircle, AlertCircle } from "lucide-react";
+import { Loader2, FileText, Palette, Eye, Save, Layout, Type, Image, CheckCircle, AlertCircle, PenTool } from "lucide-react";
+import { PdfEditorCanvas } from "./PdfEditorCanvas";
 
 type DocumentType = 'invoice' | 'quote' | 'contract';
 
@@ -126,7 +127,7 @@ export function PdfSettingsManager() {
         {/* Settings Panel */}
         <div className="lg:col-span-2 space-y-6">
           <Tabs defaultValue="colors" className="w-full">
-            <TabsList className="grid w-full grid-cols-4">
+            <TabsList className="grid w-full grid-cols-5">
               <TabsTrigger value="colors" className="gap-1">
                 <Palette className="h-4 w-4" />
                 <span className="hidden sm:inline">Colores</span>
@@ -142,6 +143,10 @@ export function PdfSettingsManager() {
               <TabsTrigger value="typography" className="gap-1">
                 <Type className="h-4 w-4" />
                 <span className="hidden sm:inline">Texto</span>
+              </TabsTrigger>
+              <TabsTrigger value="visual-editor" className="gap-1">
+                <PenTool className="h-4 w-4" />
+                <span className="hidden sm:inline">Editor</span>
               </TabsTrigger>
             </TabsList>
             
@@ -440,6 +445,23 @@ export function PdfSettingsManager() {
                       </p>
                     </div>
                   </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="visual-editor" className="space-y-4 mt-4">
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <PenTool className="h-4 w-4" />
+                    Editor Visual Avanzado
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-sm text-muted-foreground mb-4">
+                    Diseña plantillas personalizadas con drag-and-drop. Añade texto, formas, tablas y variables dinámicas.
+                  </p>
+                  <PdfEditorCanvas documentType={selectedDocument} />
                 </CardContent>
               </Card>
             </TabsContent>

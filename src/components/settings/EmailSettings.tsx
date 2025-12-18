@@ -9,12 +9,14 @@ import { Textarea } from "@/components/ui/textarea";
 import { Mail, Server, Lock, Save, TestTube, FileSignature } from "lucide-react";
 import { useEmailSettings, useUpdateEmailSettings, useTestEmailConnection } from "@/hooks/useEmailSettings";
 import { toast } from "sonner";
+import { EmailProviderSelector } from "./EmailProviderSelector";
 
 export function EmailSettings() {
   const { data: settings, isLoading } = useEmailSettings();
   const updateSettings = useUpdateEmailSettings();
   const testConnection = useTestEmailConnection();
   
+  const [currentProvider, setCurrentProvider] = useState<'smtp' | 'gmail' | 'outlook'>('smtp');
   const [formData, setFormData] = useState({
     smtp_host: "",
     smtp_port: 587,
@@ -26,6 +28,12 @@ export function EmailSettings() {
     is_active: false,
     signature_html: "",
   });
+
+  useEffect(() => {
+    if (settings?.provider) {
+      setCurrentProvider(settings.provider as 'smtp' | 'gmail' | 'outlook');
+    }
+  }, [settings?.provider]);
 
   useEffect(() => {
     if (settings) {
@@ -68,8 +76,19 @@ export function EmailSettings() {
     );
   }
 
+  const handleProviderChange = (provider: 'smtp' | 'gmail' | 'outlook') => {
+    setCurrentProvider(provider);
+    updateSettings.mutate({ provider });
+  };
+
   return (
     <div className="space-y-6">
+      <EmailProviderSelector 
+        currentProvider={currentProvider} 
+        onProviderChange={handleProviderChange} 
+      />
+
+      {currentProvider === 'smtp' && (
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -156,7 +175,9 @@ export function EmailSettings() {
           </div>
         </CardContent>
       </Card>
+      )}
 
+      {currentProvider === 'smtp' && (
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -187,6 +208,7 @@ export function EmailSettings() {
           </div>
         </CardContent>
       </Card>
+      )}
 
       <Card>
         <CardHeader>
@@ -226,6 +248,7 @@ export function EmailSettings() {
         </CardContent>
       </Card>
 
+      {currentProvider === 'smtp' && (
       <div className="flex justify-end gap-3">
         <Button
           variant="outline"
@@ -245,6 +268,7 @@ export function EmailSettings() {
           {updateSettings.isPending ? "Guardando..." : "Guardar Configuración"}
         </Button>
       </div>
+      )}
     </div>
   );
 }
