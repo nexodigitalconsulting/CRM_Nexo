@@ -656,6 +656,66 @@ export type Database = {
         }
         Relationships: []
       }
+      email_logs: {
+        Row: {
+          attachment_count: number | null
+          attachments: Json | null
+          body_preview: string | null
+          created_at: string
+          entity_id: string | null
+          entity_type: string | null
+          error_message: string | null
+          id: string
+          provider: string
+          recipient_email: string
+          recipient_name: string | null
+          sender_email: string
+          sender_name: string | null
+          sent_at: string
+          status: string
+          subject: string
+          user_id: string | null
+        }
+        Insert: {
+          attachment_count?: number | null
+          attachments?: Json | null
+          body_preview?: string | null
+          created_at?: string
+          entity_id?: string | null
+          entity_type?: string | null
+          error_message?: string | null
+          id?: string
+          provider?: string
+          recipient_email: string
+          recipient_name?: string | null
+          sender_email: string
+          sender_name?: string | null
+          sent_at?: string
+          status?: string
+          subject: string
+          user_id?: string | null
+        }
+        Update: {
+          attachment_count?: number | null
+          attachments?: Json | null
+          body_preview?: string | null
+          created_at?: string
+          entity_id?: string | null
+          entity_type?: string | null
+          error_message?: string | null
+          id?: string
+          provider?: string
+          recipient_email?: string
+          recipient_name?: string | null
+          sender_email?: string
+          sender_name?: string | null
+          sent_at?: string
+          status?: string
+          subject?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       email_settings: {
         Row: {
           created_at: string | null
@@ -663,6 +723,7 @@ export type Database = {
           from_name: string | null
           id: string
           is_active: boolean | null
+          provider: string | null
           signature_html: string | null
           smtp_host: string
           smtp_password: string
@@ -677,6 +738,7 @@ export type Database = {
           from_name?: string | null
           id?: string
           is_active?: boolean | null
+          provider?: string | null
           signature_html?: string | null
           smtp_host: string
           smtp_password: string
@@ -691,6 +753,7 @@ export type Database = {
           from_name?: string | null
           id?: string
           is_active?: boolean | null
+          provider?: string | null
           signature_html?: string | null
           smtp_host?: string
           smtp_password?: string
@@ -841,6 +904,39 @@ export type Database = {
           supplier_cif?: string | null
           supplier_name?: string
           total?: number | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      gmail_config: {
+        Row: {
+          access_token: string | null
+          created_at: string | null
+          email_address: string | null
+          id: string
+          is_active: boolean | null
+          refresh_token: string | null
+          token_expiry: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          access_token?: string | null
+          created_at?: string | null
+          email_address?: string | null
+          id?: string
+          is_active?: boolean | null
+          refresh_token?: string | null
+          token_expiry?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          access_token?: string | null
+          created_at?: string | null
+          email_address?: string | null
+          id?: string
+          is_active?: boolean | null
+          refresh_token?: string | null
+          token_expiry?: string | null
           updated_at?: string | null
         }
         Relationships: []
