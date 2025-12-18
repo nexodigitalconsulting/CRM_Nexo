@@ -704,16 +704,19 @@ export function PdfTemplateEditor({ documentType }: PdfTemplateEditorProps) {
   }
 
   return (
-    <div className="flex flex-col h-[calc(100vh-280px)] min-h-[600px]">
+    <div className="flex flex-col h-full">
       {/* Header con gestión de plantillas */}
-      <div className="flex items-center justify-between mb-4 gap-4">
-        <div className="flex items-center gap-3">
+      <div className="flex items-center justify-between mb-4 gap-4 flex-wrap">
+        <div className="flex items-center gap-3 flex-wrap">
           <Select value={selectedTemplateId || ''} onValueChange={(id) => {
             const t = templates?.find(t => t.id === id);
             if (t) handleSelectTemplate(t);
           }}>
-            <SelectTrigger className="w-[280px]">
-              <SelectValue placeholder="Seleccionar plantilla" />
+            <SelectTrigger className="w-[220px]">
+              <div className="flex items-center gap-2">
+                {selectedTemplate?.is_default && <Star className="h-3 w-3 text-yellow-500 fill-yellow-500" />}
+                <SelectValue placeholder="Seleccionar plantilla" />
+              </div>
             </SelectTrigger>
             <SelectContent>
               {templates?.map((t) => (
@@ -762,15 +765,6 @@ export function PdfTemplateEditor({ documentType }: PdfTemplateEditorProps) {
               </DialogFooter>
             </DialogContent>
           </Dialog>
-        </div>
-
-        <div className="flex items-center gap-2">
-          <Button variant="ghost" size="sm" onClick={() => setShowPreview(!showPreview)}>
-            {showPreview ? <EyeOff className="h-4 w-4 mr-1" /> : <Eye className="h-4 w-4 mr-1" />}
-            {showPreview ? 'Ocultar' : 'Vista previa'}
-          </Button>
-
-          <Separator orientation="vertical" className="h-6" />
 
           <Button variant="ghost" size="sm" onClick={handleDuplicateTemplate} disabled={!selectedTemplate}>
             <Copy className="h-4 w-4 mr-1" />
@@ -791,7 +785,8 @@ export function PdfTemplateEditor({ documentType }: PdfTemplateEditorProps) {
             <AlertDialog>
               <AlertDialogTrigger asChild>
                 <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive">
-                  <Trash2 className="h-4 w-4" />
+                  <Trash2 className="h-4 w-4 mr-1" />
+                  Eliminar
                 </Button>
               </AlertDialogTrigger>
               <AlertDialogContent>
@@ -816,21 +811,26 @@ export function PdfTemplateEditor({ documentType }: PdfTemplateEditorProps) {
               </AlertDialogContent>
             </AlertDialog>
           )}
+        </div>
 
-          <Separator orientation="vertical" className="h-6" />
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" onClick={() => setShowPreview(!showPreview)}>
+            {showPreview ? <EyeOff className="h-4 w-4 mr-1" /> : <Eye className="h-4 w-4 mr-1" />}
+            {showPreview ? 'Ocultar preview' : 'Ver preview'}
+          </Button>
 
           <Button onClick={handleSave} disabled={updateTemplate.isPending}>
             <Save className="h-4 w-4 mr-1" />
-            Guardar
+            Guardar cambios
           </Button>
         </div>
       </div>
 
-      {/* Contenido principal */}
-      <div className="flex gap-4 flex-1 min-h-0">
+      {/* Contenido principal - Grid responsive */}
+      <div className={`grid gap-4 flex-1 min-h-0 ${showPreview ? 'grid-cols-[280px_1fr_380px]' : 'grid-cols-[280px_1fr]'}`}>
         {/* Panel izquierdo - Bloques y Variables */}
-        <Card className="w-72 flex-shrink-0 flex flex-col">
-          <CardHeader className="pb-2">
+        <Card className="flex flex-col overflow-hidden">
+          <CardHeader className="pb-2 flex-shrink-0">
             <CardTitle className="text-sm flex items-center gap-2">
               <Layout className="h-4 w-4" />
               Componentes
@@ -840,8 +840,8 @@ export function PdfTemplateEditor({ documentType }: PdfTemplateEditorProps) {
             </CardDescription>
           </CardHeader>
           <CardContent className="flex-1 p-2 overflow-hidden">
-            <Tabs value={activeTab} onValueChange={setActiveTab}>
-              <TabsList className="grid grid-cols-2 w-full">
+            <Tabs value={activeTab} onValueChange={setActiveTab} className="h-full flex flex-col">
+              <TabsList className="grid grid-cols-2 w-full flex-shrink-0">
                 <TabsTrigger value="blocks" className="text-xs">
                   <Layout className="h-3 w-3 mr-1" />
                   Bloques
@@ -852,9 +852,9 @@ export function PdfTemplateEditor({ documentType }: PdfTemplateEditorProps) {
                 </TabsTrigger>
               </TabsList>
 
-              <TabsContent value="blocks" className="mt-2 h-[calc(100%-40px)]">
-                <ScrollArea className="h-full pr-2">
-                  <div className="space-y-4">
+              <TabsContent value="blocks" className="mt-2 flex-1 overflow-hidden">
+                <ScrollArea className="h-full">
+                  <div className="space-y-4 pr-3">
                     {['header', 'content', 'table', 'totals', 'layout', 'footer'].map((category) => {
                       const categoryBlocks = allBlocks.filter(b => b.category === category);
                       if (categoryBlocks.length === 0) return null;
@@ -870,7 +870,7 @@ export function PdfTemplateEditor({ documentType }: PdfTemplateEditorProps) {
 
                       return (
                         <div key={category}>
-                          <p className="text-xs font-medium text-muted-foreground mb-2 px-1">
+                          <p className="text-xs font-medium text-muted-foreground mb-2 px-1 uppercase tracking-wide">
                             {categoryLabels[category]}
                           </p>
                           <div className="space-y-1">
@@ -879,10 +879,10 @@ export function PdfTemplateEditor({ documentType }: PdfTemplateEditorProps) {
                                 key={block.id}
                                 variant="ghost"
                                 size="sm"
-                                className="w-full justify-start gap-2 text-xs h-9"
+                                className="w-full justify-start gap-2 text-xs h-9 hover:bg-primary/10"
                                 onClick={() => insertBlock(block.html)}
                               >
-                                <block.icon className="h-3.5 w-3.5 text-muted-foreground" />
+                                <block.icon className="h-3.5 w-3.5 text-primary" />
                                 {block.label}
                               </Button>
                             ))}
@@ -894,21 +894,21 @@ export function PdfTemplateEditor({ documentType }: PdfTemplateEditorProps) {
                 </ScrollArea>
               </TabsContent>
 
-              <TabsContent value="variables" className="mt-2 h-[calc(100%-40px)]">
-                <ScrollArea className="h-full pr-2">
-                  <div className="space-y-1">
+              <TabsContent value="variables" className="mt-2 flex-1 overflow-hidden">
+                <ScrollArea className="h-full">
+                  <div className="space-y-1 pr-3">
                     {allVariables.map((v) => (
                       <Button
                         key={v.key}
                         variant="ghost"
                         size="sm"
-                        className="w-full justify-start gap-2 text-xs h-9 font-mono"
+                        className="w-full justify-start gap-2 text-xs h-9 font-mono hover:bg-primary/10"
                         onClick={() => insertVariable(v.key)}
                       >
-                        <v.icon className="h-3.5 w-3.5 text-muted-foreground" />
-                        <span className="truncate">{v.label}</span>
-                        <Badge variant="secondary" className="ml-auto text-[10px] font-mono">
-                          {`{{${v.key.split('_')[0]}}}`}
+                        <v.icon className="h-3.5 w-3.5 text-primary" />
+                        <span className="truncate flex-1 text-left">{v.label}</span>
+                        <Badge variant="outline" className="ml-auto text-[10px] font-mono bg-muted">
+                          {`{{...}}`}
                         </Badge>
                       </Button>
                     ))}
@@ -919,20 +919,21 @@ export function PdfTemplateEditor({ documentType }: PdfTemplateEditorProps) {
           </CardContent>
         </Card>
 
-        {/* Editor de código */}
-        <Card className={`flex-1 flex flex-col ${showPreview ? '' : 'col-span-2'}`}>
-          <CardHeader className="pb-2">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Code className="h-4 w-4" />
+        {/* Editor de código central */}
+        <Card className="flex flex-col overflow-hidden">
+          <CardHeader className="pb-2 flex-shrink-0">
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2 flex-1">
+                <Code className="h-4 w-4 text-muted-foreground" />
                 <Input
                   value={editName}
                   onChange={(e) => setEditName(e.target.value)}
-                  className="h-7 text-sm font-medium w-56"
+                  className="h-8 text-sm font-medium max-w-xs"
+                  placeholder="Nombre de la plantilla"
                 />
               </div>
               {selectedTemplate?.is_default && (
-                <Badge variant="secondary" className="gap-1">
+                <Badge variant="secondary" className="gap-1 flex-shrink-0">
                   <Star className="h-3 w-3 fill-yellow-500 text-yellow-500" />
                   Predeterminada
                 </Badge>
@@ -943,21 +944,40 @@ export function PdfTemplateEditor({ documentType }: PdfTemplateEditorProps) {
             <Textarea
               value={editContent}
               onChange={(e) => setEditContent(e.target.value)}
-              className="h-full font-mono text-xs resize-none"
+              className="h-full w-full font-mono text-xs resize-none bg-muted/30 border-muted"
               placeholder="Escribe o pega el HTML de tu plantilla aquí..."
+              spellCheck={false}
             />
           </CardContent>
         </Card>
 
-        {/* Preview */}
+        {/* Panel de Vista Previa */}
         {showPreview && (
-          <div className="w-[400px] flex-shrink-0">
-            <PdfPreview
-              content={editContent}
-              documentType={documentType}
-              scale={0.55}
-            />
-          </div>
+          <Card className="flex flex-col overflow-hidden">
+            <CardHeader className="pb-2 flex-shrink-0 border-b">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-sm flex items-center gap-2">
+                  <Eye className="h-4 w-4" />
+                  Vista previa
+                </CardTitle>
+                <Badge variant="outline">{DOCUMENT_LABELS[documentType]}</Badge>
+              </div>
+            </CardHeader>
+            <CardContent className="flex-1 p-0 overflow-hidden">
+              <ScrollArea className="h-full">
+                <div className="p-4">
+                  <PdfPreview
+                    content={editContent}
+                    documentType={documentType}
+                    scale={0.5}
+                  />
+                  <p className="text-xs text-muted-foreground text-center mt-4 px-4">
+                    Vista previa con datos de ejemplo. El PDF final incluirá los datos reales.
+                  </p>
+                </div>
+              </ScrollArea>
+            </CardContent>
+          </Card>
         )}
       </div>
     </div>
