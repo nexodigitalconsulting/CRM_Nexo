@@ -120,13 +120,13 @@ export function DatabaseStatus() {
         {status && (
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <div className="space-y-1">
-              <p className="text-sm text-muted-foreground">Versión actual</p>
+              <p className="text-sm text-muted-foreground">Versión en BD</p>
               <Badge variant="outline" className="font-mono">
                 {status.currentVersion}
               </Badge>
             </div>
             <div className="space-y-1">
-              <p className="text-sm text-muted-foreground">Versión objetivo</p>
+              <p className="text-sm text-muted-foreground">Versión requerida</p>
               <Badge variant="secondary" className="font-mono">
                 {status.targetVersion}
               </Badge>

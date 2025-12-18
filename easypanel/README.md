@@ -127,62 +127,104 @@ En Easypanel, ve a la configuración del servicio CRM:
 
 ---
 
-## Paso 6: Configurar Edge Functions (SIMPLIFICADO)
+## Paso 6: Configurar Edge Functions (DEFINITIVO)
 
-> ✅ **Método simplificado**: Las Edge Functions se sincronizan automáticamente usando `docker cp`
-> directamente al contenedor edge-runtime. Solo necesitas montar el Docker socket.
+> ✅ **Sincronización Automática**: Las Edge Functions se sincronizan automáticamente 
+> en cada deploy del CRM. Soporta dos métodos: volumen directo o Docker socket.
 
-### 6.1 Configurar el servicio CRM en EasyPanel
+### 6.1 Método 1: Volumen Directo (Recomendado)
 
-En el servicio CRM, configura:
+Este método es más rápido y no requiere reiniciar edge-runtime.
+
+#### Variables de Entorno
+
+| Variable | Valor | Descripción |
+|----------|-------|-------------|
+| `EDGE_FUNCTIONS_VOLUME` | `/etc/easypanel/projects/PROYECTO/supabase/code/supabase/code/volumes/functions` | Ruta al volumen de funciones |
+
+> 💡 Reemplaza `PROYECTO` con el nombre de tu proyecto en EasyPanel.
+
+#### ¿Cómo encontrar la ruta del volumen?
+
+```bash
+# En tu VPS, busca el volumen de functions
+find /etc/easypanel -name "functions" -type d 2>/dev/null | grep volumes
+```
+
+### 6.2 Método 2: Docker Socket (Alternativo)
+
+Si no puedes montar el volumen directamente, usa el Docker socket.
 
 #### Mounts (Advanced → Mounts)
 
 | Host Path | Container Path | Descripción |
 |-----------|----------------|-------------|
-| `/var/run/docker.sock` | `/var/run/docker.sock` | Docker socket (requerido) |
+| `/var/run/docker.sock` | `/var/run/docker.sock` | Docker socket |
 
-#### Variables de Entorno (Environment)
+#### Variables de Entorno
 
 | Variable | Valor | Descripción |
 |----------|-------|-------------|
 | `EDGE_RUNTIME_CONTAINER` | `proyecto_supabase-functions-1` | Nombre del contenedor edge-runtime |
 
-> ⚠️ **IMPORTANTE**: El nombre del contenedor varía según tu proyecto en EasyPanel.
-> Para encontrarlo, ejecuta en tu VPS: `docker ps | grep functions`
+> ⚠️ Para encontrar el nombre del contenedor: `docker ps | grep functions`
 
-### 6.2 Funcionamiento automático
+### 6.3 Funcionamiento Automático
 
 Al hacer deploy del CRM:
 
-1. ✅ Se construye la imagen con las funciones incluidas en `/app/supabase/functions`
-2. ✅ Al iniciar, `startup.sh` ejecuta `sync-edge-functions.sh`
-3. ✅ El script usa `EDGE_RUNTIME_CONTAINER` para copiar las funciones
-4. ✅ Las funciones se copian directamente con `docker cp`
-5. ✅ Se crea la función `_main` (healthcheck requerido por edge-runtime)
-6. ✅ Reinicia automáticamente edge-runtime
-7. ✅ Las Edge Functions están disponibles sin intervención manual
+1. ✅ `startup.sh` verifica conexión PostgreSQL
+2. ✅ Compara versión de schema (BD vs código)
+3. ✅ Lista migraciones SQL pendientes
+4. ✅ Sincroniza Edge Functions automáticamente
+5. ✅ Verifica que las funciones coinciden con el repositorio
+6. ✅ Muestra resumen completo en logs
 
-### 6.3 Sincronización manual (desde el VPS)
+#### Logs de ejemplo:
 
-Si necesitas sincronizar manualmente sin redeploy:
+```
+==========================================
+  CRM Web - Verificación e Inicio
+==========================================
 
-```bash
-# 1. Copiar funciones al contenedor edge-runtime
-docker cp /ruta/al/crm/supabase/functions/. NOMBRE_CONTENEDOR_FUNCTIONS:/home/deno/functions/
+--- PostgreSQL ---
+ℹ️  Host: supabase-db:5432
+ℹ️  Base de datos: postgres
+✅ Conexión PostgreSQL OK
+ℹ️  Versión en BD: v1.2.0
+ℹ️  Versión en código: v1.4.0
+⚠️  Migraciones pendientes
+   Ejecutar: easypanel/init-scripts/migrations/apply_all.sql
 
-# 2. Crear función _main (healthcheck)
-docker exec NOMBRE_CONTENEDOR_FUNCTIONS mkdir -p /home/deno/functions/_main
-echo 'Deno.serve(() => new Response("ok"))' | docker exec -i NOMBRE_CONTENEDOR_FUNCTIONS tee /home/deno/functions/_main/index.ts
+--- Edge Functions ---
+ℹ️  Método: Volumen Directo
+✅ Sincronización: 10 funciones copiadas
+✅ Verificación OK
 
-# 3. Reiniciar edge-runtime
-docker restart NOMBRE_CONTENEDOR_FUNCTIONS
+==========================================
+  Resumen de Verificación
+==========================================
 
-# 4. Verificar
-curl https://tu-supabase.dominio.com/functions/v1/ping
+PostgreSQL:     ✅ Configurado
+Schema:         ⚠️  Pendiente (BD: v1.2.0 → Código: v1.4.0)
+Edge Functions: ✅ Volumen directo
 ```
 
-### 6.4 Verificar funciones disponibles
+### 6.4 Sincronización Manual (desde el VPS)
+
+Si necesitas sincronizar manualmente:
+
+```bash
+# Método 1: Volumen directo
+cp -r /ruta/crm/supabase/functions/* $EDGE_FUNCTIONS_VOLUME/
+
+# Método 2: Docker
+CRM_CONTAINER=$(docker ps --format "{{.Names}}" | grep -i crm | head -1)
+docker cp $CRM_CONTAINER:/app/supabase/functions/. /ruta/volumen/functions/
+docker restart EDGE_RUNTIME_CONTAINER
+```
+
+### 6.5 Verificar funciones disponibles
 
 ```bash
 curl https://tu-supabase.dominio.com/functions/v1/ping
@@ -190,21 +232,23 @@ curl https://tu-supabase.dominio.com/functions/v1/ping
 
 Respuesta esperada:
 ```json
-{"ok":true,"version":"1.2.0","environment":"hybrid"}
+{"ok":true,"version":"1.4.0","environment":"hybrid"}
 ```
 
-### 6.5 Lista de Edge Functions
+### 6.6 Lista de Edge Functions
 
 | Función | Descripción |
 |---------|-------------|
 | `ping` | Health check y versión |
 | `send-email` | Envío de emails SMTP |
+| `db-migrate` | Verificación de migraciones |
 | `process-notifications` | Procesamiento de notificaciones |
 | `calendar-ical` | Exportación calendario iCal |
-| `db-migrate` | Verificación de migraciones |
 | `setup-database` | Setup inicial |
 | `bootstrap-admin` | Creación de admin |
-| `google-calendar-*` | Integración Google Calendar |
+| `google-calendar-auth` | Auth Google Calendar |
+| `google-calendar-callback` | Callback OAuth |
+| `google-calendar-events` | Eventos Google Calendar |
 | `_main` | Healthcheck (auto-generado) |
 
 ---
@@ -488,7 +532,8 @@ Recomendaciones:
 | `EXTERNAL_POSTGRES_DB` | Base de datos | `postgres` |
 | `EXTERNAL_POSTGRES_USER` | Usuario PostgreSQL | `postgres` |
 | `EXTERNAL_POSTGRES_PASSWORD` | Contraseña PostgreSQL | `tu_password` |
-| `SUPABASE_FUNCTIONS_VOLUME` | **NUEVO** Ruta al volumen de funciones | `/var/lib/easypanel/projects/supabase/volumes/functions` |
+| `EDGE_FUNCTIONS_VOLUME` | **Método 1**: Ruta al volumen de funciones | `/etc/easypanel/.../volumes/functions` |
+| `EDGE_RUNTIME_CONTAINER` | **Método 2**: Nombre contenedor edge-runtime | `proyecto_supabase-functions-1` |
 
 ### Variables de Supabase (si necesitas personalizarlas)
 
