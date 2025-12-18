@@ -20,6 +20,7 @@ import { EmailSettings } from "@/components/settings/EmailSettings";
 import { NotificationRulesSettings } from "@/components/settings/NotificationRulesSettings";
 import { PdfSettingsManager } from "@/components/settings/PdfSettingsManager";
 import { EntityConfigManager } from "@/components/settings/EntityConfigManager";
+import { DatabaseStatus } from "@/components/settings/DatabaseStatus";
 
 export default function Settings() {
   return (
@@ -79,33 +80,7 @@ export default function Settings() {
           </TabsContent>
 
           <TabsContent value="database">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Database className="h-5 w-5" />
-                  Configuración de Base de Datos
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <Alert>
-                  <AlertDescription>
-                    La base de datos está gestionada por Supabase. Las migraciones
-                    y configuraciones avanzadas se realizan desde el panel de Supabase.
-                  </AlertDescription>
-                </Alert>
-                <div className="space-y-2">
-                  <Label>URL del proyecto</Label>
-                  <Input
-                    value="https://honfwrfkiukckyoelsdm.supabase.co"
-                    readOnly
-                    className="font-mono text-sm"
-                  />
-                </div>
-                <div className="text-sm text-muted-foreground">
-                  Si estás en self-hosted, abre tu Supabase Studio local (no existe panel en supabase.com).
-                </div>
-              </CardContent>
-            </Card>
+            <DatabaseStatus />
           </TabsContent>
 
           <TabsContent value="users">
