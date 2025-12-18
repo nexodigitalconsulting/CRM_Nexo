@@ -1,6 +1,4 @@
 import { useMemo } from 'react';
-import { Card } from '@/components/ui/card';
-import { ScrollArea } from '@/components/ui/scroll-area';
 
 interface PdfPreviewProps {
   content: string;
@@ -125,33 +123,40 @@ function replaceVariables(content: string, data: Record<string, unknown>): strin
   return result;
 }
 
-export function PdfPreview({ content, documentType, scale = 0.7 }: PdfPreviewProps) {
+export function PdfPreview({ content, documentType, scale = 0.5 }: PdfPreviewProps) {
   const renderedContent = useMemo(() => {
     const data = SAMPLE_DATA[documentType];
     return replaceVariables(content, data);
   }, [content, documentType]);
 
+  // A4 dimensions in pixels at 72 DPI: 595 x 842
+  const pageWidth = 595;
+  const pageHeight = 842;
+
   return (
-    <Card className="bg-muted/30 h-full overflow-hidden">
-      <ScrollArea className="h-full">
-        <div className="p-4 flex justify-center">
-          <div 
-            className="bg-white shadow-xl rounded-sm origin-top"
-            style={{
-              width: 595 * scale,
-              minHeight: 842 * scale,
-              transform: `scale(1)`,
-              padding: `${40 * scale}px`,
-              fontSize: `${14 * scale}px`,
-            }}
-          >
-            <div 
-              dangerouslySetInnerHTML={{ __html: renderedContent }}
-              style={{ transform: `scale(${scale})`, transformOrigin: 'top left', width: `${100/scale}%` }}
-            />
-          </div>
-        </div>
-      </ScrollArea>
-    </Card>
+    <div 
+      className="bg-white shadow-lg rounded border mx-auto"
+      style={{
+        width: pageWidth * scale,
+        minHeight: pageHeight * scale,
+        maxWidth: '100%',
+      }}
+    >
+      <div 
+        style={{
+          transform: `scale(${scale})`,
+          transformOrigin: 'top left',
+          width: pageWidth,
+          minHeight: pageHeight,
+          padding: 40,
+          fontSize: 14,
+          fontFamily: "'Segoe UI', Arial, sans-serif",
+          color: '#1f2937',
+          lineHeight: 1.5,
+        }}
+      >
+        <div dangerouslySetInnerHTML={{ __html: renderedContent }} />
+      </div>
+    </div>
   );
 }
