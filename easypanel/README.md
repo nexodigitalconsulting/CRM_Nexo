@@ -134,7 +134,7 @@ En Easypanel, ve a la configuración del servicio CRM:
 
 ### 6.1 Configurar el servicio CRM en EasyPanel
 
-En el servicio CRM, configura **solo UN mount**:
+En el servicio CRM, configura:
 
 #### Mounts (Advanced → Mounts)
 
@@ -142,8 +142,14 @@ En el servicio CRM, configura **solo UN mount**:
 |-----------|----------------|-------------|
 | `/var/run/docker.sock` | `/var/run/docker.sock` | Docker socket (requerido) |
 
-> ℹ️ **Ya no necesitas** `SUPABASE_FUNCTIONS_VOLUME` ni el mount del volumen de funciones.
-> El script usa `docker cp` para copiar directamente al contenedor edge-runtime.
+#### Variables de Entorno (Environment)
+
+| Variable | Valor | Descripción |
+|----------|-------|-------------|
+| `EDGE_RUNTIME_CONTAINER` | `proyecto_supabase-functions-1` | Nombre del contenedor edge-runtime |
+
+> ⚠️ **IMPORTANTE**: El nombre del contenedor varía según tu proyecto en EasyPanel.
+> Para encontrarlo, ejecuta en tu VPS: `docker ps | grep functions`
 
 ### 6.2 Funcionamiento automático
 
@@ -151,32 +157,40 @@ Al hacer deploy del CRM:
 
 1. ✅ Se construye la imagen con las funciones incluidas en `/app/supabase/functions`
 2. ✅ Al iniciar, `startup.sh` ejecuta `sync-edge-functions.sh`
-3. ✅ El script detecta automáticamente el contenedor edge-runtime
+3. ✅ El script usa `EDGE_RUNTIME_CONTAINER` para copiar las funciones
 4. ✅ Las funciones se copian directamente con `docker cp`
 5. ✅ Se crea la función `_main` (healthcheck requerido por edge-runtime)
 6. ✅ Reinicia automáticamente edge-runtime
 7. ✅ Las Edge Functions están disponibles sin intervención manual
 
-### 6.3 Verificar funciones disponibles
+### 6.3 Sincronización manual (desde el VPS)
+
+Si necesitas sincronizar manualmente sin redeploy:
 
 ```bash
-# Desde tu VPS
+# 1. Copiar funciones al contenedor edge-runtime
+docker cp /ruta/al/crm/supabase/functions/. NOMBRE_CONTENEDOR_FUNCTIONS:/home/deno/functions/
+
+# 2. Crear función _main (healthcheck)
+docker exec NOMBRE_CONTENEDOR_FUNCTIONS mkdir -p /home/deno/functions/_main
+echo 'Deno.serve(() => new Response("ok"))' | docker exec -i NOMBRE_CONTENEDOR_FUNCTIONS tee /home/deno/functions/_main/index.ts
+
+# 3. Reiniciar edge-runtime
+docker restart NOMBRE_CONTENEDOR_FUNCTIONS
+
+# 4. Verificar
+curl https://tu-supabase.dominio.com/functions/v1/ping
+```
+
+### 6.4 Verificar funciones disponibles
+
+```bash
 curl https://tu-supabase.dominio.com/functions/v1/ping
 ```
 
 Respuesta esperada:
 ```json
 {"ok":true,"version":"1.2.0","environment":"hybrid"}
-```
-
-### 6.4 Sincronización manual (si es necesario)
-
-```bash
-# Ejecutar sincronización manualmente dentro del contenedor CRM
-docker exec -it NOMBRE_CRM /app/easypanel/scripts/sync-edge-functions.sh
-
-# O reiniciar el CRM (ejecutará la sincronización automáticamente)
-docker restart NOMBRE_CRM
 ```
 
 ### 6.5 Lista de Edge Functions
