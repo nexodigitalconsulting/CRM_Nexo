@@ -32,3 +32,12 @@ verify_jwt = false
 
 [functions.db-migrate]
 verify_jwt = false
+
+[functions.gmail-oauth-auth]
+verify_jwt = false
+
+[functions.gmail-oauth-callback]
+verify_jwt = false
+
+[functions.main]
+verify_jwt = false
