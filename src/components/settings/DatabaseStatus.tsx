@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Database, RefreshCw, Check, Clock, Copy, AlertTriangle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-
+import { compareVersions } from "@/lib/schemaChecker";
 interface MigrationStatus {
   success: boolean;
   currentVersion: string;
@@ -52,30 +52,48 @@ export function DatabaseStatus() {
 
   const checkStatus = async () => {
     setLoading(true);
+    console.log("[DatabaseStatus] Iniciando verificación...");
+    
     try {
       // Llamar a la edge function
+      console.log("[DatabaseStatus] Invocando db-migrate...");
       const { data, error } = await supabase.functions.invoke("db-migrate");
       
       if (error) {
+        console.error("[DatabaseStatus] Error edge function:", error);
         toast.error("Error al verificar estado: " + error.message);
         return;
+      }
+      
+      console.log("[DatabaseStatus] Respuesta db-migrate:", data);
+      
+      // Log the response for debugging
+      if (data?.logs) {
+        console.log("[DatabaseStatus] Logs del servidor:");
+        data.logs.forEach((log: string) => console.log("  ", log));
       }
       
       setStatus(data);
       
       // Obtener versiones aplicadas
-      const { data: versions } = await supabase
+      console.log("[DatabaseStatus] Obteniendo historial de versiones...");
+      const { data: versions, error: versionsError } = await supabase
         .from("schema_versions")
         .select("version, description, applied_at")
         .order("applied_at", { ascending: true });
       
-      if (versions) {
+      if (versionsError) {
+        console.error("[DatabaseStatus] Error obteniendo versiones:", versionsError);
+      } else if (versions) {
+        console.log("[DatabaseStatus] Versiones aplicadas:", versions.map(v => v.version));
         setAppliedVersions(versions);
       }
     } catch (err: any) {
+      console.error("[DatabaseStatus] Error:", err);
       toast.error("Error: " + err.message);
     } finally {
       setLoading(false);
+      console.log("[DatabaseStatus] Verificación completada");
     }
   };
 
@@ -126,7 +144,7 @@ export function DatabaseStatus() {
               </Badge>
             </div>
             <div className="space-y-1">
-              <p className="text-sm text-muted-foreground">Versión requerida</p>
+              <p className="text-sm text-muted-foreground">Versión código</p>
               <Badge variant="secondary" className="font-mono">
                 {status.targetVersion}
               </Badge>
@@ -136,12 +154,17 @@ export function DatabaseStatus() {
               {status.isUpToDate ? (
                 <Badge className="bg-green-500/20 text-green-600 border-green-500/30">
                   <Check className="h-3 w-3 mr-1" />
-                  Actualizado
+                  Sincronizado
+                </Badge>
+              ) : compareVersions(status.currentVersion, status.targetVersion) > 0 ? (
+                <Badge className="bg-blue-500/20 text-blue-600 border-blue-500/30">
+                  <Check className="h-3 w-3 mr-1" />
+                  BD adelantada (OK)
                 </Badge>
               ) : (
                 <Badge className="bg-yellow-500/20 text-yellow-600 border-yellow-500/30">
                   <AlertTriangle className="h-3 w-3 mr-1" />
-                  Migraciones pendientes
+                  Actualización requerida
                 </Badge>
               )}
             </div>

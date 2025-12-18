@@ -9,7 +9,7 @@ export interface SchemaStatus {
   environment: "cloud" | "self-hosted" | "unknown";
 }
 
-export const TARGET_VERSION = "v1.2.0";
+export const TARGET_VERSION = "v1.4.0";
 
 // Required tables for the CRM to function
 const REQUIRED_TABLES = [
@@ -53,6 +53,9 @@ export async function checkSchemaDirectly(): Promise<SchemaStatus> {
     environment: "unknown",
   };
 
+  console.log("[SchemaChecker] Iniciando verificación de esquema...");
+  console.log("[SchemaChecker] Versión objetivo:", TARGET_VERSION);
+
   try {
     // 1. Check if profiles table exists (basic connectivity test)
     const { error: profileError } = await supabase
@@ -61,9 +64,11 @@ export async function checkSchemaDirectly(): Promise<SchemaStatus> {
       .limit(1);
 
     if (profileError?.code === "42P01") {
+      console.error("[SchemaChecker] Tabla profiles no existe");
       status.missingComponents.push("profiles table");
       return status;
     }
+    console.log("[SchemaChecker] ✓ Tabla profiles existe");
 
     // 2. Check schema_versions table EXPLICITLY
     const { data: schemaVersionData, error: schemaVersionError } = await supabase
@@ -73,17 +78,17 @@ export async function checkSchemaDirectly(): Promise<SchemaStatus> {
       .limit(1);
 
     if (schemaVersionError?.code === "42P01") {
-      // schema_versions table doesn't exist
+      console.warn("[SchemaChecker] Tabla schema_versions no existe");
       status.hasSchemaVersions = false;
       status.missingComponents.push("schema_versions table");
     } else if (!schemaVersionError && schemaVersionData?.length > 0) {
-      // schema_versions exists and has data
       status.hasSchemaVersions = true;
       status.currentVersion = schemaVersionData[0].version;
+      console.log("[SchemaChecker] ✓ Versión en BD:", status.currentVersion);
     } else if (!schemaVersionError) {
-      // Table exists but is empty
       status.hasSchemaVersions = true;
       status.currentVersion = "v0.0.0";
+      console.log("[SchemaChecker] Tabla schema_versions vacía, versión: v0.0.0");
     }
 
     // 3. Check critical tables
@@ -96,6 +101,7 @@ export async function checkSchemaDirectly(): Promise<SchemaStatus> {
         .limit(1);
       
       if (error?.code === "42P01") {
+        console.warn(`[SchemaChecker] Tabla ${table} no existe`);
         status.missingComponents.push(`${table} table`);
       }
     }
@@ -107,6 +113,7 @@ export async function checkSchemaDirectly(): Promise<SchemaStatus> {
       .limit(1);
 
     if (pdfError?.code === "42P01") {
+      console.warn("[SchemaChecker] Tabla pdf_settings no existe (v1.1.0)");
       status.missingComponents.push("pdf_settings table (v1.1.0)");
     }
 
@@ -117,6 +124,7 @@ export async function checkSchemaDirectly(): Promise<SchemaStatus> {
       .limit(1);
     
     if (ipError?.code === "42P01") {
+      console.warn("[SchemaChecker] Tabla invoice_products no existe (v1.2.0)");
       status.missingComponents.push("invoice_products table (v1.2.0)");
     }
 
@@ -126,10 +134,11 @@ export async function checkSchemaDirectly(): Promise<SchemaStatus> {
       .limit(1);
     
     if (qpError?.code === "42P01") {
+      console.warn("[SchemaChecker] Tabla quote_products no existe (v1.2.0)");
       status.missingComponents.push("quote_products table (v1.2.0)");
     }
 
-    // 6. Check email_settings for signature_html column
+    // 6. Check email_settings for signature_html column (v1.2.0)
     try {
       const { error } = await supabase
         .from("email_settings")
@@ -137,20 +146,45 @@ export async function checkSchemaDirectly(): Promise<SchemaStatus> {
         .limit(1);
       
       if (error?.message?.includes("signature_html")) {
+        console.warn("[SchemaChecker] Columna signature_html no existe (v1.2.0)");
         status.missingComponents.push("signature_html column (v1.2.0)");
       }
     } catch {
       // Column check failed
     }
 
-    // 7. Determine if complete
-    status.isComplete = 
-      status.missingComponents.length === 0 && 
-      status.currentVersion === TARGET_VERSION;
+    // 7. Check invoices.is_sent and sent_at columns (v1.4.0)
+    try {
+      const { error: sentError } = await supabase
+        .from("invoices")
+        .select("is_sent, sent_at")
+        .limit(1);
+      
+      if (sentError?.message?.includes("is_sent") || sentError?.message?.includes("sent_at")) {
+        console.warn("[SchemaChecker] Columnas is_sent/sent_at no existen (v1.4.0)");
+        status.missingComponents.push("invoices.is_sent/sent_at columns (v1.4.0)");
+      }
+    } catch {
+      // Column check failed
+    }
+
+    // 8. Determine if complete - version must match OR be higher
+    const versionComparison = compareVersions(status.currentVersion, TARGET_VERSION);
+    const versionOk = versionComparison >= 0; // Current >= Target is OK
+    
+    status.isComplete = status.missingComponents.length === 0 && versionOk;
+
+    console.log("[SchemaChecker] Resultado:", {
+      currentVersion: status.currentVersion,
+      targetVersion: TARGET_VERSION,
+      versionComparison,
+      missingComponents: status.missingComponents.length,
+      isComplete: status.isComplete
+    });
 
     return status;
   } catch (error) {
-    console.error("Schema check error:", error);
+    console.error("[SchemaChecker] Error:", error);
     return status;
   }
 }
