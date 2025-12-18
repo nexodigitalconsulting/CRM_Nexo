@@ -42,38 +42,18 @@ echo ""
 
 # === 2. Sincronizar Edge Functions ===
 echo "--- Paso 2: Edge Functions ---"
-if [ -x "/app/easypanel/scripts/sync-edge-functions.sh" ]; then
-    /app/easypanel/scripts/sync-edge-functions.sh || {
-        log_warn "sync-edge-functions.sh falló, continuando..."
-    }
-else
-    # Fallback: sincronización básica si el script no existe
-    if [ -n "$SUPABASE_FUNCTIONS_VOLUME" ] && [ -d "$SUPABASE_FUNCTIONS_VOLUME" ]; then
-        log_info "Sincronizando Edge Functions (modo básico)..."
-        
-        if [ -d "/app/supabase/functions" ]; then
-            for fn_dir in /app/supabase/functions/*/; do
-                if [ -d "$fn_dir" ]; then
-                    fn_name=$(basename "$fn_dir")
-                    mkdir -p "$SUPABASE_FUNCTIONS_VOLUME/$fn_name"
-                    cp -r "$fn_dir"* "$SUPABASE_FUNCTIONS_VOLUME/$fn_name/" 2>/dev/null || true
-                    echo "   - $fn_name"
-                fi
-            done
-            
-            # Crear _main healthcheck
-            mkdir -p "$SUPABASE_FUNCTIONS_VOLUME/_main"
-            echo 'Deno.serve(() => new Response("OK"));' > "$SUPABASE_FUNCTIONS_VOLUME/_main/index.ts"
-            
-            log_success "Edge Functions copiadas"
-            log_warn "Reinicia edge-runtime manualmente: docker restart <edge-functions-container>"
-        fi
+if [ -S "/var/run/docker.sock" ]; then
+    if [ -x "/app/easypanel/scripts/sync-edge-functions.sh" ]; then
+        /app/easypanel/scripts/sync-edge-functions.sh || {
+            log_warn "sync-edge-functions.sh falló, continuando..."
+        }
     else
-        log_warn "SUPABASE_FUNCTIONS_VOLUME no configurado"
-        log_info "Para sincronizar Edge Functions automáticamente:"
-        echo "   1. Configura variable: SUPABASE_FUNCTIONS_VOLUME=/supabase-functions"
-        echo "   2. Añade Mount: Host=/etc/easypanel/.../volumes/functions → Container=/supabase-functions"
+        log_warn "sync-edge-functions.sh no encontrado o no ejecutable"
     fi
+else
+    log_warn "Docker socket no disponible"
+    log_info "Para sincronizar Edge Functions automáticamente:"
+    echo "   Añade Mount en EasyPanel: /var/run/docker.sock → /var/run/docker.sock"
 fi
 
 echo ""
