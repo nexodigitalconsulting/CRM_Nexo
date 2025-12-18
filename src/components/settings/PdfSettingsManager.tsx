@@ -16,7 +16,7 @@ import { Badge } from "@/components/ui/badge";
 import { usePdfSettings, useUpdatePdfSettings, PdfSettingsUpdate } from "@/hooks/usePdfSettings";
 import { useCompanySettings } from "@/hooks/useCompanySettings";
 import { Loader2, FileText, Palette, Eye, Save, Layout, Type, Image, CheckCircle, AlertCircle, PenTool } from "lucide-react";
-import { PdfEditorCanvas } from "./PdfEditorCanvas";
+import { PdfTemplateEditor } from "./PdfTemplateEditor";
 
 type DocumentType = 'invoice' | 'quote' | 'contract';
 
@@ -457,11 +457,8 @@ export function PdfSettingsManager() {
                     Editor Visual Avanzado
                   </CardTitle>
                 </CardHeader>
-                <CardContent>
-                  <p className="text-sm text-muted-foreground mb-4">
-                    Diseña plantillas personalizadas con drag-and-drop. Añade texto, formas, tablas y variables dinámicas.
-                  </p>
-                  <PdfEditorCanvas documentType={selectedDocument} />
+                <CardContent className="p-0">
+                  <PdfTemplateEditor documentType={selectedDocument} />
                 </CardContent>
               </Card>
             </TabsContent>
