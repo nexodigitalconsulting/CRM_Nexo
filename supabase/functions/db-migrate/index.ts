@@ -7,13 +7,15 @@ const corsHeaders = {
 };
 
 // Current schema version - UPDATE THIS when adding new migrations
-const CURRENT_VERSION = "v1.2.0";
+const CURRENT_VERSION = "v1.4.0";
 
 // Migration definitions (SQL stored for reference, applied via Supabase client)
 const MIGRATIONS = [
   { version: "v1.0.0", description: "Schema base del CRM" },
   { version: "v1.1.0", description: "Tabla pdf_settings para personalización de documentos" },
-  { version: "v1.2.0", description: "Columna signature_html, tablas de productos y triggers" }
+  { version: "v1.2.0", description: "Columna signature_html, tablas de productos y triggers" },
+  { version: "v1.3.0", description: "RLS para schema_versions" },
+  { version: "v1.4.0", description: "Columnas is_sent y sent_at en invoices" }
 ];
 
 serve(async (req) => {
@@ -140,6 +142,26 @@ serve(async (req) => {
 
     if (emailError?.message?.includes("signature_html")) {
       missingComponents.push("email_settings.signature_html column");
+    }
+
+    // Check invoices.is_sent column
+    const { data: invoiceSentData, error: invoiceSentError } = await supabaseAdmin
+      .from("invoices")
+      .select("is_sent")
+      .limit(1);
+
+    if (invoiceSentError?.message?.includes("is_sent")) {
+      missingComponents.push("invoices.is_sent column");
+    }
+
+    // Check invoices.sent_at column
+    const { data: invoiceSentAtData, error: invoiceSentAtError } = await supabaseAdmin
+      .from("invoices")
+      .select("sent_at")
+      .limit(1);
+
+    if (invoiceSentAtError?.message?.includes("sent_at")) {
+      missingComponents.push("invoices.sent_at column");
     }
 
     // ============================================
