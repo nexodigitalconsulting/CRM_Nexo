@@ -189,9 +189,9 @@ BEGIN
   RAISE NOTICE '[%] ╔═══════════════════════════════════════════════════════════════╗', clock_timestamp();
   RAISE NOTICE '[%] ║  SINCRONIZACIÓN COMPLETADA                                    ║', clock_timestamp();
   RAISE NOTICE '[%] ╠═══════════════════════════════════════════════════════════════╣', clock_timestamp();
-  RAISE NOTICE '[%] ║  Cambios realizados: %                                        ║', v_changes_made;
+  RAISE NOTICE '[%] ║  Cambios realizados: %                                        ║', clock_timestamp(), v_changes_made;
   RAISE NOTICE '[%] ║  Versión final: v1.4.0                                        ║', clock_timestamp();
-  RAISE NOTICE '[%] ║  Tiempo: % ms                                                 ║', EXTRACT(MILLISECONDS FROM clock_timestamp() - v_start_time)::integer;
+  RAISE NOTICE '[%] ║  Tiempo: % ms                                                 ║', clock_timestamp(), EXTRACT(MILLISECONDS FROM clock_timestamp() - v_start_time)::integer;
   RAISE NOTICE '[%] ╚═══════════════════════════════════════════════════════════════╝', clock_timestamp();
   RAISE NOTICE '';
 END $$;
