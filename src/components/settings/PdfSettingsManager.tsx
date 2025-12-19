@@ -50,6 +50,8 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { PdfPreview } from "./PdfPreview";
+import { embedPdfConfigInTemplate, extractPdfConfigFromTemplate } from "@/hooks/useDefaultTemplate";
+import { PdfConfig } from "@/lib/pdf/pdfUtils";
 
 type DocumentType = 'invoice' | 'quote' | 'contract';
 
@@ -509,12 +511,13 @@ export function PdfSettingsManager() {
     setHasUnsavedChanges(false);
   }, [selectedDocument]);
 
-  // Extraer colores del contenido HTML
+  // Extraer colores del contenido HTML usando el extractor mejorado
   const extractColorsFromContent = (content: string) => {
-    const primaryMatch = content.match(/color:\s*(#[0-9a-fA-F]{6})/);
-    const bgMatch = content.match(/background:\s*(#[0-9a-fA-F]{6})/);
-    if (primaryMatch) setPrimaryColor(primaryMatch[1]);
-    if (bgMatch) setPrimaryColor(bgMatch[1]);
+    // First try to extract from PDF_CONFIG comment
+    const templateData = { content, id: '', name: '', entity_type: selectedDocument, variables: null, is_default: false, is_active: true, created_at: '', updated_at: '' };
+    const config = extractPdfConfigFromTemplate(templateData as any);
+    if (config.primary_color) setPrimaryColor(config.primary_color);
+    if (config.secondary_color) setSecondaryColor(config.secondary_color);
   };
 
   // Actualizar colores en el contenido
@@ -561,14 +564,35 @@ export function PdfSettingsManager() {
   const handleSave = async () => {
     if (!selectedTemplateId) return;
     try {
+      // Create PDF_CONFIG from current settings
+      const pdfConfig: PdfConfig = {
+        primary_color: primaryColor,
+        secondary_color: secondaryColor,
+        accent_color: primaryColor,
+        show_logo: true,
+        logo_position: 'left',
+        show_iban_footer: editedContent.includes('{{company_iban}}'),
+        show_notes: editedContent.includes('{{notes}}'),
+        show_discounts_column: editedContent.includes('{{discount'),
+        header_style: 'classic',
+        font_size_base: 10,
+      };
+
+      // Embed PDF_CONFIG comment in the content for reliable extraction
+      const contentWithConfig = embedPdfConfigInTemplate(editedContent, pdfConfig);
+
       await updateTemplate.mutateAsync({
         id: selectedTemplateId,
         updates: {
           name: editedName,
-          content: editedContent,
+          content: contentWithConfig,
         },
       });
+      
+      // Update local content with the embedded config
+      setEditedContent(contentWithConfig);
       setHasUnsavedChanges(false);
+      console.log('[PdfSettingsManager] Saved template with PDF_CONFIG:', pdfConfig);
     } catch (error) {
       console.error('Error saving template:', error);
     }

@@ -1,24 +1,35 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
-import { ExternalLink, AlertTriangle, Copy, CheckCircle2 } from 'lucide-react';
+import { ExternalLink, AlertTriangle, Copy, CheckCircle2, Info } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
 
+// Project ID dinámico - se puede obtener del cliente de Supabase
+const SUPABASE_PROJECT_ID = 'honfwrfkiukckyoelsdm';
+
 interface GmailOAuthInstructionsProps {
-  callbackUrl: string;
+  callbackUrl?: string;
   onClose?: () => void;
 }
 
-export function GmailOAuthInstructions({ callbackUrl, onClose }: GmailOAuthInstructionsProps) {
-  const [copied, setCopied] = useState(false);
+// URLs de callback para todas las integraciones de Google
+export const GOOGLE_CALLBACK_URLS = {
+  gmail: `https://${SUPABASE_PROJECT_ID}.supabase.co/functions/v1/gmail-oauth-callback`,
+  calendar: `https://${SUPABASE_PROJECT_ID}.supabase.co/functions/v1/google-calendar-callback`,
+};
 
-  const handleCopy = async () => {
+export function GmailOAuthInstructions({ callbackUrl, onClose }: GmailOAuthInstructionsProps) {
+  const [copiedUrl, setCopiedUrl] = useState<string | null>(null);
+
+  const gmailCallbackUrl = callbackUrl || GOOGLE_CALLBACK_URLS.gmail;
+
+  const handleCopy = async (url: string, label: string) => {
     try {
-      await navigator.clipboard.writeText(callbackUrl);
-      setCopied(true);
-      toast.success('URL copiada al portapapeles');
-      setTimeout(() => setCopied(false), 2000);
+      await navigator.clipboard.writeText(url);
+      setCopiedUrl(url);
+      toast.success(`URL de ${label} copiada`);
+      setTimeout(() => setCopiedUrl(null), 2000);
     } catch (error) {
       toast.error('Error al copiar');
     }
@@ -36,18 +47,80 @@ export function GmailOAuthInstructions({ callbackUrl, onClose }: GmailOAuthInstr
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
-        <Alert>
+        <Alert variant="destructive">
           <AlertTriangle className="h-4 w-4" />
           <AlertTitle>Error 403: access_denied</AlertTitle>
           <AlertDescription>
-            Este error indica que la configuración de OAuth en Google Cloud Console no es correcta.
-            Sigue los pasos a continuación para solucionarlo.
+            Este error indica que falta configuración en Google Cloud Console.
+            <strong className="block mt-1">Sigue TODOS los pasos a continuación.</strong>
           </AlertDescription>
         </Alert>
 
+        {/* URLS IMPORTANTES - MUY VISIBLES */}
+        <Card className="border-2 border-primary/50 bg-primary/5">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm flex items-center gap-2 text-primary">
+              <Info className="h-4 w-4" />
+              URLs de redirección OBLIGATORIAS
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <p className="text-xs text-muted-foreground">
+              Copia y pega EXACTAMENTE estas URLs en "URIs de redirección autorizados" de tu cliente OAuth:
+            </p>
+            
+            {/* Gmail Callback */}
+            <div className="space-y-1">
+              <label className="text-xs font-medium">Gmail (envío de correos):</label>
+              <div className="flex items-center gap-2 bg-background p-2 rounded-md border">
+                <code className="text-xs flex-1 break-all font-mono text-primary">
+                  {gmailCallbackUrl}
+                </code>
+                <Button 
+                  variant="ghost" 
+                  size="icon" 
+                  className="h-8 w-8 shrink-0" 
+                  onClick={() => handleCopy(gmailCallbackUrl, 'Gmail')}
+                >
+                  {copiedUrl === gmailCallbackUrl ? (
+                    <CheckCircle2 className="h-4 w-4 text-green-500" />
+                  ) : (
+                    <Copy className="h-4 w-4" />
+                  )}
+                </Button>
+              </div>
+            </div>
+
+            {/* Calendar Callback */}
+            <div className="space-y-1">
+              <label className="text-xs font-medium">Google Calendar (sincronización):</label>
+              <div className="flex items-center gap-2 bg-background p-2 rounded-md border">
+                <code className="text-xs flex-1 break-all font-mono text-primary">
+                  {GOOGLE_CALLBACK_URLS.calendar}
+                </code>
+                <Button 
+                  variant="ghost" 
+                  size="icon" 
+                  className="h-8 w-8 shrink-0" 
+                  onClick={() => handleCopy(GOOGLE_CALLBACK_URLS.calendar, 'Calendar')}
+                >
+                  {copiedUrl === GOOGLE_CALLBACK_URLS.calendar ? (
+                    <CheckCircle2 className="h-4 w-4 text-green-500" />
+                  ) : (
+                    <Copy className="h-4 w-4" />
+                  )}
+                </Button>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
         <div className="space-y-4">
           <div className="space-y-2">
-            <h4 className="font-medium">1. Accede a Google Cloud Console</h4>
+            <h4 className="font-medium">1. Accede a las credenciales OAuth</h4>
+            <p className="text-sm text-muted-foreground">
+              Abre Google Cloud Console y selecciona tu proyecto.
+            </p>
             <Button
               variant="outline"
               size="sm"
@@ -55,32 +128,25 @@ export function GmailOAuthInstructions({ callbackUrl, onClose }: GmailOAuthInstr
               onClick={() => window.open('https://console.cloud.google.com/apis/credentials', '_blank')}
             >
               <ExternalLink className="h-3 w-3" />
-              Abrir Google Cloud Console
+              Abrir Credenciales OAuth
             </Button>
           </div>
 
           <div className="space-y-2">
-            <h4 className="font-medium">2. Configura la URI de redirección autorizada</h4>
-            <p className="text-sm text-muted-foreground">
-              En tu cliente OAuth 2.0, añade la siguiente URL en "URIs de redirección autorizados":
-            </p>
-            <div className="flex items-center gap-2 bg-muted p-2 rounded-md">
-              <code className="text-xs flex-1 break-all">{callbackUrl}</code>
-              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={handleCopy}>
-                {copied ? <CheckCircle2 className="h-4 w-4 text-green-500" /> : <Copy className="h-4 w-4" />}
-              </Button>
-            </div>
+            <h4 className="font-medium">2. Edita tu cliente OAuth 2.0</h4>
+            <ol className="text-sm text-muted-foreground list-decimal list-inside space-y-1">
+              <li>Haz clic en tu cliente OAuth (tipo "Web application")</li>
+              <li>En <strong>"URIs de redirección autorizados"</strong>, añade las URLs de arriba</li>
+              <li>Guarda los cambios</li>
+            </ol>
           </div>
 
           <div className="space-y-2">
-            <h4 className="font-medium">3. Configura la pantalla de consentimiento OAuth</h4>
-            <p className="text-sm text-muted-foreground">
-              En "Pantalla de consentimiento OAuth":
-            </p>
+            <h4 className="font-medium">3. Configura la pantalla de consentimiento</h4>
             <ul className="text-sm text-muted-foreground list-disc list-inside space-y-1">
-              <li>Si la app está en "Testing", añade tu email como usuario de prueba</li>
-              <li>O bien, publica la app para producción</li>
-              <li>Asegúrate de que los scopes incluyan "Gmail Send" y "User Info"</li>
+              <li><strong>Estado "Testing":</strong> Añade tu email en "Test users"</li>
+              <li><strong>Estado "Production":</strong> Cualquier usuario puede acceder</li>
+              <li>Verifica que los scopes incluyan: <code className="bg-muted px-1 rounded">gmail.send</code>, <code className="bg-muted px-1 rounded">userinfo.email</code></li>
             </ul>
             <Button
               variant="outline"
@@ -94,33 +160,40 @@ export function GmailOAuthInstructions({ callbackUrl, onClose }: GmailOAuthInstr
           </div>
 
           <div className="space-y-2">
-            <h4 className="font-medium">4. Habilita la API de Gmail</h4>
-            <p className="text-sm text-muted-foreground">
-              Asegúrate de que la API de Gmail esté habilitada en tu proyecto.
-            </p>
-            <Button
-              variant="outline"
-              size="sm"
-              className="gap-2"
-              onClick={() => window.open('https://console.cloud.google.com/apis/library/gmail.googleapis.com', '_blank')}
-            >
-              <ExternalLink className="h-3 w-3" />
-              Ver API de Gmail
-            </Button>
+            <h4 className="font-medium">4. Habilita las APIs necesarias</h4>
+            <div className="flex gap-2 flex-wrap">
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-2"
+                onClick={() => window.open('https://console.cloud.google.com/apis/library/gmail.googleapis.com', '_blank')}
+              >
+                <ExternalLink className="h-3 w-3" />
+                Gmail API
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-2"
+                onClick={() => window.open('https://console.cloud.google.com/apis/library/calendar-json.googleapis.com', '_blank')}
+              >
+                <ExternalLink className="h-3 w-3" />
+                Google Calendar API
+              </Button>
+            </div>
           </div>
 
           <div className="space-y-2">
-            <h4 className="font-medium">5. Verifica las credenciales</h4>
+            <h4 className="font-medium">5. Verifica los secretos en Supabase</h4>
             <p className="text-sm text-muted-foreground">
               Asegúrate de que <code className="bg-muted px-1 rounded">GOOGLE_CLIENT_ID</code> y{' '}
-              <code className="bg-muted px-1 rounded">GOOGLE_CLIENT_SECRET</code> están configurados
-              correctamente en los secretos de Supabase Edge Functions.
+              <code className="bg-muted px-1 rounded">GOOGLE_CLIENT_SECRET</code> coinciden con los de tu cliente OAuth.
             </p>
             <Button
               variant="outline"
               size="sm"
               className="gap-2"
-              onClick={() => window.open('https://supabase.com/dashboard/project/honfwrfkiukckyoelsdm/settings/functions', '_blank')}
+              onClick={() => window.open(`https://supabase.com/dashboard/project/${SUPABASE_PROJECT_ID}/settings/functions`, '_blank')}
             >
               <ExternalLink className="h-3 w-3" />
               Ver Secretos de Edge Functions
