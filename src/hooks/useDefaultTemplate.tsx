@@ -85,15 +85,16 @@ export function useDefaultTemplate(entityType: 'invoice' | 'contract' | 'quote')
  * Format: <!-- PDF_CONFIG: {"primary_color":"#4f46e5","secondary_color":"#666666"} -->
  */
 function parsePdfConfigComment(content: string): Partial<PdfConfig> | null {
-  const match = content.match(/<!--\s*PDF_CONFIG:\s*(\{[^}]+\})\s*-->/);
-  if (match) {
-    try {
-      return JSON.parse(match[1]);
-    } catch {
-      console.warn('Failed to parse PDF_CONFIG comment');
-    }
+  // Use a non-greedy match so JSON can contain nested objects/arrays (e.g. footer_legal_lines)
+  const match = content.match(/<!--\s*PDF_CONFIG:\s*([\s\S]*?)\s*-->/);
+  if (!match) return null;
+
+  try {
+    return JSON.parse(match[1]);
+  } catch {
+    console.warn('Failed to parse PDF_CONFIG comment');
+    return null;
   }
-  return null;
 }
 
 /**
@@ -325,6 +326,7 @@ export function generatePdfConfigComment(config: PdfConfig): string {
     show_discounts_column: config.show_discounts_column,
     header_style: config.header_style,
     font_size_base: config.font_size_base,
+
     // Extended configurable parameters
     title_text: config.title_text,
     title_size: config.title_size,
@@ -333,11 +335,24 @@ export function generatePdfConfigComment(config: PdfConfig): string {
     table_header_color: config.table_header_color,
     show_footer_legal: config.show_footer_legal,
     footer_legal_lines: config.footer_legal_lines,
+
+    // Spacing
+    line_spacing: config.line_spacing,
+    section_spacing: config.section_spacing,
+    row_height: config.row_height,
+    client_box_padding: config.client_box_padding,
+    margins: config.margins,
+
+    // Table borders
+    show_table_borders: config.show_table_borders,
+    table_border_color: config.table_border_color,
   };
+
   // Remove undefined values
-  Object.keys(configObj).forEach(key => {
+  Object.keys(configObj).forEach((key) => {
     if (configObj[key] === undefined) delete configObj[key];
   });
+
   return `<!-- PDF_CONFIG: ${JSON.stringify(configObj)} -->`;
 }
 
