@@ -230,11 +230,14 @@ export default function Quotes() {
                   name: quote.name,
                   client: quote.client,
                   contact: quote.contact,
+                  services: quote.services || [],
                 };
                 const pdfConfig = extractPdfConfigFromTemplate(defaultTemplate);
-                await downloadQuotePdf(quoteData as any, companySettings as any, pdfConfig);
+                const template = defaultTemplate ? { name: defaultTemplate.name, content: defaultTemplate.content } : null;
+                await downloadQuotePdf(quoteData as any, companySettings as any, pdfConfig, template);
                 toast.success("PDF descargado");
               } catch (error) {
+                console.error('Error downloading quote PDF:', error);
                 toast.error("Error al descargar PDF");
               }
             }}>

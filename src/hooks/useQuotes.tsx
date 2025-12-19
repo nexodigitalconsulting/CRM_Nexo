@@ -24,7 +24,8 @@ export function useQuotes() {
         .select(`
           *,
           client:clients(*),
-          contact:contacts(*)
+          contact:contacts(*),
+          services:quote_services(*, service:services(*))
         `)
         .order("quote_number", { ascending: false });
       

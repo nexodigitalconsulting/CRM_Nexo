@@ -170,7 +170,12 @@ export function SendEmailDialog({
             defaultDocTemplate as any
           );
         case 'quote':
-          return await generateQuotePdfBase64(entityData as unknown as QuoteData, company, pdfConfig);
+          return await generateQuotePdfBase64(
+            entityData as unknown as QuoteData,
+            company,
+            pdfConfig,
+            defaultDocTemplate as any
+          );
         case 'contract':
           return await generateContractPdfBase64(entityData as unknown as ContractData, company, pdfConfig);
         default:
@@ -198,7 +203,7 @@ export function SendEmailDialog({
           await downloadInvoicePdf(entityData as unknown as InvoiceData, company, pdfConfig, defaultDocTemplate as any);
           break;
         case 'quote':
-          await downloadQuotePdf(entityData as unknown as QuoteData, company, pdfConfig);
+          await downloadQuotePdf(entityData as unknown as QuoteData, company, pdfConfig, defaultDocTemplate as any);
           break;
         case 'contract':
           await downloadContractPdf(entityData as unknown as ContractData, company, pdfConfig);
