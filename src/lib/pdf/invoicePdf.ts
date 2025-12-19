@@ -109,11 +109,16 @@ async function generateInvoicePdfFact2(
   const rowHeight = config?.row_height || 22;
   const boxPadding = config?.client_box_padding || 14;
   const docMargin = config?.margins || MARGIN;
-  
+
   // Table borders
   const showTableBorders = config?.show_table_borders !== false;
   const tableBorderColor = config?.table_border_color || '#e5e7eb';
   const tableBorderRgb = hexToRgb(tableBorderColor);
+
+  // Totals separators
+  const showTotalsLines = config?.show_totals_lines !== false;
+  const totalsLineColor = config?.totals_line_color;
+  const totalsLineRgb = totalsLineColor ? hexToRgb(totalsLineColor) : null;
 
   const clientData: ClientData = invoice.client || { name: 'Cliente' };
 
@@ -400,13 +405,17 @@ async function generateInvoicePdfFact2(
   const totalsX = right - totalsWidth;
   const labelColor = pdfColors.secondary;
 
+  const totalsSeparatorColor = totalsLineRgb
+    ? rgb(totalsLineRgb.r, totalsLineRgb.g, totalsLineRgb.b)
+    : pdfColors.border;
+
   const rows = [
     { label: 'Subtotal:', value: formatCurrency(invoice.subtotal || 0), bold: false },
     { label: `IVA (${invoice.iva_percent || 21}%):`, value: formatCurrency(invoice.iva_amount || 0), bold: false },
     { label: 'TOTAL:', value: formatCurrency(invoice.total || 0), bold: true },
   ];
 
-  let tY = y;
+  let currentY = y;
   rows.forEach((r, i) => {
     const isTotal = r.bold;
     const size = isTotal ? 18 : fontSize;
@@ -415,7 +424,7 @@ async function generateInvoicePdfFact2(
 
     page.drawText(r.label, {
       x: totalsX,
-      y: tY,
+      y: currentY,
       size,
       font,
       color,
@@ -424,19 +433,25 @@ async function generateInvoicePdfFact2(
     const vW = font.widthOfTextAtSize(r.value, size);
     page.drawText(r.value, {
       x: right - vW,
-      y: tY,
+      y: currentY,
       size,
       font,
       color,
     });
 
-    const gap = isTotal ? Math.max(22, lineSpacing + 8) : Math.max(16, lineSpacing + 2);
-    tY -= gap;
+    const gap = isTotal
+      ? Math.max(26, lineSpacing + 12)
+      : Math.max(18, lineSpacing + 6);
 
-    if (i < 2) {
-      const lineY = tY + Math.round(gap / 2);
-      drawLine(page, totalsX, lineY, right, lineY, pdfColors.border, 0.5);
+    const nextY = currentY - gap;
+
+    // Separator line centered between rows (prevents overlap)
+    if (showTotalsLines && i < 2) {
+      const lineY = currentY - gap / 2;
+      drawLine(page, totalsX, lineY, right, lineY, totalsSeparatorColor, 0.5);
     }
+
+    currentY = nextY;
   });
 
   // Footer section

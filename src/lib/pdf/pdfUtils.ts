@@ -31,9 +31,14 @@ export interface PdfConfig {
   row_height?: number;              // Table row height (18-30, default: 22)
   client_box_padding?: number;      // Client box padding (10-25, default: 14)
   margins?: number;                 // Document margins (40-70, default: 50)
+
   // Table borders
   show_table_borders?: boolean;     // Show table row dividers (default: true)
   table_border_color?: string;      // Table border color (default: #e5e7eb)
+
+  // Totals section
+  show_totals_lines?: boolean;      // Show separator lines in totals block (default: true)
+  totals_line_color?: string;       // Totals separator color (default: border)
 }
 
 export interface PdfColors {

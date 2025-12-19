@@ -500,8 +500,12 @@ export function PdfSettingsManager() {
   const [rowHeight, setRowHeight] = useState(22);
   const [clientBoxPadding, setClientBoxPadding] = useState(14);
   const [docMargins, setDocMargins] = useState(50);
+
+  // Lines
   const [showTableBorders, setShowTableBorders] = useState(true);
   const [tableBorderColor, setTableBorderColor] = useState('#e5e7eb');
+  const [showTotalsLines, setShowTotalsLines] = useState(true);
+  const [totalsLineColor, setTotalsLineColor] = useState('#e5e7eb');
 
   const { data: templates = [], isLoading } = usePdfTemplates(selectedDocument);
   const createTemplate = useCreatePdfTemplate();
@@ -531,10 +535,14 @@ export function PdfSettingsManager() {
     if (config.row_height) setRowHeight(config.row_height);
     if (config.client_box_padding) setClientBoxPadding(config.client_box_padding);
     if (config.margins) setDocMargins(config.margins);
-    
+
     // Load table border settings
     setShowTableBorders(config.show_table_borders ?? true);
     if (config.table_border_color) setTableBorderColor(config.table_border_color);
+
+    // Load totals separator settings
+    setShowTotalsLines(config.show_totals_lines ?? true);
+    if (config.totals_line_color) setTotalsLineColor(config.totals_line_color);
   }, [selectedDocument]);
 
   // Seleccionar plantilla predeterminada al cargar
@@ -638,6 +646,9 @@ export function PdfSettingsManager() {
         // Table borders
         show_table_borders: showTableBorders,
         table_border_color: tableBorderColor,
+        // Totals
+        show_totals_lines: showTotalsLines,
+        totals_line_color: totalsLineColor,
       };
 
       // Embed PDF_CONFIG comment in the content for reliable extraction
@@ -655,6 +666,7 @@ export function PdfSettingsManager() {
       setEditedContent(contentWithConfig);
       setHasUnsavedChanges(false);
       console.log('[PdfSettingsManager] Saved template with PDF_CONFIG:', pdfConfig);
+      toast.success('Plantilla actualizada');
     } catch (error) {
       console.error('Error saving template:', error);
     }
@@ -1186,6 +1198,35 @@ export function PdfSettingsManager() {
                           </div>
                         )}
                       </div>
+
+                      {/* Líneas en Totales */}
+                      <div className="mt-4 pt-4 border-t space-y-3">
+                        <div className="flex items-center justify-between">
+                          <Label>Mostrar líneas separadoras en Totales</Label>
+                          <Switch
+                            checked={showTotalsLines}
+                            onCheckedChange={(checked) => {
+                              setShowTotalsLines(checked);
+                              setHasUnsavedChanges(true);
+                            }}
+                          />
+                        </div>
+                        {showTotalsLines && (
+                          <div className="flex items-center gap-3">
+                            <Label className="w-32">Color de líneas:</Label>
+                            <Input
+                              type="color"
+                              value={totalsLineColor}
+                              onChange={(e) => {
+                                setTotalsLineColor(e.target.value);
+                                setHasUnsavedChanges(true);
+                              }}
+                              className="w-12 h-8 p-0"
+                            />
+                            <span className="text-xs text-muted-foreground">{totalsLineColor}</span>
+                          </div>
+                        )}
+                      </div>
                     </div>
 
                     {/* Vista previa */}
@@ -1227,6 +1268,10 @@ export function PdfSettingsManager() {
                         <div className="flex justify-between items-center">
                           <span className="text-muted-foreground">Bordes tabla:</span>
                           <span>{showTableBorders ? 'Sí' : 'No'}</span>
+                        </div>
+                        <div className="flex justify-between items-center">
+                          <span className="text-muted-foreground">Líneas totales:</span>
+                          <span>{showTotalsLines ? 'Sí' : 'No'}</span>
                         </div>
                       </div>
                     </div>
