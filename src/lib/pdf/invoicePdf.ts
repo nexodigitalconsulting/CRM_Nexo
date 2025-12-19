@@ -491,9 +491,12 @@ async function generateInvoicePdfFact2(
         color,
       });
 
-      // Draw separator line BETWEEN rows (not on last row)
+      // Move to next row FIRST
+      currentY -= totalsLineSpacing;
+
+      // Draw separator line BETWEEN rows (after moving, so line is above next text)
       if (showTotalsLines && i < rows.length - 1) {
-        const lineY = currentY - totalsLineSpacing / 2;
+        const lineY = currentY + 5; // 5px above next text
         drawLine(
           page, 
           totalsX, 
@@ -504,9 +507,6 @@ async function generateInvoicePdfFact2(
           0.5
         );
       }
-
-      // Move to next row using configured line spacing
-      currentY -= totalsLineSpacing;
     });
 
     y = currentY;
