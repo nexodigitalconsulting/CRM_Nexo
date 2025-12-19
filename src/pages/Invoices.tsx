@@ -374,7 +374,7 @@ export default function Invoices() {
         </div>
 
         {/* Filters */}
-        <div className="flex flex-col sm:flex-row gap-4">
+        <div className="flex flex-col sm:flex-row gap-4 items-center">
           <Input 
             placeholder="Buscar facturas..." 
             className="sm:w-80" 
@@ -393,6 +393,25 @@ export default function Invoices() {
               <SelectItem value="cancelled">Cancelada</SelectItem>
             </SelectContent>
           </Select>
+          
+          {/* Template indicator */}
+          {defaultTemplate && (
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <div className="flex items-center gap-1.5 text-xs bg-muted px-2 py-1 rounded-md">
+                    <FileText className="h-3 w-3" />
+                    <span className="text-muted-foreground">Plantilla:</span>
+                    <span className="font-medium">{defaultTemplate.name}</span>
+                  </div>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Plantilla PDF activa para descargas y envíos</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          )}
+          
           <div className="flex gap-2 ml-auto">
             <Button variant="outline" size="icon">
               <Filter className="h-4 w-4" />

@@ -117,6 +117,21 @@ npm run dev
 - [Guía de Despliegue en Easypanel](./easypanel/README.md)
 - [Arquitectura Híbrida PostgreSQL + Supabase](./docs/MIGRATION_HYBRID_ARCHITECTURE.md)
 
+## 🔐 Configuración de Google OAuth
+
+Para las integraciones de Gmail y Google Calendar, debes configurar las siguientes URLs de callback en Google Cloud Console:
+
+| Integración | URL de Callback |
+|-------------|-----------------|
+| **Gmail OAuth** | `https://honfwrfkiukckyoelsdm.supabase.co/functions/v1/gmail-oauth-callback` |
+| **Google Calendar** | `https://honfwrfkiukckyoelsdm.supabase.co/functions/v1/google-calendar-callback` |
+
+**Pasos:**
+1. Ve a [Google Cloud Console → Credenciales](https://console.cloud.google.com/apis/credentials)
+2. Edita tu cliente OAuth 2.0
+3. En "URIs de redirección autorizados", añade las URLs de arriba
+4. En "Pantalla de consentimiento OAuth", añade tu email como usuario de prueba si está en modo Testing
+
 ## 🔒 Seguridad
 
 - ✅ Row Level Security (RLS) en todas las tablas
