@@ -5,24 +5,43 @@ import { ExternalLink, AlertTriangle, Copy, CheckCircle2, Info } from 'lucide-re
 import { useState } from 'react';
 import { toast } from 'sonner';
 
-// Project ID dinámico - se puede obtener del cliente de Supabase
-const SUPABASE_PROJECT_ID = 'honfwrfkiukckyoelsdm';
+import { SUPABASE_URL } from '@/integrations/supabase/client';
 
 interface GmailOAuthInstructionsProps {
+  /** Permite sobreescribir la URL (útil en tests o casos especiales) */
   callbackUrl?: string;
   onClose?: () => void;
 }
 
-// URLs de callback para todas las integraciones de Google
-export const GOOGLE_CALLBACK_URLS = {
-  gmail: `https://${SUPABASE_PROJECT_ID}.supabase.co/functions/v1/gmail-oauth-callback`,
-  calendar: `https://${SUPABASE_PROJECT_ID}.supabase.co/functions/v1/google-calendar-callback`,
-};
+function getCallbackUrls() {
+  const base = (SUPABASE_URL || '').replace(/\/$/, '');
+  return {
+    gmail: `${base}/functions/v1/gmail-oauth-callback`,
+    calendar: `${base}/functions/v1/google-calendar-callback`,
+  };
+}
+
+function getCloudProjectId(): string | null {
+  try {
+    const base = (SUPABASE_URL || '').replace(/\/$/, '');
+    const hostname = new URL(base).hostname;
+    const parts = hostname.split('.');
+    if (parts.length >= 3 && parts.slice(-2).join('.') === 'supabase.co') {
+      return parts[0];
+    }
+  } catch {
+    // ignore
+  }
+  return null;
+}
 
 export function GmailOAuthInstructions({ callbackUrl, onClose }: GmailOAuthInstructionsProps) {
   const [copiedUrl, setCopiedUrl] = useState<string | null>(null);
 
-  const gmailCallbackUrl = callbackUrl || GOOGLE_CALLBACK_URLS.gmail;
+  const callbackUrls = getCallbackUrls();
+  const gmailCallbackUrl = callbackUrl || callbackUrls.gmail;
+  const calendarCallbackUrl = callbackUrls.calendar;
+  const cloudProjectId = getCloudProjectId();
 
   const handleCopy = async (url: string, label: string) => {
     try {
@@ -96,15 +115,15 @@ export function GmailOAuthInstructions({ callbackUrl, onClose }: GmailOAuthInstr
               <label className="text-xs font-medium">Google Calendar (sincronización):</label>
               <div className="flex items-center gap-2 bg-background p-2 rounded-md border">
                 <code className="text-xs flex-1 break-all font-mono text-primary">
-                  {GOOGLE_CALLBACK_URLS.calendar}
+                  {calendarCallbackUrl}
                 </code>
-                <Button 
-                  variant="ghost" 
-                  size="icon" 
-                  className="h-8 w-8 shrink-0" 
-                  onClick={() => handleCopy(GOOGLE_CALLBACK_URLS.calendar, 'Calendar')}
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 shrink-0"
+                  onClick={() => handleCopy(calendarCallbackUrl, 'Calendar')}
                 >
-                  {copiedUrl === GOOGLE_CALLBACK_URLS.calendar ? (
+                  {copiedUrl === calendarCallbackUrl ? (
                     <CheckCircle2 className="h-4 w-4 text-green-500" />
                   ) : (
                     <Copy className="h-4 w-4" />
@@ -189,15 +208,26 @@ export function GmailOAuthInstructions({ callbackUrl, onClose }: GmailOAuthInstr
               Asegúrate de que <code className="bg-muted px-1 rounded">GOOGLE_CLIENT_ID</code> y{' '}
               <code className="bg-muted px-1 rounded">GOOGLE_CLIENT_SECRET</code> coinciden con los de tu cliente OAuth.
             </p>
-            <Button
-              variant="outline"
-              size="sm"
-              className="gap-2"
-              onClick={() => window.open(`https://supabase.com/dashboard/project/${SUPABASE_PROJECT_ID}/settings/functions`, '_blank')}
-            >
-              <ExternalLink className="h-3 w-3" />
-              Ver Secretos de Edge Functions
-            </Button>
+            {cloudProjectId ? (
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-2"
+                onClick={() =>
+                  window.open(
+                    `https://supabase.com/dashboard/project/${cloudProjectId}/settings/functions`,
+                    '_blank'
+                  )
+                }
+              >
+                <ExternalLink className="h-3 w-3" />
+                Ver Secretos de Edge Functions
+              </Button>
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                Estás en un entorno autoalojado: revisa/gestiona los secretos en la configuración de tu stack (Easypanel / variables del servicio).
+              </p>
+            )}
           </div>
         </div>
 
