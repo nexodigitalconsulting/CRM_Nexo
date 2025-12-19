@@ -105,9 +105,9 @@ Deno.serve(async (req: Request) => {
   console.log(`[Dispatcher] Routing request to: ${functionName}`);
 
   try {
-    // Preparar variables de entorno como tuplas [key, value]
-    const envVarsObj = Deno.env.toObject();
-    const envVars = Object.keys(envVarsObj).map((k) => [k, envVarsObj[k]]);
+    // Pasar variables de entorno al worker
+    // Nota: algunas versiones de edge-runtime esperan un objeto { KEY: VALUE } (no tuplas).
+    const envVars = Deno.env.toObject() as Record<string, string>;
     
     // Crear worker para la función
     // @ts-ignore - EdgeRuntime es global en Supabase Edge Runtime
