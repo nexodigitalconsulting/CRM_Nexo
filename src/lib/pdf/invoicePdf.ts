@@ -494,9 +494,9 @@ async function generateInvoicePdfFact2(
       // Move to next row FIRST
       currentY -= totalsLineSpacing;
 
-      // Draw separator line BETWEEN rows (after moving, so line is above next text)
+      // Draw separator line BETWEEN rows (placed slightly BELOW next baseline to avoid touching text)
       if (showTotalsLines && i < rows.length - 1) {
-        const lineY = currentY + 5; // 5px above next text
+        const lineY = currentY - 2;
         drawLine(
           page, 
           totalsX, 
