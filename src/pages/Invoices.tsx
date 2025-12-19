@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { Header } from "@/components/layout/Header";
 import { DataTable } from "@/components/ui/data-table";
 import { StatusBadge } from "@/components/ui/status-badge";
@@ -11,7 +11,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Plus, Filter, FileText, Edit, Trash2, Mail, Download, Send } from "lucide-react";
+import { Plus, Filter, FileText, Edit, Trash2, Mail, Download, Send, Loader2 } from "lucide-react";
 import { ExportDropdown } from "@/components/common/ExportDropdown";
 import { TableViewManager, ColumnConfig } from "@/components/common/TableViewManager";
 import { useDefaultTableView } from "@/hooks/useTableViews";
@@ -36,6 +36,7 @@ import { useDefaultTemplate, extractPdfConfigFromTemplate } from "@/hooks/useDef
 import { downloadInvoicePdf } from "@/lib/pdf/invoicePdf";
 import { SendEmailDialog } from "@/components/common/SendEmailDialog";
 import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
 import {
   Tooltip,
   TooltipContent,
@@ -100,9 +101,31 @@ export default function Invoices() {
   // Email dialog state
   const [emailDialogOpen, setEmailDialogOpen] = useState(false);
   const [emailInvoiceId, setEmailInvoiceId] = useState<string | null>(null);
+  
+  // Download state
+  const [downloadingInvoiceId, setDownloadingInvoiceId] = useState<string | null>(null);
 
   // Fetch full invoice for email - this triggers when emailInvoiceId is set
   const { data: emailFullInvoice, isLoading: isLoadingEmailInvoice } = useInvoice(emailInvoiceId || undefined);
+  
+  // Function to fetch complete invoice with services for PDF generation
+  const fetchInvoiceForPdf = useCallback(async (invoiceId: string) => {
+    const { data, error } = await supabase
+      .from("invoices")
+      .select(`
+        *,
+        client:clients(id, name, cif, email, iban, address, city, postal_code),
+        services:invoice_services(
+          *,
+          service:services(id, name, price, description)
+        )
+      `)
+      .eq("id", invoiceId)
+      .single();
+    
+    if (error) throw error;
+    return data;
+  }, []);
 
   // Apply default view
   if (defaultView && visibleColumns.length === columnConfigs.filter(c => c.defaultVisible).length) {
@@ -262,28 +285,51 @@ export default function Invoices() {
           <Button
             variant="ghost"
             size="icon"
+            disabled={downloadingInvoiceId === invoice.id}
             onClick={async () => {
               try {
+                setDownloadingInvoiceId(invoice.id);
+                
+                // Fetch complete invoice with services
+                const fullInvoice = await fetchInvoiceForPdf(invoice.id);
+                
+                // Prepare invoice data with services
                 const invoiceData = {
-                  invoice_number: invoice.invoice_number,
-                  issue_date: invoice.issue_date,
-                  due_date: invoice.due_date,
-                  subtotal: invoice.subtotal,
-                  iva_amount: invoice.iva_amount,
-                  total: invoice.total,
-                  notes: invoice.notes,
-                  client: invoice.client,
+                  invoice_number: fullInvoice.invoice_number,
+                  issue_date: fullInvoice.issue_date,
+                  due_date: fullInvoice.due_date,
+                  subtotal: fullInvoice.subtotal,
+                  iva_amount: fullInvoice.iva_amount,
+                  iva_percent: fullInvoice.iva_percent,
+                  total: fullInvoice.total,
+                  notes: fullInvoice.notes,
+                  client: fullInvoice.client,
+                  services: fullInvoice.services,
                 };
+                
+                // Extract config from default template
                 const pdfConfig = extractPdfConfigFromTemplate(defaultTemplate);
+                
+                console.log('[PDF Download] Template:', defaultTemplate?.name);
+                console.log('[PDF Download] Config:', pdfConfig);
+                console.log('[PDF Download] Services count:', fullInvoice.services?.length || 0);
+                
                 await downloadInvoicePdf(invoiceData as any, companySettings as any, pdfConfig);
                 toast.success("PDF descargado");
               } catch (error) {
+                console.error('[PDF Download] Error:', error);
                 toast.error("Error al descargar PDF");
+              } finally {
+                setDownloadingInvoiceId(null);
               }
             }}
             title="Descargar PDF"
           >
-            <Download className="h-4 w-4" />
+            {downloadingInvoiceId === invoice.id ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Download className="h-4 w-4" />
+            )}
           </Button>
           <Button
             variant="ghost"
