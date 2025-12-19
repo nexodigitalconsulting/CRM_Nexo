@@ -155,6 +155,9 @@ Cada migración es una unidad completa:
 | v1.0.0 | 2024-12-01 | Schema base inicial |
 | v1.1.0 | 2024-12-17 | Tabla `pdf_settings` para personalización de documentos |
 | v1.2.0 | 2024-12-17 | Columna `signature_html` en `email_settings` |
+| v1.3.0 | 2024-12-17 | RLS para `schema_versions` - lectura pública |
+| v1.4.0 | 2024-12-18 | Columnas `is_sent` y `sent_at` en invoices, quotes, contracts |
+| v1.5.0 | 2024-12-18 | Tabla `email_logs`, tabla `gmail_config`, columna `provider` en email_settings |
 
 ## Troubleshooting
 
