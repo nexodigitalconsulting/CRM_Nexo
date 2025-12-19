@@ -13,12 +13,16 @@ serve(async (req) => {
 
   console.log(`[gmail-oauth-callback] Received callback`);
 
-  // HTML template for response
-  const htmlResponse = (title: string, message: string, isSuccess: boolean) => `
+  // Get the app URL for redirecting back (use origin from request or env)
+  const appUrl = Deno.env.get("APP_URL") || "https://nexodigitalconsulting.lovable.app";
+  
+  // HTML template for response with auto-redirect
+  const htmlResponse = (title: string, message: string, isSuccess: boolean, redirectUrl?: string) => `
     <!DOCTYPE html>
     <html>
     <head>
       <title>${title}</title>
+      <meta http-equiv="refresh" content="2;url=${redirectUrl || `${appUrl}/settings`}" />
       <style>
         body {
           font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
@@ -47,19 +51,18 @@ serve(async (req) => {
         }
         p {
           color: #6b7280;
-          margin: 0 0 24px 0;
+          margin: 0 0 16px 0;
         }
-        .close-btn {
-          background: ${isSuccess ? '#10b981' : '#ef4444'};
-          color: white;
-          border: none;
-          padding: 12px 24px;
-          border-radius: 8px;
-          font-size: 16px;
-          cursor: pointer;
+        .redirect-text {
+          font-size: 14px;
+          color: #9ca3af;
         }
-        .close-btn:hover {
-          opacity: 0.9;
+        a {
+          color: ${isSuccess ? '#059669' : '#dc2626'};
+          text-decoration: none;
+        }
+        a:hover {
+          text-decoration: underline;
         }
       </style>
     </head>
@@ -68,17 +71,8 @@ serve(async (req) => {
         <div class="icon">${isSuccess ? '✅' : '❌'}</div>
         <h1>${title}</h1>
         <p>${message}</p>
-        <button class="close-btn" onclick="window.close()">Cerrar ventana</button>
+        <p class="redirect-text">Redirigiendo automáticamente... <a href="${redirectUrl || `${appUrl}/settings`}">Click aquí si no redirige</a></p>
       </div>
-      <script>
-        // Auto-close after 3 seconds
-        setTimeout(() => {
-          if (window.opener) {
-            window.opener.postMessage({ type: 'gmail-oauth-${isSuccess ? 'success' : 'error'}' }, '*');
-          }
-          window.close();
-        }, 3000);
-      </script>
     </body>
     </html>
   `;
@@ -86,14 +80,14 @@ serve(async (req) => {
   if (error) {
     console.error(`[gmail-oauth-callback] OAuth error: ${error}`);
     return new Response(
-      htmlResponse("Error de autenticación", `No se pudo conectar con Gmail: ${error}`, false),
+      htmlResponse("Error de autenticación", `No se pudo conectar con Gmail: ${error}`, false, `${appUrl}/settings`),
       { headers: { "Content-Type": "text/html" } }
     );
   }
 
   if (!code) {
     return new Response(
-      htmlResponse("Error", "No se recibió el código de autorización", false),
+      htmlResponse("Error", "No se recibió el código de autorización", false, `${appUrl}/settings`),
       { headers: { "Content-Type": "text/html" } }
     );
   }
@@ -166,8 +160,9 @@ serve(async (req) => {
     return new Response(
       htmlResponse(
         "¡Gmail conectado!",
-        `Tu cuenta ${userInfo.email} ha sido vinculada correctamente. Esta ventana se cerrará automáticamente.`,
-        true
+        `Tu cuenta ${userInfo.email} ha sido vinculada correctamente. Redirigiendo...`,
+        true,
+        `${appUrl}/settings`
       ),
       { headers: { "Content-Type": "text/html" } }
     );
@@ -176,7 +171,7 @@ serve(async (req) => {
     const errorMessage = err instanceof Error ? err.message : "Error al conectar Gmail";
     console.error("[gmail-oauth-callback] Error:", errorMessage);
     return new Response(
-      htmlResponse("Error", errorMessage, false),
+      htmlResponse("Error", errorMessage, false, `${appUrl}/settings`),
       { headers: { "Content-Type": "text/html" } }
     );
   }

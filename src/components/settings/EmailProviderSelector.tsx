@@ -32,12 +32,12 @@ export function EmailProviderSelector({ onProviderChange, currentProvider }: Ema
 
       if (error) throw error;
       if (data?.authUrl) {
-        window.open(data.authUrl, '_blank', 'width=600,height=700');
+        // Redirect instead of popup to avoid ERR_BLOCKED_BY_RESPONSE
+        window.location.href = data.authUrl;
       }
     } catch (error) {
       console.error('Error connecting Gmail:', error);
       toast.error('Error al conectar con Gmail');
-    } finally {
       setIsConnecting(false);
     }
   };
