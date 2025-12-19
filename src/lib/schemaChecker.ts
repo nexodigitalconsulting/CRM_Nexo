@@ -9,7 +9,7 @@ export interface SchemaStatus {
   environment: "cloud" | "self-hosted" | "unknown";
 }
 
-export const TARGET_VERSION = "v1.4.0";
+export const TARGET_VERSION = "v1.5.0";
 
 // Required tables for the CRM to function
 const REQUIRED_TABLES = [
@@ -37,6 +37,8 @@ const REQUIRED_TABLES = [
   "schema_versions",
   "invoice_products",
   "quote_products",
+  "gmail_config",
+  "email_logs",
 ];
 
 /**
@@ -168,7 +170,29 @@ export async function checkSchemaDirectly(): Promise<SchemaStatus> {
       // Column check failed
     }
 
-    // 8. Determine if complete - version must match OR be higher
+    // 8. Check email_logs table (v1.5.0)
+    const { error: emailLogsError } = await supabase
+      .from("email_logs")
+      .select("id")
+      .limit(1);
+
+    if (emailLogsError?.code === "42P01") {
+      console.warn("[SchemaChecker] Tabla email_logs no existe (v1.5.0)");
+      status.missingComponents.push("email_logs table (v1.5.0)");
+    }
+
+    // 9. Check gmail_config table (v1.5.0)
+    const { error: gmailConfigError } = await supabase
+      .from("gmail_config")
+      .select("id")
+      .limit(1);
+
+    if (gmailConfigError?.code === "42P01") {
+      console.warn("[SchemaChecker] Tabla gmail_config no existe (v1.5.0)");
+      status.missingComponents.push("gmail_config table (v1.5.0)");
+    }
+
+    // 10. Determine if complete - version must match OR be higher
     const versionComparison = compareVersions(status.currentVersion, TARGET_VERSION);
     const versionOk = versionComparison >= 0; // Current >= Target is OK
     

@@ -545,9 +545,43 @@ CREATE TABLE IF NOT EXISTS public.email_settings (
   from_email text NOT NULL,
   from_name text,
   signature_html text,
+  provider text DEFAULT 'smtp',
   is_active boolean DEFAULT false,
   created_at timestamptz DEFAULT now(),
   updated_at timestamptz DEFAULT now()
+);
+
+-- Gmail OAuth Config (v1.5.0)
+CREATE TABLE IF NOT EXISTS public.gmail_config (
+  id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+  access_token text,
+  refresh_token text,
+  token_expiry timestamptz,
+  email_address text,
+  is_active boolean DEFAULT false,
+  created_at timestamptz DEFAULT now(),
+  updated_at timestamptz DEFAULT now()
+);
+
+-- Email Logs (v1.5.0)
+CREATE TABLE IF NOT EXISTS public.email_logs (
+  id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id uuid,
+  sender_email text NOT NULL,
+  sender_name text,
+  recipient_email text NOT NULL,
+  recipient_name text,
+  subject text NOT NULL,
+  body_preview text,
+  attachments jsonb DEFAULT '[]',
+  attachment_count integer DEFAULT 0,
+  entity_type text,
+  entity_id uuid,
+  provider text NOT NULL DEFAULT 'smtp',
+  status text NOT NULL DEFAULT 'sent',
+  error_message text,
+  sent_at timestamptz NOT NULL DEFAULT now(),
+  created_at timestamptz NOT NULL DEFAULT now()
 );
 
 -- Configuración de PDF
@@ -769,6 +803,8 @@ ALTER TABLE public.user_table_views ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.documents_rag ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.invoice_products ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.quote_products ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.gmail_config ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.email_logs ENABLE ROW LEVEL SECURITY;
 
 -- ============================================
 -- PARTE 5: POLÍTICAS RLS
@@ -973,6 +1009,23 @@ CREATE POLICY "Authenticated users can view pdf_settings" ON public.pdf_settings
 DROP POLICY IF EXISTS "Admins and managers can manage pdf_settings" ON public.pdf_settings;
 CREATE POLICY "Admins and managers can manage pdf_settings" ON public.pdf_settings FOR ALL USING (has_role(auth.uid(), 'admin') OR has_role(auth.uid(), 'manager'));
 
+-- Gmail Config (v1.5.0)
+DROP POLICY IF EXISTS "Admins can manage gmail config" ON public.gmail_config;
+CREATE POLICY "Admins can manage gmail config" ON public.gmail_config FOR ALL USING (has_role(auth.uid(), 'admin'));
+
+DROP POLICY IF EXISTS "Authenticated users can view gmail config" ON public.gmail_config;
+CREATE POLICY "Authenticated users can view gmail config" ON public.gmail_config FOR SELECT USING (has_any_role(auth.uid()));
+
+-- Email Logs (v1.5.0)
+DROP POLICY IF EXISTS "Admins and managers can view all email logs" ON public.email_logs;
+CREATE POLICY "Admins and managers can view all email logs" ON public.email_logs FOR SELECT USING (has_role(auth.uid(), 'admin') OR has_role(auth.uid(), 'manager'));
+
+DROP POLICY IF EXISTS "Users can view own email logs" ON public.email_logs;
+CREATE POLICY "Users can view own email logs" ON public.email_logs FOR SELECT USING (auth.uid() = user_id);
+
+DROP POLICY IF EXISTS "System can insert email logs" ON public.email_logs;
+CREATE POLICY "System can insert email logs" ON public.email_logs FOR INSERT WITH CHECK (true);
+
 -- ============================================
 -- PARTE 6: TRIGGERS
 -- ============================================
@@ -1086,11 +1139,12 @@ VALUES
   ('v1.1.0', 'Tabla pdf_settings para personalización de documentos', now()),
   ('v1.2.0', 'Columna signature_html en email_settings', now()),
   ('v1.3.0', 'RLS para schema_versions - lectura pública', now()),
-  ('v1.4.0', 'Columnas is_sent y sent_at en invoices, quotes, contracts', now())
+  ('v1.4.0', 'Columnas is_sent y sent_at en invoices, quotes, contracts', now()),
+  ('v1.5.0', 'Email logs, Gmail OAuth config, provider selector', now())
 ON CONFLICT (version) DO NOTHING;
 
 -- ============================================
--- ✅ SCHEMA COMPLETO INSTALADO - v1.4.0
+-- ✅ SCHEMA COMPLETO INSTALADO - v1.5.0
 -- ============================================
 
 DO $$
@@ -1098,6 +1152,8 @@ DECLARE
   v_invoices_ok boolean;
   v_quotes_ok boolean;
   v_contracts_ok boolean;
+  v_email_logs_ok boolean;
+  v_gmail_config_ok boolean;
 BEGIN
   -- Verificar componentes v1.4.0
   SELECT EXISTS (
@@ -1115,20 +1171,35 @@ BEGIN
     WHERE table_name = 'contracts' AND column_name = 'is_sent'
   ) INTO v_contracts_ok;
 
+  -- Verificar componentes v1.5.0
+  SELECT EXISTS (
+    SELECT 1 FROM information_schema.tables 
+    WHERE table_name = 'email_logs'
+  ) INTO v_email_logs_ok;
+  
+  SELECT EXISTS (
+    SELECT 1 FROM information_schema.tables 
+    WHERE table_name = 'gmail_config'
+  ) INTO v_gmail_config_ok;
+
   RAISE NOTICE '';
   RAISE NOTICE '[%] ════════════════════════════════════════════', clock_timestamp();
-  RAISE NOTICE '║  ✅ CRM Schema v1.4.0 instalado correctamente  ║';
+  RAISE NOTICE '║  ✅ CRM Schema v1.5.0 instalado correctamente  ║';
   RAISE NOTICE '════════════════════════════════════════════════════';
   RAISE NOTICE '';
   RAISE NOTICE '[%] VERIFICACIÓN DE COMPONENTES:', clock_timestamp();
+  RAISE NOTICE '  v1.4.0:';
   RAISE NOTICE '  • invoices.is_sent/sent_at:  %', CASE WHEN v_invoices_ok THEN '✓ OK' ELSE '✗ FALTA' END;
   RAISE NOTICE '  • quotes.is_sent/sent_at:    %', CASE WHEN v_quotes_ok THEN '✓ OK' ELSE '✗ FALTA' END;
   RAISE NOTICE '  • contracts.is_sent/sent_at: %', CASE WHEN v_contracts_ok THEN '✓ OK' ELSE '✗ FALTA' END;
+  RAISE NOTICE '  v1.5.0:';
+  RAISE NOTICE '  • email_logs tabla:          %', CASE WHEN v_email_logs_ok THEN '✓ OK' ELSE '✗ FALTA' END;
+  RAISE NOTICE '  • gmail_config tabla:        %', CASE WHEN v_gmail_config_ok THEN '✓ OK' ELSE '✗ FALTA' END;
   RAISE NOTICE '';
   RAISE NOTICE '[%] ESTADÍSTICAS:', clock_timestamp();
-  RAISE NOTICE '  • Tablas creadas: 28';
-  RAISE NOTICE '  • Políticas RLS: 50+';
-  RAISE NOTICE '  • Triggers: 13';
+  RAISE NOTICE '  • Tablas creadas: 30';
+  RAISE NOTICE '  • Políticas RLS: 55+';
+  RAISE NOTICE '  • Triggers: 14';
   RAISE NOTICE '  • Datos iniciales: Sí';
   RAISE NOTICE '';
   RAISE NOTICE '[%] SIGUIENTE PASO:', clock_timestamp();

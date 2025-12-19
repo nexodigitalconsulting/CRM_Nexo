@@ -1,5 +1,5 @@
 -- ============================================
--- APLICADOR INTELIGENTE DE MIGRACIONES v1.4.0
+-- APLICADOR INTELIGENTE DE MIGRACIONES v1.5.0
 -- Archivo: apply_all.sql
 -- Uso: Ejecutar en cualquier instalación para sincronizar a la última versión
 -- IMPORTANTE: Este script NO depende de funciones previas
@@ -326,32 +326,172 @@ BEGIN
 END $$;
 
 -- ============================================
--- VERIFICACIÓN FINAL DE COMPONENTES v1.4.0
+-- MIGRACIÓN v1.5.0 - Email Logs & Gmail OAuth
+-- ============================================
+DO $$
+BEGIN
+  RAISE NOTICE '[%] ───────────────────────────────────────────', clock_timestamp();
+  RAISE NOTICE '[%] Verificando v1.5.0 (Email Logs & Gmail OAuth)...', clock_timestamp();
+  
+  IF EXISTS (SELECT 1 FROM schema_versions WHERE version = 'v1.5.0') THEN
+    RAISE NOTICE '[%] → v1.5.0 ya aplicada - omitiendo', clock_timestamp();
+    RETURN;
+  END IF;
+
+  RAISE NOTICE '[%] Aplicando v1.5.0 - Email Logs & Gmail OAuth...', clock_timestamp();
+
+  -- ═══════════════════════════════════════════
+  -- TABLA email_logs
+  -- ═══════════════════════════════════════════
+  CREATE TABLE IF NOT EXISTS public.email_logs (
+    id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+    user_id uuid,
+    sender_email text NOT NULL,
+    sender_name text,
+    recipient_email text NOT NULL,
+    recipient_name text,
+    subject text NOT NULL,
+    body_preview text,
+    attachments jsonb DEFAULT '[]',
+    attachment_count integer DEFAULT 0,
+    entity_type text,
+    entity_id uuid,
+    provider text NOT NULL DEFAULT 'smtp',
+    status text NOT NULL DEFAULT 'sent',
+    error_message text,
+    sent_at timestamptz NOT NULL DEFAULT now(),
+    created_at timestamptz NOT NULL DEFAULT now()
+  );
+  RAISE NOTICE '[%]   • Tabla email_logs creada', clock_timestamp();
+
+  -- Índices para email_logs
+  CREATE INDEX IF NOT EXISTS idx_email_logs_user_id ON email_logs(user_id);
+  CREATE INDEX IF NOT EXISTS idx_email_logs_entity ON email_logs(entity_type, entity_id);
+  CREATE INDEX IF NOT EXISTS idx_email_logs_sent_at ON email_logs(sent_at DESC);
+  RAISE NOTICE '[%]   • Índices de email_logs creados', clock_timestamp();
+
+  -- RLS para email_logs
+  ALTER TABLE public.email_logs ENABLE ROW LEVEL SECURITY;
+
+  -- Políticas
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'email_logs' AND policyname = 'Admins and managers can view all email logs') THEN
+    CREATE POLICY "Admins and managers can view all email logs" 
+      ON public.email_logs FOR SELECT 
+      USING (has_role(auth.uid(), 'admin') OR has_role(auth.uid(), 'manager'));
+  END IF;
+
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'email_logs' AND policyname = 'Users can view own email logs') THEN
+    CREATE POLICY "Users can view own email logs" 
+      ON public.email_logs FOR SELECT 
+      USING (auth.uid() = user_id);
+  END IF;
+
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'email_logs' AND policyname = 'System can insert email logs') THEN
+    CREATE POLICY "System can insert email logs" 
+      ON public.email_logs FOR INSERT 
+      WITH CHECK (true);
+  END IF;
+
+  RAISE NOTICE '[%]   • Políticas RLS de email_logs creadas', clock_timestamp();
+
+  -- ═══════════════════════════════════════════
+  -- TABLA gmail_config
+  -- ═══════════════════════════════════════════
+  CREATE TABLE IF NOT EXISTS public.gmail_config (
+    id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+    access_token text,
+    refresh_token text,
+    token_expiry timestamptz,
+    email_address text,
+    is_active boolean DEFAULT false,
+    created_at timestamptz DEFAULT now(),
+    updated_at timestamptz DEFAULT now()
+  );
+  RAISE NOTICE '[%]   • Tabla gmail_config creada', clock_timestamp();
+
+  -- Trigger updated_at para gmail_config
+  IF EXISTS (SELECT 1 FROM pg_proc WHERE proname = 'update_updated_at_column') THEN
+    DROP TRIGGER IF EXISTS update_gmail_config_updated_at ON gmail_config;
+    CREATE TRIGGER update_gmail_config_updated_at
+      BEFORE UPDATE ON gmail_config
+      FOR EACH ROW
+      EXECUTE FUNCTION update_updated_at_column();
+    RAISE NOTICE '[%]   • Trigger updated_at para gmail_config creado', clock_timestamp();
+  END IF;
+
+  -- RLS para gmail_config
+  ALTER TABLE public.gmail_config ENABLE ROW LEVEL SECURITY;
+
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'gmail_config' AND policyname = 'Admins can manage gmail config') THEN
+    CREATE POLICY "Admins can manage gmail config" 
+      ON public.gmail_config FOR ALL 
+      USING (has_role(auth.uid(), 'admin'));
+  END IF;
+
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'gmail_config' AND policyname = 'Authenticated users can view gmail config') THEN
+    CREATE POLICY "Authenticated users can view gmail config" 
+      ON public.gmail_config FOR SELECT 
+      USING (has_any_role(auth.uid()));
+  END IF;
+
+  RAISE NOTICE '[%]   • Políticas RLS de gmail_config creadas', clock_timestamp();
+
+  -- ═══════════════════════════════════════════
+  -- COLUMNA provider EN email_settings
+  -- ═══════════════════════════════════════════
+  IF EXISTS (
+    SELECT 1 FROM information_schema.tables 
+    WHERE table_schema = 'public' AND table_name = 'email_settings'
+  ) THEN
+    IF NOT EXISTS (
+      SELECT 1 FROM information_schema.columns 
+      WHERE table_schema = 'public' 
+      AND table_name = 'email_settings' 
+      AND column_name = 'provider'
+    ) THEN
+      ALTER TABLE email_settings ADD COLUMN provider text DEFAULT 'smtp';
+      RAISE NOTICE '[%]   • Columna provider añadida a email_settings', clock_timestamp();
+    ELSE
+      RAISE NOTICE '[%]   → Columna provider ya existe en email_settings', clock_timestamp();
+    END IF;
+  END IF;
+
+  -- Registrar migración
+  INSERT INTO schema_versions (version, description, applied_at)
+  VALUES ('v1.5.0', 'Email logs, Gmail OAuth config, provider selector', now());
+
+  RAISE NOTICE '[%] ✓ v1.5.0 aplicada correctamente', clock_timestamp();
+END $$;
+
+-- ============================================
+-- VERIFICACIÓN FINAL DE COMPONENTES v1.5.0
 -- ============================================
 DO $$
 DECLARE
   v_current text;
   v_count int;
+  v_email_logs boolean;
+  v_gmail_config boolean;
+  v_provider_col boolean;
   v_invoices_is_sent boolean;
-  v_invoices_sent_at boolean;
   v_quotes_is_sent boolean;
-  v_quotes_sent_at boolean;
   v_contracts_is_sent boolean;
-  v_contracts_sent_at boolean;
   v_all_ok boolean;
 BEGIN
   SELECT get_current_schema_version() INTO v_current;
   SELECT COUNT(*) INTO v_count FROM schema_versions;
   
-  -- Verificar cada columna
-  SELECT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'invoices' AND column_name = 'is_sent') INTO v_invoices_is_sent;
-  SELECT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'invoices' AND column_name = 'sent_at') INTO v_invoices_sent_at;
-  SELECT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'quotes' AND column_name = 'is_sent') INTO v_quotes_is_sent;
-  SELECT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'quotes' AND column_name = 'sent_at') INTO v_quotes_sent_at;
-  SELECT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'contracts' AND column_name = 'is_sent') INTO v_contracts_is_sent;
-  SELECT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'contracts' AND column_name = 'sent_at') INTO v_contracts_sent_at;
+  -- Verificar componentes v1.5.0
+  SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'email_logs') INTO v_email_logs;
+  SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'gmail_config') INTO v_gmail_config;
+  SELECT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'email_settings' AND column_name = 'provider') INTO v_provider_col;
   
-  v_all_ok := v_invoices_is_sent AND v_invoices_sent_at AND v_quotes_is_sent AND v_quotes_sent_at AND v_contracts_is_sent AND v_contracts_sent_at;
+  -- Verificar componentes v1.4.0
+  SELECT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'invoices' AND column_name = 'is_sent') INTO v_invoices_is_sent;
+  SELECT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'quotes' AND column_name = 'is_sent') INTO v_quotes_is_sent;
+  SELECT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'contracts' AND column_name = 'is_sent') INTO v_contracts_is_sent;
+  
+  v_all_ok := v_email_logs AND v_gmail_config AND v_provider_col AND v_invoices_is_sent AND v_quotes_is_sent AND v_contracts_is_sent;
   
   RAISE NOTICE '';
   RAISE NOTICE '[%] ═══════════════════════════════════════════════════════', clock_timestamp();
@@ -361,14 +501,16 @@ BEGIN
   RAISE NOTICE '[%] Total migraciones aplicadas: %', clock_timestamp(), v_count;
   RAISE NOTICE '';
   RAISE NOTICE '[%] ═══════════════════════════════════════════════════════', clock_timestamp();
-  RAISE NOTICE '[%] VERIFICACIÓN COMPONENTES v1.4.0', clock_timestamp();
+  RAISE NOTICE '[%] VERIFICACIÓN COMPONENTES', clock_timestamp();
   RAISE NOTICE '[%] ═══════════════════════════════════════════════════════', clock_timestamp();
-  RAISE NOTICE '[%] invoices.is_sent:   %', clock_timestamp(), CASE WHEN v_invoices_is_sent THEN '✓' ELSE '✗' END;
-  RAISE NOTICE '[%] invoices.sent_at:   %', clock_timestamp(), CASE WHEN v_invoices_sent_at THEN '✓' ELSE '✗' END;
-  RAISE NOTICE '[%] quotes.is_sent:     %', clock_timestamp(), CASE WHEN v_quotes_is_sent THEN '✓' ELSE '✗' END;
-  RAISE NOTICE '[%] quotes.sent_at:     %', clock_timestamp(), CASE WHEN v_quotes_sent_at THEN '✓' ELSE '✗' END;
-  RAISE NOTICE '[%] contracts.is_sent:  %', clock_timestamp(), CASE WHEN v_contracts_is_sent THEN '✓' ELSE '✗' END;
-  RAISE NOTICE '[%] contracts.sent_at:  %', clock_timestamp(), CASE WHEN v_contracts_sent_at THEN '✓' ELSE '✗' END;
+  RAISE NOTICE '[%] v1.4.0:', clock_timestamp();
+  RAISE NOTICE '[%]   invoices.is_sent:     %', clock_timestamp(), CASE WHEN v_invoices_is_sent THEN '✓' ELSE '✗' END;
+  RAISE NOTICE '[%]   quotes.is_sent:       %', clock_timestamp(), CASE WHEN v_quotes_is_sent THEN '✓' ELSE '✗' END;
+  RAISE NOTICE '[%]   contracts.is_sent:    %', clock_timestamp(), CASE WHEN v_contracts_is_sent THEN '✓' ELSE '✗' END;
+  RAISE NOTICE '[%] v1.5.0:', clock_timestamp();
+  RAISE NOTICE '[%]   email_logs tabla:     %', clock_timestamp(), CASE WHEN v_email_logs THEN '✓' ELSE '✗' END;
+  RAISE NOTICE '[%]   gmail_config tabla:   %', clock_timestamp(), CASE WHEN v_gmail_config THEN '✓' ELSE '✗' END;
+  RAISE NOTICE '[%]   email_settings.provider: %', clock_timestamp(), CASE WHEN v_provider_col THEN '✓' ELSE '✗' END;
   RAISE NOTICE '[%] ═══════════════════════════════════════════════════════', clock_timestamp();
   RAISE NOTICE '[%] ESTADO FINAL: %', clock_timestamp(), CASE WHEN v_all_ok THEN '✅ TODOS LOS COMPONENTES OK' ELSE '⚠️ FALTAN COMPONENTES' END;
   RAISE NOTICE '[%] ═══════════════════════════════════════════════════════', clock_timestamp();
