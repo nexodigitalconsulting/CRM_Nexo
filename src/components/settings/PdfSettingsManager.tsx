@@ -46,12 +46,13 @@ import {
   Loader2, FileText, Palette, Eye, Save, Layout, Type, Image, 
   CheckCircle, AlertCircle, PenTool, Plus, Trash2, Copy, Star,
   Building2, User, Calendar, DollarSign, Hash, Mail, Phone, MapPin,
-  Table2, FileSignature, Settings2
+  Table2, FileSignature, Settings2, Layers
 } from "lucide-react";
 import { toast } from "sonner";
 import { PdfPreview } from "./PdfPreview";
+import { PdfSectionEditor } from "./PdfSectionEditor";
 import { embedPdfConfigInTemplate, extractPdfConfigFromTemplate } from "@/hooks/useDefaultTemplate";
-import { PdfConfig } from "@/lib/pdf/pdfUtils";
+import { PdfConfig, PdfSections, getDefaultSections } from "@/lib/pdf/pdfUtils";
 
 type DocumentType = 'invoice' | 'quote' | 'contract';
 
@@ -507,6 +508,9 @@ export function PdfSettingsManager() {
   const [showTotalsLines, setShowTotalsLines] = useState(true);
   const [totalsLineColor, setTotalsLineColor] = useState('#e5e7eb');
 
+  // Section-based configuration
+  const [sections, setSections] = useState<PdfSections>(getDefaultSections());
+
   const { data: templates = [], isLoading } = usePdfTemplates(selectedDocument);
   const createTemplate = useCreatePdfTemplate();
   const updateTemplate = useUpdatePdfTemplate();
@@ -543,6 +547,13 @@ export function PdfSettingsManager() {
     // Load totals separator settings
     setShowTotalsLines(config.show_totals_lines ?? true);
     if (config.totals_line_color) setTotalsLineColor(config.totals_line_color);
+
+    // Load section-based configuration
+    if (config.sections) {
+      setSections({ ...getDefaultSections(), ...config.sections });
+    } else {
+      setSections(getDefaultSections());
+    }
   }, [selectedDocument]);
 
   // Seleccionar plantilla predeterminada al cargar
@@ -649,6 +660,8 @@ export function PdfSettingsManager() {
         // Totals
         show_totals_lines: showTotalsLines,
         totals_line_color: totalsLineColor,
+        // Section-based configuration
+        sections: sections,
       };
 
       // Embed PDF_CONFIG comment in the content for reliable extraction
@@ -872,8 +885,12 @@ export function PdfSettingsManager() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Editor Panel */}
           <div className="lg:col-span-2">
-            <Tabs defaultValue="colors" className="w-full">
-              <TabsList className="grid w-full grid-cols-4">
+            <Tabs defaultValue="sections" className="w-full">
+              <TabsList className="grid w-full grid-cols-5">
+                <TabsTrigger value="sections" className="gap-1">
+                  <Layers className="h-4 w-4" />
+                  <span className="hidden sm:inline">Secciones</span>
+                </TabsTrigger>
                 <TabsTrigger value="colors" className="gap-1">
                   <Palette className="h-4 w-4" />
                   <span className="hidden sm:inline">Colores</span>
@@ -891,6 +908,17 @@ export function PdfSettingsManager() {
                   <span className="hidden sm:inline">Bloques</span>
                 </TabsTrigger>
               </TabsList>
+
+              {/* Secciones - Nueva pestaña */}
+              <TabsContent value="sections" className="mt-4">
+                <PdfSectionEditor 
+                  sections={sections} 
+                  onChange={(newSections) => {
+                    setSections(newSections);
+                    setHasUnsavedChanges(true);
+                  }} 
+                />
+              </TabsContent>
 
               {/* Colores */}
               <TabsContent value="colors" className="mt-4">

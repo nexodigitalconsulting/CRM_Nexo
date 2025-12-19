@@ -5,6 +5,69 @@ export const A4_WIDTH = 595.28;
 export const A4_HEIGHT = 841.89;
 export const MARGIN = 50;
 
+// Section configuration for individual PDF areas
+export interface PdfSectionConfig {
+  margin_top: number;      // Distance from previous section
+  spacing: number;         // Internal spacing
+  visible: boolean;        // Show/hide section
+}
+
+export interface PdfHeaderSection extends PdfSectionConfig {
+  logo_size?: number;      // Logo max height (40-80)
+}
+
+export interface PdfTitleSection extends PdfSectionConfig {
+  text?: string;           // Custom title text
+  size?: number;           // Title font size
+}
+
+export interface PdfDatesSection extends PdfSectionConfig {}
+
+export interface PdfClientSection extends PdfSectionConfig {
+  padding: number;         // Internal padding
+  background_color?: string;
+}
+
+export interface PdfTableSection extends PdfSectionConfig {
+  row_height: number;      // Row height
+  header_height: number;   // Header row height
+  show_borders: boolean;   // Show row dividers
+  border_color?: string;   // Border color
+}
+
+export interface PdfTotalsSection extends PdfSectionConfig {
+  line_spacing: number;    // Spacing between total lines
+  show_lines: boolean;     // Show separator lines
+  line_color?: string;     // Separator line color
+}
+
+export interface PdfFooterSection extends PdfSectionConfig {
+  show_iban: boolean;      // Show IBAN in footer
+}
+
+export interface PdfSections {
+  header: PdfHeaderSection;
+  title: PdfTitleSection;
+  dates: PdfDatesSection;
+  client: PdfClientSection;
+  table: PdfTableSection;
+  totals: PdfTotalsSection;
+  footer: PdfFooterSection;
+}
+
+// Default section values
+export function getDefaultSections(): PdfSections {
+  return {
+    header: { margin_top: 0, spacing: 8, visible: true, logo_size: 60 },
+    title: { margin_top: 20, spacing: 16, visible: true, size: 28 },
+    dates: { margin_top: 22, spacing: 10, visible: true },
+    client: { margin_top: 20, spacing: 14, visible: true, padding: 14, background_color: '#f8f9fa' },
+    table: { margin_top: 28, spacing: 0, visible: true, row_height: 22, header_height: 24, show_borders: true, border_color: '#e5e7eb' },
+    totals: { margin_top: 10, spacing: 0, visible: true, line_spacing: 22, show_lines: true, line_color: '#e5e7eb' },
+    footer: { margin_top: 40, spacing: 12, visible: true, show_iban: true },
+  };
+}
+
 // PDF Configuration interface matching pdf_settings table
 export interface PdfConfig {
   primary_color?: string;
@@ -39,6 +102,9 @@ export interface PdfConfig {
   // Totals section
   show_totals_lines?: boolean;      // Show separator lines in totals block (default: true)
   totals_line_color?: string;       // Totals separator color (default: border)
+
+  // Section-based configuration (NEW)
+  sections?: PdfSections;
 }
 
 export interface PdfColors {
