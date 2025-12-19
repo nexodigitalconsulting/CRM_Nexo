@@ -46,7 +46,7 @@ import {
   Loader2, FileText, Palette, Eye, Save, Layout, Type, Image, 
   CheckCircle, AlertCircle, PenTool, Plus, Trash2, Copy, Star,
   Building2, User, Calendar, DollarSign, Hash, Mail, Phone, MapPin,
-  Table2, FileSignature, Code, Settings2
+  Table2, FileSignature, Settings2
 } from "lucide-react";
 import { toast } from "sonner";
 import { PdfPreview } from "./PdfPreview";
@@ -493,6 +493,13 @@ export function PdfSettingsManager() {
   const [tableHeaderColor, setTableHeaderColor] = useState('#3b82f6');
   const [showFooterLegal, setShowFooterLegal] = useState(false);
   const [footerLegalText, setFooterLegalText] = useState('');
+  
+  // Spacing settings
+  const [lineSpacing, setLineSpacing] = useState(14);
+  const [sectionSpacing, setSectionSpacing] = useState(28);
+  const [rowHeight, setRowHeight] = useState(22);
+  const [clientBoxPadding, setClientBoxPadding] = useState(14);
+  const [docMargins, setDocMargins] = useState(50);
 
   const { data: templates = [], isLoading } = usePdfTemplates(selectedDocument);
   const createTemplate = useCreatePdfTemplate();
@@ -515,6 +522,13 @@ export function PdfSettingsManager() {
     if (config.table_header_color) setTableHeaderColor(config.table_header_color);
     setShowFooterLegal(config.show_footer_legal ?? false);
     if (config.footer_legal_lines) setFooterLegalText(config.footer_legal_lines.join('\n'));
+    
+    // Load spacing settings
+    if (config.line_spacing) setLineSpacing(config.line_spacing);
+    if (config.section_spacing) setSectionSpacing(config.section_spacing);
+    if (config.row_height) setRowHeight(config.row_height);
+    if (config.client_box_padding) setClientBoxPadding(config.client_box_padding);
+    if (config.margins) setDocMargins(config.margins);
   }, [selectedDocument]);
 
   // Seleccionar plantilla predeterminada al cargar
@@ -609,6 +623,12 @@ export function PdfSettingsManager() {
         table_header_color: tableHeaderColor,
         show_footer_legal: showFooterLegal,
         footer_legal_lines: footerLegalText.split('\n').filter(line => line.trim()),
+        // Spacing parameters
+        line_spacing: lineSpacing,
+        section_spacing: sectionSpacing,
+        row_height: rowHeight,
+        client_box_padding: clientBoxPadding,
+        margins: docMargins,
       };
 
       // Embed PDF_CONFIG comment in the content for reliable extraction
@@ -832,7 +852,7 @@ export function PdfSettingsManager() {
           {/* Editor Panel */}
           <div className="lg:col-span-2">
             <Tabs defaultValue="colors" className="w-full">
-              <TabsList className="grid w-full grid-cols-5">
+              <TabsList className="grid w-full grid-cols-4">
                 <TabsTrigger value="colors" className="gap-1">
                   <Palette className="h-4 w-4" />
                   <span className="hidden sm:inline">Colores</span>
@@ -843,15 +863,11 @@ export function PdfSettingsManager() {
                 </TabsTrigger>
                 <TabsTrigger value="content" className="gap-1">
                   <Layout className="h-4 w-4" />
-                  <span className="hidden sm:inline">Contenido</span>
+                  <span className="hidden sm:inline">Variables</span>
                 </TabsTrigger>
                 <TabsTrigger value="blocks" className="gap-1">
                   <Table2 className="h-4 w-4" />
                   <span className="hidden sm:inline">Bloques</span>
-                </TabsTrigger>
-                <TabsTrigger value="code" className="gap-1">
-                  <Code className="h-4 w-4" />
-                  <span className="hidden sm:inline">HTML</span>
                 </TabsTrigger>
               </TabsList>
 
@@ -1054,25 +1070,121 @@ export function PdfSettingsManager() {
                       )}
                     </div>
 
+                    {/* Espaciado */}
+                    <div className="space-y-4">
+                      <h4 className="font-medium text-sm flex items-center gap-2">
+                        <Layout className="h-4 w-4" />
+                        Espaciado
+                      </h4>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <Label>Espaciado entre líneas: {lineSpacing}px</Label>
+                          <Input
+                            type="range"
+                            min="10"
+                            max="22"
+                            value={lineSpacing}
+                            onChange={(e) => {
+                              setLineSpacing(Number(e.target.value));
+                              setHasUnsavedChanges(true);
+                            }}
+                            className="w-full"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Espacio entre secciones: {sectionSpacing}px</Label>
+                          <Input
+                            type="range"
+                            min="16"
+                            max="50"
+                            value={sectionSpacing}
+                            onChange={(e) => {
+                              setSectionSpacing(Number(e.target.value));
+                              setHasUnsavedChanges(true);
+                            }}
+                            className="w-full"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Altura de filas tabla: {rowHeight}px</Label>
+                          <Input
+                            type="range"
+                            min="18"
+                            max="36"
+                            value={rowHeight}
+                            onChange={(e) => {
+                              setRowHeight(Number(e.target.value));
+                              setHasUnsavedChanges(true);
+                            }}
+                            className="w-full"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Padding caja cliente: {clientBoxPadding}px</Label>
+                          <Input
+                            type="range"
+                            min="8"
+                            max="28"
+                            value={clientBoxPadding}
+                            onChange={(e) => {
+                              setClientBoxPadding(Number(e.target.value));
+                              setHasUnsavedChanges(true);
+                            }}
+                            className="w-full"
+                          />
+                        </div>
+                        <div className="space-y-2 col-span-2">
+                          <Label>Márgenes del documento: {docMargins}px</Label>
+                          <Input
+                            type="range"
+                            min="30"
+                            max="80"
+                            value={docMargins}
+                            onChange={(e) => {
+                              setDocMargins(Number(e.target.value));
+                              setHasUnsavedChanges(true);
+                            }}
+                            className="w-full"
+                          />
+                        </div>
+                      </div>
+                    </div>
+
                     {/* Vista previa */}
                     <div className="border rounded-lg p-4 bg-muted/30">
                       <p className="text-sm font-medium mb-3">Vista previa de configuración</p>
-                      <div className="space-y-2 text-sm">
+                      <div className="grid grid-cols-2 gap-x-6 gap-y-2 text-sm">
                         <div className="flex justify-between">
                           <span className="text-muted-foreground">Título:</span>
-                          <span className="font-medium" style={{ fontSize: `${Math.min(titleSize / 2, 16)}px` }}>{titleText}</span>
+                          <span className="font-medium">{titleText} ({titleSize}px)</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Espaciado líneas:</span>
+                          <span>{lineSpacing}px</span>
                         </div>
                         <div className="flex justify-between items-center">
                           <span className="text-muted-foreground">Caja cliente:</span>
-                          <div className="w-16 h-4 rounded" style={{ backgroundColor: clientBoxColor }} />
+                          <div className="w-12 h-4 rounded" style={{ backgroundColor: clientBoxColor }} />
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Espacio secciones:</span>
+                          <span>{sectionSpacing}px</span>
                         </div>
                         <div className="flex justify-between items-center">
                           <span className="text-muted-foreground">Cabecera tabla:</span>
-                          <div className="w-16 h-4 rounded" style={{ backgroundColor: tableHeaderColor }} />
+                          <div className="w-12 h-4 rounded" style={{ backgroundColor: tableHeaderColor }} />
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Altura filas:</span>
+                          <span>{rowHeight}px</span>
                         </div>
                         <div className="flex justify-between">
                           <span className="text-muted-foreground">Pie legal:</span>
-                          <span>{showFooterLegal ? 'Activado' : 'Desactivado'}</span>
+                          <span>{showFooterLegal ? 'Sí' : 'No'}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Márgenes:</span>
+                          <span>{docMargins}px</span>
                         </div>
                       </div>
                     </div>
@@ -1085,7 +1197,7 @@ export function PdfSettingsManager() {
                 <Card>
                   <CardContent className="pt-6">
                     <p className="text-sm text-muted-foreground mb-4">
-                      Haz clic en una variable para insertarla en el editor HTML
+                      Variables disponibles para usar en las plantillas PDF
                     </p>
                     <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
                       {allVariables.map((variable) => (
@@ -1148,19 +1260,6 @@ export function PdfSettingsManager() {
                 </Card>
               </TabsContent>
 
-              {/* Editor HTML */}
-              <TabsContent value="code" className="mt-4">
-                <Card>
-                  <CardContent className="pt-6">
-                    <Textarea
-                      value={editedContent}
-                      onChange={(e) => handleContentChange(e.target.value)}
-                      className="font-mono text-xs min-h-[500px]"
-                      placeholder="Escribe o pega tu HTML aquí..."
-                    />
-                  </CardContent>
-                </Card>
-              </TabsContent>
             </Tabs>
           </div>
 
