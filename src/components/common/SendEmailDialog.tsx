@@ -163,7 +163,12 @@ export function SendEmailDialog({
       
       switch (entityType) {
         case 'invoice':
-          return await generateInvoicePdfBase64(entityData as unknown as InvoiceData, company, pdfConfig);
+          return await generateInvoicePdfBase64(
+            entityData as unknown as InvoiceData,
+            company,
+            pdfConfig,
+            defaultDocTemplate as any
+          );
         case 'quote':
           return await generateQuotePdfBase64(entityData as unknown as QuoteData, company, pdfConfig);
         case 'contract':
@@ -190,7 +195,7 @@ export function SendEmailDialog({
       
       switch (entityType) {
         case 'invoice':
-          await downloadInvoicePdf(entityData as unknown as InvoiceData, company, pdfConfig);
+          await downloadInvoicePdf(entityData as unknown as InvoiceData, company, pdfConfig, defaultDocTemplate as any);
           break;
         case 'quote':
           await downloadQuotePdf(entityData as unknown as QuoteData, company, pdfConfig);

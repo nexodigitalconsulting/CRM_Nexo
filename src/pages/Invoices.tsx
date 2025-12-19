@@ -314,7 +314,7 @@ export default function Invoices() {
                 console.log('[PDF Download] Config:', pdfConfig);
                 console.log('[PDF Download] Services count:', fullInvoice.services?.length || 0);
                 
-                await downloadInvoicePdf(invoiceData as any, companySettings as any, pdfConfig);
+                await downloadInvoicePdf(invoiceData as any, companySettings as any, pdfConfig, defaultTemplate as any);
                 toast.success("PDF descargado");
               } catch (error) {
                 console.error('[PDF Download] Error:', error);
