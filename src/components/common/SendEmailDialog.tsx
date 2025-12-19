@@ -6,9 +6,10 @@ import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Mail, Send, Eye, FileText, Paperclip, Loader2, Download } from "lucide-react";
+import { Mail, Send, Eye, FileText, Paperclip, Loader2, Download, Star } from "lucide-react";
 import { useSendEmail, useEmailTemplates, useEmailSettings, EmailTemplate } from "@/hooks/useEmailSettings";
 import { useCompanySettings } from "@/hooks/useCompanySettings";
+import { useDefaultTemplate, extractColorsFromTemplate } from "@/hooks/useDefaultTemplate";
 import { toast } from "sonner";
 import { 
   generateInvoicePdfBase64, 
@@ -21,6 +22,7 @@ import {
   InvoiceData,
   QuoteData,
   ContractData,
+  PdfConfig,
 } from "@/lib/pdf";
 
 interface SendEmailDialogProps {
@@ -75,6 +77,7 @@ export function SendEmailDialog({
   const { data: emailSettings } = useEmailSettings();
   const { data: templates } = useEmailTemplates();
   const { data: companySettings } = useCompanySettings();
+  const { data: defaultDocTemplate } = useDefaultTemplate(entityType);
   const sendEmail = useSendEmail();
 
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
@@ -83,6 +86,17 @@ export function SendEmailDialog({
   const [formData, setFormData] = useState({ to: "", cc: "", subject: "", html: "" });
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
+  
+  // Get PDF config from the default document template
+  const getPdfConfigFromTemplate = (): PdfConfig | undefined => {
+    if (!defaultDocTemplate?.content) return undefined;
+    
+    const colors = extractColorsFromTemplate(defaultDocTemplate.content);
+    return {
+      primary_color: colors.primaryColor,
+      secondary_color: colors.secondaryColor,
+    };
+  };
   
   const availableTemplates = templates?.filter(t => TEMPLATE_TYPES_BY_ENTITY[entityType]?.includes(t.template_type)) || [];
   const selectedTemplate = templates?.find(t => t.id === selectedTemplateId) || availableTemplates[0];
@@ -150,14 +164,15 @@ export function SendEmailDialog({
     
     try {
       const company = getCompanyData();
+      const pdfConfig = getPdfConfigFromTemplate();
       
       switch (entityType) {
         case 'invoice':
-          return await generateInvoicePdfBase64(entityData as unknown as InvoiceData, company);
+          return await generateInvoicePdfBase64(entityData as unknown as InvoiceData, company, pdfConfig);
         case 'quote':
-          return await generateQuotePdfBase64(entityData as unknown as QuoteData, company);
+          return await generateQuotePdfBase64(entityData as unknown as QuoteData, company, pdfConfig);
         case 'contract':
-          return await generateContractPdfBase64(entityData as unknown as ContractData, company);
+          return await generateContractPdfBase64(entityData as unknown as ContractData, company, pdfConfig);
         default:
           return null;
       }
@@ -176,16 +191,17 @@ export function SendEmailDialog({
     setIsDownloading(true);
     try {
       const company = getCompanyData();
+      const pdfConfig = getPdfConfigFromTemplate();
       
       switch (entityType) {
         case 'invoice':
-          await downloadInvoicePdf(entityData as unknown as InvoiceData, company);
+          await downloadInvoicePdf(entityData as unknown as InvoiceData, company, pdfConfig);
           break;
         case 'quote':
-          await downloadQuotePdf(entityData as unknown as QuoteData, company);
+          await downloadQuotePdf(entityData as unknown as QuoteData, company, pdfConfig);
           break;
         case 'contract':
-          await downloadContractPdf(entityData as unknown as ContractData, company);
+          await downloadContractPdf(entityData as unknown as ContractData, company, pdfConfig);
           break;
       }
       toast.success("PDF descargado");
