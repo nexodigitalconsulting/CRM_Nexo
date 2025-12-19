@@ -346,6 +346,10 @@ export function generatePdfConfigComment(config: PdfConfig): string {
     // Table borders
     show_table_borders: config.show_table_borders,
     table_border_color: config.table_border_color,
+
+    // Totals
+    show_totals_lines: config.show_totals_lines,
+    totals_line_color: config.totals_line_color,
   };
 
   // Remove undefined values
