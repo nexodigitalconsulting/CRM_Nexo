@@ -491,22 +491,22 @@ async function generateInvoicePdfFact2(
         color,
       });
 
-      // Move to next row FIRST
-      currentY -= totalsLineSpacing;
-
-      // Draw separator line BETWEEN rows (placed slightly BELOW next baseline to avoid touching text)
+      // Draw separator line just UNDER the current row text (and keep clear space to next row)
       if (showTotalsLines && i < rows.length - 1) {
-        const lineY = currentY - 2;
+        const lineY = currentY - 3;
         drawLine(
-          page, 
-          totalsX, 
-          lineY, 
-          right, 
-          lineY, 
-          rgb(totalsLineRgb.r, totalsLineRgb.g, totalsLineRgb.b), 
-          0.5
+          page,
+          totalsX,
+          lineY,
+          right,
+          lineY,
+          rgb(totalsLineRgb.r, totalsLineRgb.g, totalsLineRgb.b),
+          0.5,
         );
       }
+
+      // Move to next row using configured line spacing
+      currentY -= totalsLineSpacing;
     });
 
     y = currentY;
