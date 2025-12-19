@@ -314,7 +314,7 @@ export function extractPdfConfigFromTemplate(template: DocumentTemplate | null):
  * This should be called when saving a template to ensure config is persisted
  */
 export function generatePdfConfigComment(config: PdfConfig): string {
-  const configObj = {
+  const configObj: Record<string, unknown> = {
     primary_color: config.primary_color,
     secondary_color: config.secondary_color,
     accent_color: config.accent_color,
@@ -325,7 +325,19 @@ export function generatePdfConfigComment(config: PdfConfig): string {
     show_discounts_column: config.show_discounts_column,
     header_style: config.header_style,
     font_size_base: config.font_size_base,
+    // Extended configurable parameters
+    title_text: config.title_text,
+    title_size: config.title_size,
+    title_color: config.title_color,
+    client_box_color: config.client_box_color,
+    table_header_color: config.table_header_color,
+    show_footer_legal: config.show_footer_legal,
+    footer_legal_lines: config.footer_legal_lines,
   };
+  // Remove undefined values
+  Object.keys(configObj).forEach(key => {
+    if (configObj[key] === undefined) delete configObj[key];
+  });
   return `<!-- PDF_CONFIG: ${JSON.stringify(configObj)} -->`;
 }
 

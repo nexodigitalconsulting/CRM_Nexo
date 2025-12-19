@@ -7,6 +7,7 @@ import {
   A4_HEIGHT,
   MARGIN,
   createColorsFromConfig,
+  hexToRgb,
   formatCurrency,
   formatDate,
   drawLine,
@@ -93,6 +94,14 @@ async function generateInvoicePdfFact2(
   const pdfColors = createColorsFromConfig(config);
   const fontSize = config?.font_size_base || 10;
   const showIban = config?.show_iban_footer !== false;
+  
+  // Configurable parameters from template
+  const titleText = config?.title_text || 'FACTURA';
+  const titleSize = config?.title_size || 28;
+  const clientBoxColor = config?.client_box_color || '#f8f9fa';
+  const tableHeaderColor = config?.table_header_color || config?.primary_color || '#3b82f6';
+  const showFooterLegal = config?.show_footer_legal !== false;
+  const footerLegalLines = config?.footer_legal_lines || [];
 
   const clientData: ClientData = invoice.client || { name: 'Cliente' };
 
@@ -141,17 +150,16 @@ async function generateInvoicePdfFact2(
     rightY -= 14;
   });
 
-  // Title centered (matches Fact2 HTML: 28px title, 16px number)
+  // Title centered - uses configurable titleText and titleSize
   y = headerTopY - 40;
-  const title = 'FACTURA';
-  const titleSize = 28;
-  const titleWidth = fonts.bold.widthOfTextAtSize(title, titleSize);
-  page.drawText(title, {
+  const titleWidth = fonts.bold.widthOfTextAtSize(titleText, titleSize);
+  const titleColor = config?.title_color ? hexToRgb(config.title_color) : null;
+  page.drawText(titleText, {
     x: (A4_WIDTH - titleWidth) / 2,
     y,
     size: titleSize,
     font: fonts.bold,
-    color: pdfColors.primary,
+    color: titleColor ? rgb(titleColor.r, titleColor.g, titleColor.b) : pdfColors.primary,
   });
 
   const numberText = `Nº ${formatInvoiceNumber(invoice.invoice_number)}`;
@@ -200,16 +208,16 @@ async function generateInvoicePdfFact2(
 
   y -= 28;
 
-  // Client box
+  // Client box - use configurable clientBoxColor
   const boxPadding = 14;
   const boxHeight = 78;
+  const clientBoxRgb = hexToRgb(clientBoxColor);
   page.drawRectangle({
     x: MARGIN,
     y: y - boxHeight,
     width: A4_WIDTH - MARGIN * 2,
     height: boxHeight,
-    // Match template background: #f8f9fa
-    color: rgb(248 / 255, 249 / 255, 250 / 255),
+    color: rgb(clientBoxRgb.r, clientBoxRgb.g, clientBoxRgb.b),
   });
 
   let boxY = y - boxPadding - 10;
@@ -254,14 +262,15 @@ async function generateInvoicePdfFact2(
 
   y = y - boxHeight - 25;
 
-  // Services table (header with primary background, white text)
+  // Services table - use configurable tableHeaderColor
   const headerHeight = 26;
+  const tableHeaderRgb = hexToRgb(tableHeaderColor);
   page.drawRectangle({
     x: MARGIN,
     y: y - headerHeight + 6,
     width: A4_WIDTH - MARGIN * 2,
     height: headerHeight,
-    color: pdfColors.primary,
+    color: rgb(tableHeaderRgb.r, tableHeaderRgb.g, tableHeaderRgb.b),
   });
 
   const cols = [
@@ -384,12 +393,50 @@ async function generateInvoicePdfFact2(
     }
   });
 
-  // Footer (matches Fact2 HTML: 2 centered lines)
-  const footerTopY = 70;
+  // Footer section
+  let footerTopY = 100; // Start higher if we have legal text
+  
+  // Legal footer lines (configurable)
+  if (showFooterLegal && footerLegalLines.length > 0) {
+    const legalFontSize = 8;
+    const legalColor = rgb(100 / 255, 116 / 255, 139 / 255); // #64748b
+    
+    let legalY = footerTopY + (footerLegalLines.length * 12);
+    
+    // Draw legal background
+    page.drawRectangle({
+      x: MARGIN,
+      y: footerTopY - 10,
+      width: A4_WIDTH - MARGIN * 2,
+      height: footerLegalLines.length * 14 + 20,
+      color: rgb(248 / 255, 250 / 255, 252 / 255), // #f8fafc
+    });
+    
+    drawLine(page, MARGIN, legalY + 10, A4_WIDTH - MARGIN, legalY + 10, pdfColors.border, 0.5);
+    
+    footerLegalLines.forEach((legalLine) => {
+      const trimmedLine = legalLine.substring(0, 120);
+      const lw = fonts.regular.widthOfTextAtSize(trimmedLine, legalFontSize);
+      page.drawText(trimmedLine, {
+        x: (A4_WIDTH - lw) / 2,
+        y: legalY - 5,
+        size: legalFontSize,
+        font: fonts.regular,
+        color: legalColor,
+      });
+      legalY -= 12;
+    });
+    
+    footerTopY = legalY - 20;
+  } else {
+    footerTopY = 70;
+  }
+  
+  // Company info footer
   drawLine(page, MARGIN, footerTopY, A4_WIDTH - MARGIN, footerTopY, pdfColors.border, 0.5);
 
   const footerColor = rgb(156 / 255, 163 / 255, 175 / 255); // #9ca3af
-  const footerSize = 9; // ~11px in HTML
+  const footerSize = 9;
 
   const line1Parts = [company.name, company.address].filter(Boolean);
   const line1Raw = line1Parts.join(' · ');

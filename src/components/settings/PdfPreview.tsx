@@ -1,9 +1,11 @@
 import { useMemo } from 'react';
+import { PdfConfig } from '@/lib/pdf/pdfUtils';
 
 interface PdfPreviewProps {
   content: string;
   documentType: 'invoice' | 'contract' | 'quote';
   scale?: number;
+  config?: PdfConfig;
 }
 
 // Datos de ejemplo para la previsualización
@@ -137,11 +139,21 @@ function replaceVariables(content: string, data: Record<string, unknown>): strin
   return result;
 }
 
-export function PdfPreview({ content, documentType, scale = 0.5 }: PdfPreviewProps) {
+export function PdfPreview({ content, documentType, scale = 0.5, config }: PdfPreviewProps) {
   const renderedContent = useMemo(() => {
     const data = SAMPLE_DATA[documentType];
-    return replaceVariables(content, data);
-  }, [content, documentType]);
+    let result = replaceVariables(content, data);
+    
+    // Apply config overrides for visual preview consistency
+    if (config?.title_text) {
+      // Replace title text in preview
+      result = result.replace(/>FACTURA</g, `>${config.title_text}<`);
+      result = result.replace(/>PRESUPUESTO</g, `>${config.title_text}<`);
+      result = result.replace(/>CONTRATO</g, `>${config.title_text}<`);
+    }
+    
+    return result;
+  }, [content, documentType, config]);
 
   // A4 dimensions in pixels at 72 DPI: 595 x 842
   const pageWidth = 595;

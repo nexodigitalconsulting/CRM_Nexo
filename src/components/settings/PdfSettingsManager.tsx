@@ -46,7 +46,7 @@ import {
   Loader2, FileText, Palette, Eye, Save, Layout, Type, Image, 
   CheckCircle, AlertCircle, PenTool, Plus, Trash2, Copy, Star,
   Building2, User, Calendar, DollarSign, Hash, Mail, Phone, MapPin,
-  Table2, FileSignature, Code
+  Table2, FileSignature, Code, Settings2
 } from "lucide-react";
 import { toast } from "sonner";
 import { PdfPreview } from "./PdfPreview";
@@ -485,6 +485,14 @@ export function PdfSettingsManager() {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [newTemplateName, setNewTemplateName] = useState('');
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  
+  // Extended design settings
+  const [titleText, setTitleText] = useState('FACTURA');
+  const [titleSize, setTitleSize] = useState(28);
+  const [clientBoxColor, setClientBoxColor] = useState('#f1f5f9');
+  const [tableHeaderColor, setTableHeaderColor] = useState('#3b82f6');
+  const [showFooterLegal, setShowFooterLegal] = useState(false);
+  const [footerLegalText, setFooterLegalText] = useState('');
 
   const { data: templates = [], isLoading } = usePdfTemplates(selectedDocument);
   const createTemplate = useCreatePdfTemplate();
@@ -494,6 +502,21 @@ export function PdfSettingsManager() {
 
   const selectedTemplate = templates.find(t => t.id === selectedTemplateId);
 
+  // Load extended config when template is selected
+  const loadExtendedConfig = useCallback((content: string) => {
+    const templateData = { content, id: '', name: '', entity_type: selectedDocument, variables: null, is_default: false, is_active: true, created_at: '', updated_at: '' };
+    const config = extractPdfConfigFromTemplate(templateData as any);
+    
+    if (config.primary_color) setPrimaryColor(config.primary_color);
+    if (config.secondary_color) setSecondaryColor(config.secondary_color);
+    if (config.title_text) setTitleText(config.title_text);
+    if (config.title_size) setTitleSize(config.title_size);
+    if (config.client_box_color) setClientBoxColor(config.client_box_color);
+    if (config.table_header_color) setTableHeaderColor(config.table_header_color);
+    setShowFooterLegal(config.show_footer_legal ?? false);
+    if (config.footer_legal_lines) setFooterLegalText(config.footer_legal_lines.join('\n'));
+  }, [selectedDocument]);
+
   // Seleccionar plantilla predeterminada al cargar
   useEffect(() => {
     if (templates.length > 0 && !selectedTemplateId) {
@@ -501,23 +524,26 @@ export function PdfSettingsManager() {
       setSelectedTemplateId(defaultTemplate.id);
       setEditedContent(defaultTemplate.content);
       setEditedName(defaultTemplate.name);
-      extractColorsFromContent(defaultTemplate.content);
+      loadExtendedConfig(defaultTemplate.content);
     }
-  }, [templates, selectedTemplateId]);
+  }, [templates, selectedTemplateId, loadExtendedConfig]);
 
   // Resetear selección cuando cambia el tipo de documento
   useEffect(() => {
     setSelectedTemplateId(null);
     setHasUnsavedChanges(false);
+    // Reset title based on document type
+    const defaultTitles: Record<DocumentType, string> = {
+      invoice: 'FACTURA',
+      quote: 'PRESUPUESTO',
+      contract: 'CONTRATO'
+    };
+    setTitleText(defaultTitles[selectedDocument]);
   }, [selectedDocument]);
 
-  // Extraer colores del contenido HTML usando el extractor mejorado
+  // Legacy function for backward compatibility
   const extractColorsFromContent = (content: string) => {
-    // First try to extract from PDF_CONFIG comment
-    const templateData = { content, id: '', name: '', entity_type: selectedDocument, variables: null, is_default: false, is_active: true, created_at: '', updated_at: '' };
-    const config = extractPdfConfigFromTemplate(templateData as any);
-    if (config.primary_color) setPrimaryColor(config.primary_color);
-    if (config.secondary_color) setSecondaryColor(config.secondary_color);
+    loadExtendedConfig(content);
   };
 
   // Actualizar colores en el contenido
@@ -564,7 +590,7 @@ export function PdfSettingsManager() {
   const handleSave = async () => {
     if (!selectedTemplateId) return;
     try {
-      // Create PDF_CONFIG from current settings
+      // Create PDF_CONFIG from current settings including extended parameters
       const pdfConfig: PdfConfig = {
         primary_color: primaryColor,
         secondary_color: secondaryColor,
@@ -576,6 +602,13 @@ export function PdfSettingsManager() {
         show_discounts_column: editedContent.includes('{{discount'),
         header_style: 'classic',
         font_size_base: 10,
+        // Extended parameters
+        title_text: titleText,
+        title_size: titleSize,
+        client_box_color: clientBoxColor,
+        table_header_color: tableHeaderColor,
+        show_footer_legal: showFooterLegal,
+        footer_legal_lines: footerLegalText.split('\n').filter(line => line.trim()),
       };
 
       // Embed PDF_CONFIG comment in the content for reliable extraction
@@ -799,10 +832,14 @@ export function PdfSettingsManager() {
           {/* Editor Panel */}
           <div className="lg:col-span-2">
             <Tabs defaultValue="colors" className="w-full">
-              <TabsList className="grid w-full grid-cols-4">
+              <TabsList className="grid w-full grid-cols-5">
                 <TabsTrigger value="colors" className="gap-1">
                   <Palette className="h-4 w-4" />
                   <span className="hidden sm:inline">Colores</span>
+                </TabsTrigger>
+                <TabsTrigger value="design" className="gap-1">
+                  <Settings2 className="h-4 w-4" />
+                  <span className="hidden sm:inline">Diseño</span>
                 </TabsTrigger>
                 <TabsTrigger value="content" className="gap-1">
                   <Layout className="h-4 w-4" />
@@ -882,6 +919,160 @@ export function PdfSettingsManager() {
                         <div className="flex items-center gap-2">
                           <div className="w-6 h-6 rounded border" style={{ backgroundColor: secondaryColor }} />
                           <span className="text-sm" style={{ color: secondaryColor }}>Texto secundario</span>
+                        </div>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </TabsContent>
+
+              {/* Diseño Avanzado */}
+              <TabsContent value="design" className="mt-4">
+                <Card>
+                  <CardContent className="pt-6 space-y-6">
+                    {/* Título */}
+                    <div className="space-y-4">
+                      <h4 className="font-medium text-sm flex items-center gap-2">
+                        <Type className="h-4 w-4" />
+                        Título del documento
+                      </h4>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <Label>Texto del título</Label>
+                          <Input
+                            value={titleText}
+                            onChange={(e) => {
+                              setTitleText(e.target.value);
+                              setHasUnsavedChanges(true);
+                            }}
+                            placeholder="FACTURA"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Tamaño (px): {titleSize}</Label>
+                          <Input
+                            type="range"
+                            min="20"
+                            max="40"
+                            value={titleSize}
+                            onChange={(e) => {
+                              setTitleSize(Number(e.target.value));
+                              setHasUnsavedChanges(true);
+                            }}
+                            className="w-full"
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Colores de elementos */}
+                    <div className="space-y-4">
+                      <h4 className="font-medium text-sm flex items-center gap-2">
+                        <Palette className="h-4 w-4" />
+                        Colores de elementos
+                      </h4>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <Label>Fondo caja cliente</Label>
+                          <div className="flex gap-2">
+                            <Input
+                              type="color"
+                              value={clientBoxColor}
+                              onChange={(e) => {
+                                setClientBoxColor(e.target.value);
+                                setHasUnsavedChanges(true);
+                              }}
+                              className="w-12 h-10 p-1 cursor-pointer"
+                            />
+                            <Input
+                              value={clientBoxColor}
+                              onChange={(e) => {
+                                setClientBoxColor(e.target.value);
+                                setHasUnsavedChanges(true);
+                              }}
+                              className="flex-1 font-mono text-sm"
+                            />
+                          </div>
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Cabecera de tabla</Label>
+                          <div className="flex gap-2">
+                            <Input
+                              type="color"
+                              value={tableHeaderColor}
+                              onChange={(e) => {
+                                setTableHeaderColor(e.target.value);
+                                setHasUnsavedChanges(true);
+                              }}
+                              className="w-12 h-10 p-1 cursor-pointer"
+                            />
+                            <Input
+                              value={tableHeaderColor}
+                              onChange={(e) => {
+                                setTableHeaderColor(e.target.value);
+                                setHasUnsavedChanges(true);
+                              }}
+                              className="flex-1 font-mono text-sm"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Footer Legal */}
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between">
+                        <h4 className="font-medium text-sm flex items-center gap-2">
+                          <FileSignature className="h-4 w-4" />
+                          Pie legal
+                        </h4>
+                        <Switch
+                          checked={showFooterLegal}
+                          onCheckedChange={(checked) => {
+                            setShowFooterLegal(checked);
+                            setHasUnsavedChanges(true);
+                          }}
+                        />
+                      </div>
+                      {showFooterLegal && (
+                        <div className="space-y-2">
+                          <Label>Texto legal (una línea por fila)</Label>
+                          <Textarea
+                            value={footerLegalText}
+                            onChange={(e) => {
+                              setFooterLegalText(e.target.value);
+                              setHasUnsavedChanges(true);
+                            }}
+                            placeholder="Esta factura ha sido emitida conforme a la legislación vigente.&#10;Los datos fiscales son confidenciales.&#10;Para consultas contacte con info@empresa.com"
+                            rows={4}
+                            className="text-sm"
+                          />
+                          <p className="text-xs text-muted-foreground">
+                            Cada línea aparecerá centrada en el pie del PDF
+                          </p>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Vista previa */}
+                    <div className="border rounded-lg p-4 bg-muted/30">
+                      <p className="text-sm font-medium mb-3">Vista previa de configuración</p>
+                      <div className="space-y-2 text-sm">
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Título:</span>
+                          <span className="font-medium" style={{ fontSize: `${Math.min(titleSize / 2, 16)}px` }}>{titleText}</span>
+                        </div>
+                        <div className="flex justify-between items-center">
+                          <span className="text-muted-foreground">Caja cliente:</span>
+                          <div className="w-16 h-4 rounded" style={{ backgroundColor: clientBoxColor }} />
+                        </div>
+                        <div className="flex justify-between items-center">
+                          <span className="text-muted-foreground">Cabecera tabla:</span>
+                          <div className="w-16 h-4 rounded" style={{ backgroundColor: tableHeaderColor }} />
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Pie legal:</span>
+                          <span>{showFooterLegal ? 'Activado' : 'Desactivado'}</span>
                         </div>
                       </div>
                     </div>
