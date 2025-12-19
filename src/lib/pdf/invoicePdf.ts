@@ -102,10 +102,17 @@ async function generateInvoicePdfFact2(
   const tableHeaderColor = config?.table_header_color || config?.primary_color || '#3b82f6';
   const showFooterLegal = config?.show_footer_legal !== false;
   const footerLegalLines = config?.footer_legal_lines || [];
+  
+  // Spacing parameters (configurable)
+  const lineSpacing = config?.line_spacing || 14;
+  const sectionSpacing = config?.section_spacing || 28;
+  const rowHeight = config?.row_height || 22;
+  const boxPadding = config?.client_box_padding || 14;
+  const docMargin = config?.margins || MARGIN;
 
   const clientData: ClientData = invoice.client || { name: 'Cliente' };
 
-  let y = A4_HEIGHT - MARGIN;
+  let y = A4_HEIGHT - docMargin;
 
   // Header (logo + company name) LEFT, details RIGHT
   const showLogo = config?.show_logo !== false;
@@ -206,10 +213,9 @@ async function generateInvoicePdfFact2(
     color: pdfColors.text,
   });
 
-  y -= 28;
+  y -= sectionSpacing;
 
-  // Client box - use configurable clientBoxColor
-  const boxPadding = 14;
+  // Client box - use configurable clientBoxColor and boxPadding
   const boxHeight = 78;
   const clientBoxRgb = hexToRgb(clientBoxColor);
   page.drawRectangle({
@@ -295,7 +301,6 @@ async function generateInvoicePdfFact2(
   y = y - headerHeight - 6;
 
   const services = invoice.services || [];
-  const rowHeight = 22;
 
   services.forEach((svc, idx) => {
     if (idx % 2 === 1) {

@@ -25,6 +25,12 @@ export interface PdfConfig {
   table_header_color?: string;      // Background color for table header
   show_footer_legal?: boolean;      // Show legal footer text
   footer_legal_lines?: string[];    // Lines of legal text for footer
+  // Spacing parameters
+  line_spacing?: number;            // Spacing between text lines (12-20, default: 14)
+  section_spacing?: number;         // Space between sections (20-40, default: 28)
+  row_height?: number;              // Table row height (18-30, default: 22)
+  client_box_padding?: number;      // Client box padding (10-25, default: 14)
+  margins?: number;                 // Document margins (40-70, default: 50)
 }
 
 export interface PdfColors {
