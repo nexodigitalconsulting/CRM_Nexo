@@ -61,9 +61,21 @@ export function MigrationGate({ children }: MigrationGateProps) {
         if (!error && data) {
           setResult(data);
 
-          // Edge Function worked - this is Cloud environment
+          // Edge Function worked - determine environment from response or URL
           const directStatus = await checkSchemaDirectly();
-          directStatus.environment = "cloud";
+          
+          // Use environment from edge function response if available, otherwise detect from URL
+          const edgeEnv = (data as any)?.environment;
+          const currentUrl = window.location.hostname;
+          const isSelfHostedUrl = currentUrl.includes("easypanel") || 
+                                  currentUrl.includes("localhost") ||
+                                  currentUrl.includes("127.0.0.1");
+          
+          if (edgeEnv === "self-hosted" || edgeEnv === "hybrid" || isSelfHostedUrl) {
+            directStatus.environment = "self-hosted";
+          } else {
+            directStatus.environment = "cloud";
+          }
           setSchemaStatus(directStatus);
 
           if (data.requiresSetup) {
