@@ -16,8 +16,6 @@ interface EmailProviderSelectorProps {
   currentProvider: string;
 }
 
-const CALLBACK_URL = 'https://honfwrfkiukckyoelsdm.supabase.co/functions/v1/gmail-oauth-callback';
-
 export function EmailProviderSelector({ onProviderChange, currentProvider }: EmailProviderSelectorProps) {
   const { data: gmailConfig, refetch: refetchGmail } = useGmailConfig();
   const { data: emailSettings } = useEmailSettings();
@@ -82,10 +80,7 @@ export function EmailProviderSelector({ onProviderChange, currentProvider }: Ema
   return (
     <div className="space-y-4">
       {showInstructions && (
-        <GmailOAuthInstructions 
-          callbackUrl={CALLBACK_URL} 
-          onClose={() => setShowInstructions(false)} 
-        />
+        <GmailOAuthInstructions onClose={() => setShowInstructions(false)} />
       )}
 
       <Card>
