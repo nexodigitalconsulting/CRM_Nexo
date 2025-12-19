@@ -350,6 +350,9 @@ export function generatePdfConfigComment(config: PdfConfig): string {
     // Totals
     show_totals_lines: config.show_totals_lines,
     totals_line_color: config.totals_line_color,
+
+    // Section-based configuration
+    sections: config.sections,
   };
 
   // Remove undefined values

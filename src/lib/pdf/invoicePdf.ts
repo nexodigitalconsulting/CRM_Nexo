@@ -26,6 +26,8 @@ import {
   CompanyData,
   ClientData,
   PdfConfig,
+  PdfSections,
+  getDefaultSections,
 } from './pdfUtils';
 
 export interface InvoiceService {
@@ -93,32 +95,41 @@ async function generateInvoicePdfFact2(
 
   const pdfColors = createColorsFromConfig(config);
   const fontSize = config?.font_size_base || 10;
-  const showIban = config?.show_iban_footer !== false;
+  
+  // Get section configuration (use defaults if not provided)
+  const defaultSections = getDefaultSections();
+  const sections: PdfSections = config?.sections 
+    ? { ...defaultSections, ...config.sections }
+    : defaultSections;
+  
+  // Legacy config values (can be overridden by sections)
+  const showIban = sections.footer.show_iban ?? config?.show_iban_footer !== false;
   
   // Configurable parameters from template
-  const titleText = config?.title_text || 'FACTURA';
-  const titleSize = config?.title_size || 28;
-  const clientBoxColor = config?.client_box_color || '#f8f9fa';
+  const titleText = sections.title.text || config?.title_text || 'FACTURA';
+  const titleSize = sections.title.size || config?.title_size || 28;
+  const clientBoxColor = sections.client.background_color || config?.client_box_color || '#f8f9fa';
   const tableHeaderColor = config?.table_header_color || config?.primary_color || '#3b82f6';
   const showFooterLegal = config?.show_footer_legal !== false;
   const footerLegalLines = config?.footer_legal_lines || [];
   
-  // Spacing parameters (configurable)
-  const lineSpacing = config?.line_spacing || 14;
-  const sectionSpacing = config?.section_spacing || 28;
-  const rowHeight = config?.row_height || 22;
-  const boxPadding = config?.client_box_padding || 14;
+  // Section-based spacing parameters
+  const lineSpacing = sections.client.spacing || config?.line_spacing || 14;
+  const sectionSpacing = sections.title.margin_top + sections.dates.margin_top || config?.section_spacing || 28;
+  const rowHeight = sections.table.row_height || config?.row_height || 22;
+  const boxPadding = sections.client.padding || config?.client_box_padding || 14;
   const docMargin = config?.margins || MARGIN;
 
-  // Table borders
-  const showTableBorders = config?.show_table_borders !== false;
-  const tableBorderColor = config?.table_border_color || '#e5e7eb';
+  // Table borders from sections
+  const showTableBorders = sections.table.show_borders ?? config?.show_table_borders !== false;
+  const tableBorderColor = sections.table.border_color || config?.table_border_color || '#e5e7eb';
   const tableBorderRgb = hexToRgb(tableBorderColor);
 
-  // Totals separators
-  const showTotalsLines = config?.show_totals_lines !== false;
-  const totalsLineColor = config?.totals_line_color;
+  // Totals separators from sections
+  const showTotalsLines = sections.totals.show_lines ?? config?.show_totals_lines !== false;
+  const totalsLineColor = sections.totals.line_color || config?.totals_line_color;
   const totalsLineRgb = totalsLineColor ? hexToRgb(totalsLineColor) : null;
+  const totalsLineSpacing = sections.totals.line_spacing || 22;
 
   const clientData: ClientData = invoice.client || { name: 'Cliente' };
 
@@ -439,9 +450,10 @@ async function generateInvoicePdfFact2(
       color,
     });
 
+    // Use section-based line spacing for totals
     const gap = isTotal
-      ? Math.max(26, lineSpacing + 12)
-      : Math.max(18, lineSpacing + 6);
+      ? totalsLineSpacing + 6
+      : totalsLineSpacing;
 
     const nextY = currentY - gap;
 
