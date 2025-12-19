@@ -19,9 +19,19 @@ Deno.serve(async (req) => {
     // Determine environment type
     let environment: "lovable-cloud" | "self-hosted" | "hybrid" = "lovable-cloud";
     
+    // Detect self-hosted: Easypanel uses .easypanel.host domains or custom domains
+    // Also check for localhost, 127.0.0.1, or explicit SELF_HOSTED flag
+    const isSelfHosted = 
+      supabaseUrl.includes("easypanel") ||
+      supabaseUrl.includes("localhost") ||
+      supabaseUrl.includes("127.0.0.1") ||
+      supabaseUrl.includes("self-hosted") ||
+      Deno.env.get("SELF_HOSTED") === "true" ||
+      Deno.env.get("EASYPANEL") === "true";
+    
     if (externalPostgres) {
       environment = "hybrid"; // Using external Postgres with Lovable Edge Functions
-    } else if (supabaseUrl.includes("localhost") || supabaseUrl.includes("self-hosted")) {
+    } else if (isSelfHosted) {
       environment = "self-hosted";
     }
 
@@ -35,7 +45,7 @@ Deno.serve(async (req) => {
           dbMigrate: true,
           setupDatabase: true,
         },
-        version: "1.2.0",
+        version: "1.5.0",
       }),
       {
         status: 200,
