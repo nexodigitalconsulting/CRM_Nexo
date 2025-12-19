@@ -26,6 +26,8 @@ export interface PdfDatesSection extends PdfSectionConfig {}
 export interface PdfClientSection extends PdfSectionConfig {
   padding: number;         // Internal padding
   background_color?: string;
+  show_border?: boolean;   // Show border around client box
+  border_color?: string;   // Border color
 }
 
 export interface PdfTableSection extends PdfSectionConfig {
