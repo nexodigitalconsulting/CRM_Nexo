@@ -99,443 +99,493 @@ async function generateInvoicePdfFact2(
   // Get section configuration (use defaults if not provided)
   const defaultSections = getDefaultSections();
   const sections: PdfSections = config?.sections 
-    ? { ...defaultSections, ...config.sections }
+    ? { 
+        header: { ...defaultSections.header, ...config.sections.header },
+        title: { ...defaultSections.title, ...config.sections.title },
+        dates: { ...defaultSections.dates, ...config.sections.dates },
+        client: { ...defaultSections.client, ...config.sections.client },
+        table: { ...defaultSections.table, ...config.sections.table },
+        totals: { ...defaultSections.totals, ...config.sections.totals },
+        footer: { ...defaultSections.footer, ...config.sections.footer },
+      }
     : defaultSections;
-  
-  // Legacy config values (can be overridden by sections)
-  const showIban = sections.footer.show_iban ?? config?.show_iban_footer !== false;
-  
-  // Configurable parameters from template
-  const titleText = sections.title.text || config?.title_text || 'FACTURA';
-  const titleSize = sections.title.size || config?.title_size || 28;
-  const clientBoxColor = sections.client.background_color || config?.client_box_color || '#f8f9fa';
-  const tableHeaderColor = config?.table_header_color || config?.primary_color || '#3b82f6';
-  const showFooterLegal = config?.show_footer_legal !== false;
-  const footerLegalLines = config?.footer_legal_lines || [];
-  
-  // Section-based spacing parameters
-  const lineSpacing = sections.client.spacing || config?.line_spacing || 14;
-  const sectionSpacing = sections.title.margin_top + sections.dates.margin_top || config?.section_spacing || 28;
-  const rowHeight = sections.table.row_height || config?.row_height || 22;
-  const boxPadding = sections.client.padding || config?.client_box_padding || 14;
-  const docMargin = config?.margins || MARGIN;
 
-  // Table borders from sections
-  const showTableBorders = sections.table.show_borders ?? config?.show_table_borders !== false;
-  const tableBorderColor = sections.table.border_color || config?.table_border_color || '#e5e7eb';
-  const tableBorderRgb = hexToRgb(tableBorderColor);
-
-  // Totals separators from sections
-  const showTotalsLines = sections.totals.show_lines ?? config?.show_totals_lines !== false;
-  const totalsLineColor = sections.totals.line_color || config?.totals_line_color;
-  const totalsLineRgb = totalsLineColor ? hexToRgb(totalsLineColor) : null;
-  const totalsLineSpacing = sections.totals.line_spacing || 22;
+  console.log('[PDF] Using sections config:', sections);
 
   const clientData: ClientData = invoice.client || { name: 'Cliente' };
 
+  const docMargin = config?.margins || MARGIN;
   const left = docMargin;
   const right = A4_WIDTH - docMargin;
   const contentWidth = right - left;
 
   let y = A4_HEIGHT - docMargin;
 
-  // Header (logo + company name) LEFT, details RIGHT
-  const showLogo = config?.show_logo !== false;
-  const logoPosition = config?.logo_position || 'left';
+  // ============ HEADER SECTION ============
+  if (sections.header.visible) {
+    y -= sections.header.margin_top;
+    
+    const showLogo = config?.show_logo !== false;
+    const logoPosition = config?.logo_position || 'left';
+    const logoSize = sections.header.logo_size || 60;
 
-  const headerLeftX = left;
-  let headerTopY = y;
-
-  if (showLogo && company.logo_url) {
-    const logo = await embedLogo(pdfDoc, company.logo_url);
-    if (logo) {
-      drawLogo(page, logo, logoPosition, headerTopY);
-      headerTopY -= logo.height + Math.max(8, lineSpacing / 2);
+    if (showLogo && company.logo_url) {
+      const logo = await embedLogo(pdfDoc, company.logo_url);
+      if (logo) {
+        // Scale logo to configured size
+        const scale = logoSize / Math.max(logo.width, logo.height);
+        const scaledHeight = logo.height * scale;
+        drawLogo(page, logo, logoPosition, y);
+        y -= scaledHeight + sections.header.spacing;
+      }
     }
+
+    // Company name
+    page.drawText(company.name || 'Mi Empresa', {
+      x: left,
+      y,
+      size: 16,
+      font: fonts.bold,
+      color: pdfColors.text,
+    });
+
+    // Company details on the right
+    const rightX = right - 220;
+    let rightY = y + 10;
+    const rightLines: string[] = [];
+    if (company.address) rightLines.push(company.address);
+    if (company.cif) rightLines.push(`CIF: ${company.cif}`);
+    if (company.email) rightLines.push(company.email);
+
+    rightLines.forEach((line) => {
+      page.drawText(line.substring(0, 55), {
+        x: rightX,
+        y: rightY,
+        size: fontSize - 1,
+        font: fonts.regular,
+        color: pdfColors.secondary,
+      });
+      rightY -= sections.header.spacing;
+    });
+
+    y -= 20; // Base spacing after header text
   }
 
-  // Company name
-  page.drawText(company.name || 'Mi Empresa', {
-    x: headerLeftX,
-    y: headerTopY,
-    size: 16,
-    font: fonts.bold,
-    color: pdfColors.text,
-  });
+  // ============ TITLE SECTION ============
+  if (sections.title.visible) {
+    y -= sections.title.margin_top;
+    
+    const titleText = sections.title.text || config?.title_text || 'FACTURA';
+    const titleSize = sections.title.size || 28;
+    const titleWidth = fonts.bold.widthOfTextAtSize(titleText, titleSize);
+    const titleColor = config?.title_color ? hexToRgb(config.title_color) : null;
+    
+    page.drawText(titleText, {
+      x: (A4_WIDTH - titleWidth) / 2,
+      y,
+      size: titleSize,
+      font: fonts.bold,
+      color: titleColor ? rgb(titleColor.r, titleColor.g, titleColor.b) : pdfColors.primary,
+    });
 
-  // Company details RIGHT
-  const rightX = right - 220;
-  let rightY = y - 10;
-  const rightLines: string[] = [];
-  if (company.address) rightLines.push(company.address);
-  if (company.cif) rightLines.push(`CIF: ${company.cif}`);
-  if (company.email) rightLines.push(company.email);
+    // Invoice number below title
+    const numberText = `Nº ${formatInvoiceNumber(invoice.invoice_number)}`;
+    const numberSize = 16;
+    const numberWidth = fonts.regular.widthOfTextAtSize(numberText, numberSize);
+    
+    y -= sections.title.spacing;
+    
+    page.drawText(numberText, {
+      x: (A4_WIDTH - numberWidth) / 2,
+      y,
+      size: numberSize,
+      font: fonts.regular,
+      color: pdfColors.secondary,
+    });
+    
+    y -= 10; // Base spacing after number
+  }
 
-  rightLines.forEach((line) => {
-    page.drawText(line.substring(0, 55), {
-      x: rightX,
-      y: rightY,
+  // ============ DATES SECTION ============
+  if (sections.dates.visible) {
+    y -= sections.dates.margin_top;
+
+    page.drawText('Fecha emisión:', {
+      x: left,
+      y,
       size: fontSize - 1,
       font: fonts.regular,
       color: pdfColors.secondary,
     });
-    rightY -= lineSpacing;
-  });
-
-  // Title centered
-  y = headerTopY - (sectionSpacing + 12);
-  const titleWidth = fonts.bold.widthOfTextAtSize(titleText, titleSize);
-  const titleColor = config?.title_color ? hexToRgb(config.title_color) : null;
-  page.drawText(titleText, {
-    x: (A4_WIDTH - titleWidth) / 2,
-    y,
-    size: titleSize,
-    font: fonts.bold,
-    color: titleColor ? rgb(titleColor.r, titleColor.g, titleColor.b) : pdfColors.primary,
-  });
-
-  const numberText = `Nº ${formatInvoiceNumber(invoice.invoice_number)}`;
-  const numberSize = 16;
-  const numberWidth = fonts.regular.widthOfTextAtSize(numberText, numberSize);
-  page.drawText(numberText, {
-    x: (A4_WIDTH - numberWidth) / 2,
-    y: y - Math.max(16, lineSpacing + 2),
-    size: numberSize,
-    font: fonts.regular,
-    color: pdfColors.secondary,
-  });
-
-  y -= sectionSpacing + 22;
-
-  // Dates row
-  page.drawText('Fecha emisión:', {
-    x: left,
-    y,
-    size: fontSize - 1,
-    font: fonts.regular,
-    color: pdfColors.secondary,
-  });
-  page.drawText(formatDate(invoice.issue_date), {
-    x: left + 80,
-    y,
-    size: fontSize - 1,
-    font: fonts.bold,
-    color: pdfColors.text,
-  });
-
-  page.drawText('Vencimiento:', {
-    x: left + 220,
-    y,
-    size: fontSize - 1,
-    font: fonts.regular,
-    color: pdfColors.secondary,
-  });
-  page.drawText(invoice.due_date ? formatDate(invoice.due_date) : '-', {
-    x: left + 300,
-    y,
-    size: fontSize - 1,
-    font: fonts.bold,
-    color: pdfColors.text,
-  });
-
-  y -= sectionSpacing;
-
-  // Client box (height and spacing driven by config)
-  const clientLineCount = 2 + (clientData.address ? 1 : 0) + (clientData.cif ? 1 : 0);
-  const boxHeight = Math.max(78, boxPadding * 2 + 18 + clientLineCount * lineSpacing);
-  const clientBoxRgb = hexToRgb(clientBoxColor);
-
-  page.drawRectangle({
-    x: left,
-    y: y - boxHeight,
-    width: contentWidth,
-    height: boxHeight,
-    color: rgb(clientBoxRgb.r, clientBoxRgb.g, clientBoxRgb.b),
-  });
-
-  let boxY = y - boxPadding - 10;
-  page.drawText('CLIENTE', {
-    x: left + boxPadding,
-    y: boxY,
-    size: fontSize - 2,
-    font: fonts.bold,
-    color: pdfColors.secondary,
-  });
-  boxY -= lineSpacing;
-
-  page.drawText(clientData.name || '', {
-    x: left + boxPadding,
-    y: boxY,
-    size: fontSize + 1,
-    font: fonts.bold,
-    color: pdfColors.text,
-  });
-  boxY -= lineSpacing;
-
-  if (clientData.address) {
-    page.drawText(clientData.address.substring(0, 70), {
-      x: left + boxPadding,
-      y: boxY,
-      size: fontSize - 1,
-      font: fonts.regular,
-      color: pdfColors.text,
-    });
-    boxY -= lineSpacing;
-  }
-
-  if (clientData.cif) {
-    page.drawText(`CIF: ${clientData.cif}`, {
-      x: left + boxPadding,
-      y: boxY,
-      size: fontSize - 1,
-      font: fonts.regular,
-      color: pdfColors.text,
-    });
-  }
-
-  y = y - boxHeight - sectionSpacing;
-
-  // Services table
-  const headerHeight = Math.max(24, lineSpacing + 12);
-  const tableHeaderRgb = hexToRgb(tableHeaderColor);
-
-  page.drawRectangle({
-    x: left,
-    y: y - headerHeight,
-    width: contentWidth,
-    height: headerHeight,
-    color: rgb(tableHeaderRgb.r, tableHeaderRgb.g, tableHeaderRgb.b),
-  });
-
-  // Column layout (relative to table width)
-  const colDescX = left + 12;
-  const colQtyX = left + contentWidth * 0.70;
-  const colUnitX = left + contentWidth * 0.84;
-  const colTotX = right - 12;
-
-  const cols = [
-    { label: 'Descripción', x: colDescX, align: 'left' as const },
-    { label: 'Cant.', x: colQtyX, align: 'right' as const },
-    { label: 'Precio', x: colUnitX, align: 'right' as const },
-    { label: 'Total', x: colTotX, align: 'right' as const },
-  ];
-
-  cols.forEach((c) => {
-    const textWidth = fonts.bold.widthOfTextAtSize(c.label, fontSize - 1);
-    const x = c.align === 'right' ? c.x - textWidth : c.x;
-    page.drawText(c.label, {
-      x,
-      y: y - headerHeight + (headerHeight - (fontSize - 1)) / 2 - 1,
+    page.drawText(formatDate(invoice.issue_date), {
+      x: left + 80,
+      y,
       size: fontSize - 1,
       font: fonts.bold,
-      color: pdfColors.white,
+      color: pdfColors.text,
     });
-  });
 
-  y -= headerHeight;
+    page.drawText('Vencimiento:', {
+      x: left + 220,
+      y,
+      size: fontSize - 1,
+      font: fonts.regular,
+      color: pdfColors.secondary,
+    });
+    page.drawText(invoice.due_date ? formatDate(invoice.due_date) : '-', {
+      x: left + 300,
+      y,
+      size: fontSize - 1,
+      font: fonts.bold,
+      color: pdfColors.text,
+    });
 
-  const services = invoice.services || [];
+    y -= sections.dates.spacing;
+  }
 
-  services.forEach((svc, idx) => {
-    const rowTopY = y;
-    const rowBottomY = y - rowHeight;
+  // ============ CLIENT SECTION ============
+  if (sections.client.visible) {
+    y -= sections.client.margin_top;
+    
+    const boxPadding = sections.client.padding;
+    const clientLineSpacing = sections.client.spacing;
+    const clientBoxColor = sections.client.background_color || '#f8f9fa';
+    
+    // Calculate box height based on content
+    const clientLineCount = 2 + (clientData.address ? 1 : 0) + (clientData.cif ? 1 : 0);
+    const boxHeight = Math.max(78, boxPadding * 2 + 18 + clientLineCount * clientLineSpacing);
+    const clientBoxRgb = hexToRgb(clientBoxColor);
 
-    // Alternate row background
-    if (idx % 2 === 1) {
+    // Draw client box background
+    page.drawRectangle({
+      x: left,
+      y: y - boxHeight,
+      width: contentWidth,
+      height: boxHeight,
+      color: rgb(clientBoxRgb.r, clientBoxRgb.g, clientBoxRgb.b),
+    });
+
+    // Draw border if configured
+    if (sections.client.show_border) {
+      const borderColor = sections.client.border_color || '#e5e7eb';
+      const borderRgb = hexToRgb(borderColor);
       page.drawRectangle({
         x: left,
-        y: rowBottomY,
+        y: y - boxHeight,
         width: contentWidth,
-        height: rowHeight,
-        color: rgb(0.98, 0.98, 0.98),
+        height: boxHeight,
+        borderColor: rgb(borderRgb.r, borderRgb.g, borderRgb.b),
+        borderWidth: 1,
       });
     }
 
-    const desc = (svc.service?.name || 'Servicio').substring(0, 60);
-    const qty = String(svc.quantity || 1);
-    const unit = formatCurrency(svc.unit_price);
-    const tot = formatCurrency(svc.total);
+    let boxY = y - boxPadding - 10;
+    page.drawText('CLIENTE', {
+      x: left + boxPadding,
+      y: boxY,
+      size: fontSize - 2,
+      font: fonts.bold,
+      color: pdfColors.secondary,
+    });
+    boxY -= clientLineSpacing;
 
-    const textY = rowBottomY + (rowHeight - (fontSize - 1)) / 2 - 1;
-
-    page.drawText(desc, {
-      x: colDescX,
-      y: textY,
-      size: fontSize - 1,
-      font: fonts.regular,
+    page.drawText(clientData.name || '', {
+      x: left + boxPadding,
+      y: boxY,
+      size: fontSize + 1,
+      font: fonts.bold,
       color: pdfColors.text,
     });
+    boxY -= clientLineSpacing;
 
-    const qtyW = fonts.regular.widthOfTextAtSize(qty, fontSize - 1);
-    page.drawText(qty, {
-      x: colQtyX - qtyW,
-      y: textY,
-      size: fontSize - 1,
-      font: fonts.regular,
-      color: pdfColors.text,
-    });
-
-    const unitW = fonts.regular.widthOfTextAtSize(unit, fontSize - 1);
-    page.drawText(unit, {
-      x: colUnitX - unitW,
-      y: textY,
-      size: fontSize - 1,
-      font: fonts.regular,
-      color: pdfColors.text,
-    });
-
-    const totW = fonts.regular.widthOfTextAtSize(tot, fontSize - 1);
-    page.drawText(tot, {
-      x: colTotX - totW,
-      y: textY,
-      size: fontSize - 1,
-      font: fonts.regular,
-      color: pdfColors.text,
-    });
-
-    // Divider line at bottom of row
-    if (showTableBorders) {
-      drawLine(
-        page,
-        left,
-        rowBottomY,
-        right,
-        rowBottomY,
-        rgb(tableBorderRgb.r, tableBorderRgb.g, tableBorderRgb.b),
-        0.6,
-      );
-    }
-
-    y = rowBottomY;
-  });
-
-  // Totals on the right
-  y -= Math.max(8, Math.round(sectionSpacing / 3));
-
-  const totalsWidth = 250;
-  const totalsX = right - totalsWidth;
-  const labelColor = pdfColors.secondary;
-
-  const totalsSeparatorColor = totalsLineRgb
-    ? rgb(totalsLineRgb.r, totalsLineRgb.g, totalsLineRgb.b)
-    : pdfColors.border;
-
-  const rows = [
-    { label: 'Subtotal:', value: formatCurrency(invoice.subtotal || 0), bold: false },
-    { label: `IVA (${invoice.iva_percent || 21}%):`, value: formatCurrency(invoice.iva_amount || 0), bold: false },
-    { label: 'TOTAL:', value: formatCurrency(invoice.total || 0), bold: true },
-  ];
-
-  let currentY = y;
-  rows.forEach((r, i) => {
-    const isTotal = r.bold;
-    const size = isTotal ? 18 : fontSize;
-    const font = isTotal ? fonts.bold : fonts.regular;
-    const color = isTotal ? pdfColors.primary : labelColor;
-
-    page.drawText(r.label, {
-      x: totalsX,
-      y: currentY,
-      size,
-      font,
-      color,
-    });
-
-    const vW = font.widthOfTextAtSize(r.value, size);
-    page.drawText(r.value, {
-      x: right - vW,
-      y: currentY,
-      size,
-      font,
-      color,
-    });
-
-    // Use section-based line spacing for totals
-    const gap = isTotal
-      ? totalsLineSpacing + 6
-      : totalsLineSpacing;
-
-    const nextY = currentY - gap;
-
-    // Separator line centered between rows (prevents overlap)
-    if (showTotalsLines && i < 2) {
-      const lineY = currentY - gap / 2;
-      drawLine(page, totalsX, lineY, right, lineY, totalsSeparatorColor, 0.5);
-    }
-
-    currentY = nextY;
-  });
-
-  // Footer section
-  let footerTopY = 100; // Start higher if we have legal text
-  
-  // Legal footer lines (configurable)
-  if (showFooterLegal && footerLegalLines.length > 0) {
-    const legalFontSize = 8;
-    const legalColor = rgb(100 / 255, 116 / 255, 139 / 255); // #64748b
-    
-    let legalY = footerTopY + (footerLegalLines.length * 12);
-    
-    // Draw legal background
-    page.drawRectangle({
-      x: MARGIN,
-      y: footerTopY - 10,
-      width: A4_WIDTH - MARGIN * 2,
-      height: footerLegalLines.length * 14 + 20,
-      color: rgb(248 / 255, 250 / 255, 252 / 255), // #f8fafc
-    });
-    
-    drawLine(page, MARGIN, legalY + 10, A4_WIDTH - MARGIN, legalY + 10, pdfColors.border, 0.5);
-    
-    footerLegalLines.forEach((legalLine) => {
-      const trimmedLine = legalLine.substring(0, 120);
-      const lw = fonts.regular.widthOfTextAtSize(trimmedLine, legalFontSize);
-      page.drawText(trimmedLine, {
-        x: (A4_WIDTH - lw) / 2,
-        y: legalY - 5,
-        size: legalFontSize,
+    if (clientData.address) {
+      page.drawText(clientData.address.substring(0, 70), {
+        x: left + boxPadding,
+        y: boxY,
+        size: fontSize - 1,
         font: fonts.regular,
-        color: legalColor,
+        color: pdfColors.text,
       });
-      legalY -= 12;
-    });
+      boxY -= clientLineSpacing;
+    }
+
+    if (clientData.cif) {
+      page.drawText(`CIF: ${clientData.cif}`, {
+        x: left + boxPadding,
+        y: boxY,
+        size: fontSize - 1,
+        font: fonts.regular,
+        color: pdfColors.text,
+      });
+    }
+
+    y = y - boxHeight;
+  }
+
+  // ============ TABLE SECTION ============
+  if (sections.table.visible) {
+    y -= sections.table.margin_top;
     
-    footerTopY = legalY - 20;
-  } else {
-    footerTopY = 70;
-  }
-  
-  // Company info footer
-  drawLine(page, MARGIN, footerTopY, A4_WIDTH - MARGIN, footerTopY, pdfColors.border, 0.5);
+    const headerHeight = sections.table.header_height;
+    const rowHeight = sections.table.row_height;
+    const showTableBorders = sections.table.show_borders;
+    const tableBorderColor = sections.table.border_color || '#e5e7eb';
+    const tableBorderRgb = hexToRgb(tableBorderColor);
+    const tableHeaderColor = config?.table_header_color || config?.primary_color || '#3b82f6';
+    const tableHeaderRgb = hexToRgb(tableHeaderColor);
 
-  const footerColor = rgb(156 / 255, 163 / 255, 175 / 255); // #9ca3af
-  const footerSize = 9;
+    // Table header background
+    page.drawRectangle({
+      x: left,
+      y: y - headerHeight,
+      width: contentWidth,
+      height: headerHeight,
+      color: rgb(tableHeaderRgb.r, tableHeaderRgb.g, tableHeaderRgb.b),
+    });
 
-  const line1Parts = [company.name, company.address].filter(Boolean);
-  const line1Raw = line1Parts.join(' · ');
-  const line1 = line1Raw.substring(0, 90);
-  if (line1) {
-    const w1 = fonts.regular.widthOfTextAtSize(line1, footerSize);
-    page.drawText(line1, {
-      x: (A4_WIDTH - w1) / 2,
-      y: footerTopY - 22,
-      size: footerSize,
-      font: fonts.regular,
-      color: footerColor,
+    // Column layout
+    const colDescX = left + 12;
+    const colQtyX = left + contentWidth * 0.70;
+    const colUnitX = left + contentWidth * 0.84;
+    const colTotX = right - 12;
+
+    const cols = [
+      { label: 'Descripción', x: colDescX, align: 'left' as const },
+      { label: 'Cant.', x: colQtyX, align: 'right' as const },
+      { label: 'Precio', x: colUnitX, align: 'right' as const },
+      { label: 'Total', x: colTotX, align: 'right' as const },
+    ];
+
+    cols.forEach((c) => {
+      const textWidth = fonts.bold.widthOfTextAtSize(c.label, fontSize - 1);
+      const x = c.align === 'right' ? c.x - textWidth : c.x;
+      page.drawText(c.label, {
+        x,
+        y: y - headerHeight + (headerHeight - (fontSize - 1)) / 2 - 1,
+        size: fontSize - 1,
+        font: fonts.bold,
+        color: pdfColors.white,
+      });
+    });
+
+    y -= headerHeight;
+
+    // Service rows
+    const services = invoice.services || [];
+
+    services.forEach((svc, idx) => {
+      const rowTopY = y;
+      const rowBottomY = y - rowHeight;
+
+      // Alternate row background
+      if (idx % 2 === 1) {
+        page.drawRectangle({
+          x: left,
+          y: rowBottomY,
+          width: contentWidth,
+          height: rowHeight,
+          color: rgb(0.98, 0.98, 0.98),
+        });
+      }
+
+      const desc = (svc.service?.name || 'Servicio').substring(0, 60);
+      const qty = String(svc.quantity || 1);
+      const unit = formatCurrency(svc.unit_price);
+      const tot = formatCurrency(svc.total);
+
+      const textY = rowBottomY + (rowHeight - (fontSize - 1)) / 2 - 1;
+
+      page.drawText(desc, {
+        x: colDescX,
+        y: textY,
+        size: fontSize - 1,
+        font: fonts.regular,
+        color: pdfColors.text,
+      });
+
+      const qtyW = fonts.regular.widthOfTextAtSize(qty, fontSize - 1);
+      page.drawText(qty, {
+        x: colQtyX - qtyW,
+        y: textY,
+        size: fontSize - 1,
+        font: fonts.regular,
+        color: pdfColors.text,
+      });
+
+      const unitW = fonts.regular.widthOfTextAtSize(unit, fontSize - 1);
+      page.drawText(unit, {
+        x: colUnitX - unitW,
+        y: textY,
+        size: fontSize - 1,
+        font: fonts.regular,
+        color: pdfColors.text,
+      });
+
+      const totW = fonts.regular.widthOfTextAtSize(tot, fontSize - 1);
+      page.drawText(tot, {
+        x: colTotX - totW,
+        y: textY,
+        size: fontSize - 1,
+        font: fonts.regular,
+        color: pdfColors.text,
+      });
+
+      // Divider line at bottom of row
+      if (showTableBorders) {
+        drawLine(
+          page,
+          left,
+          rowBottomY,
+          right,
+          rowBottomY,
+          rgb(tableBorderRgb.r, tableBorderRgb.g, tableBorderRgb.b),
+          0.6,
+        );
+      }
+
+      y = rowBottomY;
     });
   }
 
-  const line2Raw = showIban && company.iban ? `IBAN: ${company.iban}` : '';
-  const line2 = line2Raw.substring(0, 90);
-  if (line2) {
-    const w2 = fonts.regular.widthOfTextAtSize(line2, footerSize);
-    page.drawText(line2, {
-      x: (A4_WIDTH - w2) / 2,
-      y: footerTopY - 36,
-      size: footerSize,
-      font: fonts.regular,
-      color: footerColor,
+  // ============ TOTALS SECTION ============
+  if (sections.totals.visible) {
+    y -= sections.totals.margin_top;
+    
+    const totalsLineSpacing = sections.totals.line_spacing;
+    const showTotalsLines = sections.totals.show_lines;
+    const totalsLineColor = sections.totals.line_color || '#e5e7eb';
+    const totalsLineRgb = hexToRgb(totalsLineColor);
+
+    const totalsWidth = 250;
+    const totalsX = right - totalsWidth;
+
+    const rows = [
+      { label: 'Subtotal:', value: formatCurrency(invoice.subtotal || 0), bold: false },
+      { label: `IVA (${invoice.iva_percent || 21}%):`, value: formatCurrency(invoice.iva_amount || 0), bold: false },
+      { label: 'TOTAL:', value: formatCurrency(invoice.total || 0), bold: true },
+    ];
+
+    let currentY = y;
+    rows.forEach((r, i) => {
+      const isTotal = r.bold;
+      const size = isTotal ? 18 : fontSize;
+      const font = isTotal ? fonts.bold : fonts.regular;
+      const color = isTotal ? pdfColors.primary : pdfColors.secondary;
+
+      // Draw label
+      page.drawText(r.label, {
+        x: totalsX,
+        y: currentY,
+        size,
+        font,
+        color,
+      });
+
+      // Draw value (right-aligned)
+      const vW = font.widthOfTextAtSize(r.value, size);
+      page.drawText(r.value, {
+        x: right - vW,
+        y: currentY,
+        size,
+        font,
+        color,
+      });
+
+      // Draw separator line BETWEEN rows (not on last row)
+      if (showTotalsLines && i < rows.length - 1) {
+        const lineY = currentY - totalsLineSpacing / 2;
+        drawLine(
+          page, 
+          totalsX, 
+          lineY, 
+          right, 
+          lineY, 
+          rgb(totalsLineRgb.r, totalsLineRgb.g, totalsLineRgb.b), 
+          0.5
+        );
+      }
+
+      // Move to next row using configured line spacing
+      currentY -= totalsLineSpacing;
     });
+
+    y = currentY;
+  }
+
+  // ============ FOOTER SECTION ============
+  if (sections.footer.visible) {
+    const footerY = sections.footer.margin_top + 40; // Position from bottom
+    const showIban = sections.footer.show_iban ?? config?.show_iban_footer !== false;
+    const footerLegalLines = config?.footer_legal_lines || [];
+    const showFooterLegal = config?.show_footer_legal !== false;
+    
+    let footerTopY = footerY;
+
+    // Legal footer lines (configurable)
+    if (showFooterLegal && footerLegalLines.length > 0) {
+      const legalFontSize = 8;
+      const legalColor = rgb(100 / 255, 116 / 255, 139 / 255);
+      
+      let legalY = footerTopY + (footerLegalLines.length * 12);
+      
+      page.drawRectangle({
+        x: MARGIN,
+        y: footerTopY - 10,
+        width: A4_WIDTH - MARGIN * 2,
+        height: footerLegalLines.length * 14 + 20,
+        color: rgb(248 / 255, 250 / 255, 252 / 255),
+      });
+      
+      drawLine(page, MARGIN, legalY + 10, A4_WIDTH - MARGIN, legalY + 10, pdfColors.border, 0.5);
+      
+      footerLegalLines.forEach((legalLine) => {
+        const trimmedLine = legalLine.substring(0, 120);
+        const lw = fonts.regular.widthOfTextAtSize(trimmedLine, legalFontSize);
+        page.drawText(trimmedLine, {
+          x: (A4_WIDTH - lw) / 2,
+          y: legalY - 5,
+          size: legalFontSize,
+          font: fonts.regular,
+          color: legalColor,
+        });
+        legalY -= 12;
+      });
+      
+      footerTopY = legalY - 20;
+    }
+
+    // Company info footer
+    drawLine(page, MARGIN, footerTopY, A4_WIDTH - MARGIN, footerTopY, pdfColors.border, 0.5);
+
+    const footerColor = rgb(156 / 255, 163 / 255, 175 / 255);
+    const footerSize = 9;
+    const footerSpacing = sections.footer.spacing;
+
+    const line1Parts = [company.name, company.address].filter(Boolean);
+    const line1Raw = line1Parts.join(' · ');
+    const line1 = line1Raw.substring(0, 90);
+    if (line1) {
+      const w1 = fonts.regular.widthOfTextAtSize(line1, footerSize);
+      page.drawText(line1, {
+        x: (A4_WIDTH - w1) / 2,
+        y: footerTopY - footerSpacing,
+        size: footerSize,
+        font: fonts.regular,
+        color: footerColor,
+      });
+    }
+
+    if (showIban && company.iban) {
+      const line2 = `IBAN: ${company.iban}`.substring(0, 90);
+      const w2 = fonts.regular.widthOfTextAtSize(line2, footerSize);
+      page.drawText(line2, {
+        x: (A4_WIDTH - w2) / 2,
+        y: footerTopY - footerSpacing * 2,
+        size: footerSize,
+        font: fonts.regular,
+        color: footerColor,
+      });
+    }
   }
 
   return pdfToBlob(pdfDoc);
