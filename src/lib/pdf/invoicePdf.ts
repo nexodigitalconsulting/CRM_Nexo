@@ -109,6 +109,11 @@ async function generateInvoicePdfFact2(
   const rowHeight = config?.row_height || 22;
   const boxPadding = config?.client_box_padding || 14;
   const docMargin = config?.margins || MARGIN;
+  
+  // Table borders
+  const showTableBorders = config?.show_table_borders !== false;
+  const tableBorderColor = config?.table_border_color || '#e5e7eb';
+  const tableBorderRgb = hexToRgb(tableBorderColor);
 
   const clientData: ClientData = invoice.client || { name: 'Cliente' };
 
@@ -303,6 +308,7 @@ async function generateInvoicePdfFact2(
   const services = invoice.services || [];
 
   services.forEach((svc, idx) => {
+    // Alternate row background
     if (idx % 2 === 1) {
       page.drawRectangle({
         x: MARGIN,
@@ -320,7 +326,7 @@ async function generateInvoicePdfFact2(
 
     page.drawText(desc, {
       x: MARGIN + 12,
-      y: y - 14,
+      y: y - rowHeight / 2 - 4,
       size: fontSize - 1,
       font: fonts.regular,
       color: pdfColors.text,
@@ -329,7 +335,7 @@ async function generateInvoicePdfFact2(
     const qtyW = fonts.regular.widthOfTextAtSize(qty, fontSize - 1);
     page.drawText(qty, {
       x: MARGIN + 330 - qtyW,
-      y: y - 14,
+      y: y - rowHeight / 2 - 4,
       size: fontSize - 1,
       font: fonts.regular,
       color: pdfColors.text,
@@ -338,7 +344,7 @@ async function generateInvoicePdfFact2(
     const unitW = fonts.regular.widthOfTextAtSize(unit, fontSize - 1);
     page.drawText(unit, {
       x: MARGIN + 410 - unitW,
-      y: y - 14,
+      y: y - rowHeight / 2 - 4,
       size: fontSize - 1,
       font: fonts.regular,
       color: pdfColors.text,
@@ -347,13 +353,26 @@ async function generateInvoicePdfFact2(
     const totW = fonts.regular.widthOfTextAtSize(tot, fontSize - 1);
     page.drawText(tot, {
       x: A4_WIDTH - MARGIN - 12 - totW,
-      y: y - 14,
+      y: y - rowHeight / 2 - 4,
       size: fontSize - 1,
       font: fonts.regular,
       color: pdfColors.text,
     });
 
     y -= rowHeight;
+
+    // Draw row divider line
+    if (showTableBorders) {
+      drawLine(
+        page, 
+        MARGIN, 
+        y + 6, 
+        A4_WIDTH - MARGIN, 
+        y + 6, 
+        rgb(tableBorderRgb.r, tableBorderRgb.g, tableBorderRgb.b), 
+        0.5
+      );
+    }
   });
 
   // Totals on the right
