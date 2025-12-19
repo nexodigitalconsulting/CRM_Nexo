@@ -117,24 +117,28 @@ async function generateInvoicePdfFact2(
 
   const clientData: ClientData = invoice.client || { name: 'Cliente' };
 
+  const left = docMargin;
+  const right = A4_WIDTH - docMargin;
+  const contentWidth = right - left;
+
   let y = A4_HEIGHT - docMargin;
 
   // Header (logo + company name) LEFT, details RIGHT
   const showLogo = config?.show_logo !== false;
   const logoPosition = config?.logo_position || 'left';
 
-  let headerLeftX = MARGIN;
+  const headerLeftX = left;
   let headerTopY = y;
 
   if (showLogo && company.logo_url) {
     const logo = await embedLogo(pdfDoc, company.logo_url);
     if (logo) {
       drawLogo(page, logo, logoPosition, headerTopY);
-      headerTopY -= logo.height + 10;
+      headerTopY -= logo.height + Math.max(8, lineSpacing / 2);
     }
   }
 
-  // Company name (black-ish like template)
+  // Company name
   page.drawText(company.name || 'Mi Empresa', {
     x: headerLeftX,
     y: headerTopY,
@@ -144,7 +148,7 @@ async function generateInvoicePdfFact2(
   });
 
   // Company details RIGHT
-  const rightX = A4_WIDTH - MARGIN - 220;
+  const rightX = right - 220;
   let rightY = y - 10;
   const rightLines: string[] = [];
   if (company.address) rightLines.push(company.address);
@@ -159,11 +163,11 @@ async function generateInvoicePdfFact2(
       font: fonts.regular,
       color: pdfColors.secondary,
     });
-    rightY -= 14;
+    rightY -= lineSpacing;
   });
 
-  // Title centered - uses configurable titleText and titleSize
-  y = headerTopY - 40;
+  // Title centered
+  y = headerTopY - (sectionSpacing + 12);
   const titleWidth = fonts.bold.widthOfTextAtSize(titleText, titleSize);
   const titleColor = config?.title_color ? hexToRgb(config.title_color) : null;
   page.drawText(titleText, {
@@ -179,24 +183,24 @@ async function generateInvoicePdfFact2(
   const numberWidth = fonts.regular.widthOfTextAtSize(numberText, numberSize);
   page.drawText(numberText, {
     x: (A4_WIDTH - numberWidth) / 2,
-    y: y - 20,
+    y: y - Math.max(16, lineSpacing + 2),
     size: numberSize,
     font: fonts.regular,
     color: pdfColors.secondary,
   });
 
-  y -= 50;
+  y -= sectionSpacing + 22;
 
   // Dates row
   page.drawText('Fecha emisión:', {
-    x: MARGIN,
+    x: left,
     y,
     size: fontSize - 1,
     font: fonts.regular,
     color: pdfColors.secondary,
   });
   page.drawText(formatDate(invoice.issue_date), {
-    x: MARGIN + 80,
+    x: left + 80,
     y,
     size: fontSize - 1,
     font: fonts.bold,
@@ -204,14 +208,14 @@ async function generateInvoicePdfFact2(
   });
 
   page.drawText('Vencimiento:', {
-    x: MARGIN + 220,
+    x: left + 220,
     y,
     size: fontSize - 1,
     font: fonts.regular,
     color: pdfColors.secondary,
   });
   page.drawText(invoice.due_date ? formatDate(invoice.due_date) : '-', {
-    x: MARGIN + 300,
+    x: left + 300,
     y,
     size: fontSize - 1,
     font: fonts.bold,
@@ -220,50 +224,52 @@ async function generateInvoicePdfFact2(
 
   y -= sectionSpacing;
 
-  // Client box - use configurable clientBoxColor and boxPadding
-  const boxHeight = 78;
+  // Client box (height and spacing driven by config)
+  const clientLineCount = 2 + (clientData.address ? 1 : 0) + (clientData.cif ? 1 : 0);
+  const boxHeight = Math.max(78, boxPadding * 2 + 18 + clientLineCount * lineSpacing);
   const clientBoxRgb = hexToRgb(clientBoxColor);
+
   page.drawRectangle({
-    x: MARGIN,
+    x: left,
     y: y - boxHeight,
-    width: A4_WIDTH - MARGIN * 2,
+    width: contentWidth,
     height: boxHeight,
     color: rgb(clientBoxRgb.r, clientBoxRgb.g, clientBoxRgb.b),
   });
 
   let boxY = y - boxPadding - 10;
   page.drawText('CLIENTE', {
-    x: MARGIN + boxPadding,
+    x: left + boxPadding,
     y: boxY,
     size: fontSize - 2,
     font: fonts.bold,
     color: pdfColors.secondary,
   });
-  boxY -= 16;
+  boxY -= lineSpacing;
 
   page.drawText(clientData.name || '', {
-    x: MARGIN + boxPadding,
+    x: left + boxPadding,
     y: boxY,
     size: fontSize + 1,
     font: fonts.bold,
     color: pdfColors.text,
   });
-  boxY -= 14;
+  boxY -= lineSpacing;
 
   if (clientData.address) {
     page.drawText(clientData.address.substring(0, 70), {
-      x: MARGIN + boxPadding,
+      x: left + boxPadding,
       y: boxY,
       size: fontSize - 1,
       font: fonts.regular,
       color: pdfColors.text,
     });
-    boxY -= 12;
+    boxY -= lineSpacing;
   }
 
   if (clientData.cif) {
     page.drawText(`CIF: ${clientData.cif}`, {
-      x: MARGIN + boxPadding,
+      x: left + boxPadding,
       y: boxY,
       size: fontSize - 1,
       font: fonts.regular,
@@ -271,24 +277,31 @@ async function generateInvoicePdfFact2(
     });
   }
 
-  y = y - boxHeight - 25;
+  y = y - boxHeight - sectionSpacing;
 
-  // Services table - use configurable tableHeaderColor
-  const headerHeight = 26;
+  // Services table
+  const headerHeight = Math.max(24, lineSpacing + 12);
   const tableHeaderRgb = hexToRgb(tableHeaderColor);
+
   page.drawRectangle({
-    x: MARGIN,
-    y: y - headerHeight + 6,
-    width: A4_WIDTH - MARGIN * 2,
+    x: left,
+    y: y - headerHeight,
+    width: contentWidth,
     height: headerHeight,
     color: rgb(tableHeaderRgb.r, tableHeaderRgb.g, tableHeaderRgb.b),
   });
 
+  // Column layout (relative to table width)
+  const colDescX = left + 12;
+  const colQtyX = left + contentWidth * 0.70;
+  const colUnitX = left + contentWidth * 0.84;
+  const colTotX = right - 12;
+
   const cols = [
-    { label: 'Descripción', x: MARGIN + 12, align: 'left' as const },
-    { label: 'Cant.', x: MARGIN + 330, align: 'right' as const },
-    { label: 'Precio', x: MARGIN + 410, align: 'right' as const },
-    { label: 'Total', x: A4_WIDTH - MARGIN - 12, align: 'right' as const },
+    { label: 'Descripción', x: colDescX, align: 'left' as const },
+    { label: 'Cant.', x: colQtyX, align: 'right' as const },
+    { label: 'Precio', x: colUnitX, align: 'right' as const },
+    { label: 'Total', x: colTotX, align: 'right' as const },
   ];
 
   cols.forEach((c) => {
@@ -296,37 +309,42 @@ async function generateInvoicePdfFact2(
     const x = c.align === 'right' ? c.x - textWidth : c.x;
     page.drawText(c.label, {
       x,
-      y: y - 14,
+      y: y - headerHeight + (headerHeight - (fontSize - 1)) / 2 - 1,
       size: fontSize - 1,
       font: fonts.bold,
       color: pdfColors.white,
     });
   });
 
-  y = y - headerHeight - 6;
+  y -= headerHeight;
 
   const services = invoice.services || [];
 
   services.forEach((svc, idx) => {
+    const rowTopY = y;
+    const rowBottomY = y - rowHeight;
+
     // Alternate row background
     if (idx % 2 === 1) {
       page.drawRectangle({
-        x: MARGIN,
-        y: y - rowHeight + 6,
-        width: A4_WIDTH - MARGIN * 2,
+        x: left,
+        y: rowBottomY,
+        width: contentWidth,
         height: rowHeight,
         color: rgb(0.98, 0.98, 0.98),
       });
     }
 
-    const desc = (svc.service?.name || 'Servicio').substring(0, 50);
+    const desc = (svc.service?.name || 'Servicio').substring(0, 60);
     const qty = String(svc.quantity || 1);
     const unit = formatCurrency(svc.unit_price);
     const tot = formatCurrency(svc.total);
 
+    const textY = rowBottomY + (rowHeight - (fontSize - 1)) / 2 - 1;
+
     page.drawText(desc, {
-      x: MARGIN + 12,
-      y: y - rowHeight / 2 - 4,
+      x: colDescX,
+      y: textY,
       size: fontSize - 1,
       font: fonts.regular,
       color: pdfColors.text,
@@ -334,8 +352,8 @@ async function generateInvoicePdfFact2(
 
     const qtyW = fonts.regular.widthOfTextAtSize(qty, fontSize - 1);
     page.drawText(qty, {
-      x: MARGIN + 330 - qtyW,
-      y: y - rowHeight / 2 - 4,
+      x: colQtyX - qtyW,
+      y: textY,
       size: fontSize - 1,
       font: fonts.regular,
       color: pdfColors.text,
@@ -343,8 +361,8 @@ async function generateInvoicePdfFact2(
 
     const unitW = fonts.regular.widthOfTextAtSize(unit, fontSize - 1);
     page.drawText(unit, {
-      x: MARGIN + 410 - unitW,
-      y: y - rowHeight / 2 - 4,
+      x: colUnitX - unitW,
+      y: textY,
       size: fontSize - 1,
       font: fonts.regular,
       color: pdfColors.text,
@@ -352,32 +370,34 @@ async function generateInvoicePdfFact2(
 
     const totW = fonts.regular.widthOfTextAtSize(tot, fontSize - 1);
     page.drawText(tot, {
-      x: A4_WIDTH - MARGIN - 12 - totW,
-      y: y - rowHeight / 2 - 4,
+      x: colTotX - totW,
+      y: textY,
       size: fontSize - 1,
       font: fonts.regular,
       color: pdfColors.text,
     });
 
-    y -= rowHeight;
-
-    // Draw row divider line
+    // Divider line at bottom of row
     if (showTableBorders) {
       drawLine(
-        page, 
-        MARGIN, 
-        y + 6, 
-        A4_WIDTH - MARGIN, 
-        y + 6, 
-        rgb(tableBorderRgb.r, tableBorderRgb.g, tableBorderRgb.b), 
-        0.5
+        page,
+        left,
+        rowBottomY,
+        right,
+        rowBottomY,
+        rgb(tableBorderRgb.r, tableBorderRgb.g, tableBorderRgb.b),
+        0.6,
       );
     }
+
+    y = rowBottomY;
   });
 
   // Totals on the right
-  y -= 12;
-  const totalsX = A4_WIDTH - MARGIN - 250;
+  y -= Math.max(8, Math.round(sectionSpacing / 3));
+
+  const totalsWidth = 250;
+  const totalsX = right - totalsWidth;
   const labelColor = pdfColors.secondary;
 
   const rows = [
@@ -403,17 +423,19 @@ async function generateInvoicePdfFact2(
 
     const vW = font.widthOfTextAtSize(r.value, size);
     page.drawText(r.value, {
-      x: A4_WIDTH - MARGIN - vW,
+      x: right - vW,
       y: tY,
       size,
       font,
       color,
     });
 
-    tY -= isTotal ? 22 : 16;
+    const gap = isTotal ? Math.max(22, lineSpacing + 8) : Math.max(16, lineSpacing + 2);
+    tY -= gap;
 
     if (i < 2) {
-      drawLine(page, totalsX, tY + 8, A4_WIDTH - MARGIN, tY + 8, pdfColors.border, 0.5);
+      const lineY = tY + Math.round(gap / 2);
+      drawLine(page, totalsX, lineY, right, lineY, pdfColors.border, 0.5);
     }
   });
 
