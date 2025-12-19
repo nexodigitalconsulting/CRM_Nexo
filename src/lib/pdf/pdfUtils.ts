@@ -17,6 +17,14 @@ export interface PdfConfig {
   show_discounts_column?: boolean;
   header_style?: 'classic' | 'modern' | 'minimal';
   font_size_base?: number;
+  // Extended configurable parameters
+  title_text?: string;              // "FACTURA", "INVOICE", etc.
+  title_size?: number;              // 24-36
+  title_color?: string;             // Color for title (defaults to primary_color)
+  client_box_color?: string;        // Background color for client box (e.g., "#f1f5f9")
+  table_header_color?: string;      // Background color for table header
+  show_footer_legal?: boolean;      // Show legal footer text
+  footer_legal_lines?: string[];    // Lines of legal text for footer
 }
 
 export interface PdfColors {
