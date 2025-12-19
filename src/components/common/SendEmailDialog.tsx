@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Mail, Send, Eye, FileText, Paperclip, Loader2, Download, Star } from "lucide-react";
 import { useSendEmail, useEmailTemplates, useEmailSettings, EmailTemplate } from "@/hooks/useEmailSettings";
 import { useCompanySettings } from "@/hooks/useCompanySettings";
-import { useDefaultTemplate, extractColorsFromTemplate } from "@/hooks/useDefaultTemplate";
+import { useDefaultTemplate, extractPdfConfigFromTemplate } from "@/hooks/useDefaultTemplate";
 import { toast } from "sonner";
 import { 
   generateInvoicePdfBase64, 
@@ -89,13 +89,8 @@ export function SendEmailDialog({
   
   // Get PDF config from the default document template
   const getPdfConfigFromTemplate = (): PdfConfig | undefined => {
-    if (!defaultDocTemplate?.content) return undefined;
-    
-    const colors = extractColorsFromTemplate(defaultDocTemplate.content);
-    return {
-      primary_color: colors.primaryColor,
-      secondary_color: colors.secondaryColor,
-    };
+    if (!defaultDocTemplate) return undefined;
+    return extractPdfConfigFromTemplate(defaultDocTemplate);
   };
   
   const availableTemplates = templates?.filter(t => TEMPLATE_TYPES_BY_ENTITY[entityType]?.includes(t.template_type)) || [];

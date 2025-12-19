@@ -18,7 +18,7 @@ import { useDefaultTableView } from "@/hooks/useTableViews";
 import { entityExportConfigs } from "@/lib/exportUtils";
 import { useContracts, useDeleteContract, useMarkContractAsSent, ContractWithDetails } from "@/hooks/useContracts";
 import { useCompanySettings } from "@/hooks/useCompanySettings";
-import { usePdfSettings } from "@/hooks/usePdfSettings";
+import { useDefaultTemplate, extractPdfConfigFromTemplate } from "@/hooks/useDefaultTemplate";
 import { downloadContractPdf } from "@/lib/pdf/contractPdf";
 import { toast } from "sonner";
 import { ContractFormDialog } from "@/components/contracts/ContractFormDialog";
@@ -99,7 +99,7 @@ export default function Contracts() {
   const deleteContract = useDeleteContract();
   const markAsSent = useMarkContractAsSent();
   const { data: companySettings } = useCompanySettings();
-  const { data: pdfSettings } = usePdfSettings();
+  const { data: defaultTemplate } = useDefaultTemplate('contract');
   const { data: defaultView } = useDefaultTableView("contracts");
   
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -293,7 +293,8 @@ export default function Contracts() {
                         status: contract.status,
                         client: contract.client,
                       };
-                      await downloadContractPdf(contractData as any, companySettings as any);
+                      const pdfConfig = extractPdfConfigFromTemplate(defaultTemplate);
+                      await downloadContractPdf(contractData as any, companySettings as any, pdfConfig);
                       toast.success("PDF descargado");
                     } catch (error) {
                       toast.error("Error al descargar PDF");
