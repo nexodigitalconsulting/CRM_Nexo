@@ -28,6 +28,7 @@ export function useDefaultTemplate(entityType: 'invoice' | 'contract' | 'quote')
         .eq('entity_type', entityType)
         .eq('is_default', true)
         .eq('is_active', true)
+        .order('updated_at', { ascending: false })
         .limit(1)
         .maybeSingle();
 
@@ -53,7 +54,7 @@ export function useDefaultTemplate(entityType: 'invoice' | 'contract' | 'quote')
         .select('*')
         .eq('entity_type', entityType)
         .eq('is_active', true)
-        .order('created_at', { ascending: true })
+        .order('updated_at', { ascending: false })
         .limit(1)
         .maybeSingle();
 

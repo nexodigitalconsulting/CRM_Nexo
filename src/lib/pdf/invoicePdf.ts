@@ -66,11 +66,19 @@ function isFact2Template(template?: InvoiceTemplate): boolean {
   const name = template?.name?.toLowerCase() ?? '';
   const content = template?.content?.toLowerCase() ?? '';
 
+  // We intentionally key off the template NAME first (most explicit),
+  // and then fall back to content markers.
   return (
+    name.trim() === 'fact2' ||
     name.includes('fact2') ||
     content.includes('<!-- pdf_config:') ||
-    (content.includes('services_rows') && content.includes('factura') && content.includes('cliente'))
+    content.includes('{{services_rows}}')
   );
+}
+
+function formatInvoiceNumber(invoiceNumber: number): string {
+  // Matches the UI prefix used across the app (FF-0001)
+  return `FF-${String(invoiceNumber).padStart(4, '0')}`;
 }
 
 async function generateInvoicePdfFact2(
@@ -133,10 +141,10 @@ async function generateInvoicePdfFact2(
     rightY -= 14;
   });
 
-  // Title centered
-  y = headerTopY - 35;
+  // Title centered (matches Fact2 HTML: 28px title, 16px number)
+  y = headerTopY - 40;
   const title = 'FACTURA';
-  const titleSize = 22;
+  const titleSize = 28;
   const titleWidth = fonts.bold.widthOfTextAtSize(title, titleSize);
   page.drawText(title, {
     x: (A4_WIDTH - titleWidth) / 2,
@@ -146,12 +154,12 @@ async function generateInvoicePdfFact2(
     color: pdfColors.primary,
   });
 
-  const numberText = `Nº ${invoice.invoice_number}`;
-  const numberSize = 12;
+  const numberText = `Nº ${formatInvoiceNumber(invoice.invoice_number)}`;
+  const numberSize = 16;
   const numberWidth = fonts.regular.widthOfTextAtSize(numberText, numberSize);
   page.drawText(numberText, {
     x: (A4_WIDTH - numberWidth) / 2,
-    y: y - 18,
+    y: y - 20,
     size: numberSize,
     font: fonts.regular,
     color: pdfColors.secondary,
@@ -200,7 +208,8 @@ async function generateInvoicePdfFact2(
     y: y - boxHeight,
     width: A4_WIDTH - MARGIN * 2,
     height: boxHeight,
-    color: rgb(0.97, 0.98, 0.99),
+    // Match template background: #f8f9fa
+    color: rgb(248 / 255, 249 / 255, 250 / 255),
   });
 
   let boxY = y - boxPadding - 10;
@@ -347,7 +356,7 @@ async function generateInvoicePdfFact2(
   let tY = y;
   rows.forEach((r, i) => {
     const isTotal = r.bold;
-    const size = isTotal ? fontSize + 6 : fontSize;
+    const size = isTotal ? 18 : fontSize;
     const font = isTotal ? fonts.bold : fonts.regular;
     const color = isTotal ? pdfColors.primary : labelColor;
 
@@ -375,8 +384,39 @@ async function generateInvoicePdfFact2(
     }
   });
 
-  // Footer
-  drawFooter(page, company, fonts, showIban, pdfColors);
+  // Footer (matches Fact2 HTML: 2 centered lines)
+  const footerTopY = 70;
+  drawLine(page, MARGIN, footerTopY, A4_WIDTH - MARGIN, footerTopY, pdfColors.border, 0.5);
+
+  const footerColor = rgb(156 / 255, 163 / 255, 175 / 255); // #9ca3af
+  const footerSize = 9; // ~11px in HTML
+
+  const line1Parts = [company.name, company.address].filter(Boolean);
+  const line1Raw = line1Parts.join(' · ');
+  const line1 = line1Raw.substring(0, 90);
+  if (line1) {
+    const w1 = fonts.regular.widthOfTextAtSize(line1, footerSize);
+    page.drawText(line1, {
+      x: (A4_WIDTH - w1) / 2,
+      y: footerTopY - 22,
+      size: footerSize,
+      font: fonts.regular,
+      color: footerColor,
+    });
+  }
+
+  const line2Raw = showIban && company.iban ? `IBAN: ${company.iban}` : '';
+  const line2 = line2Raw.substring(0, 90);
+  if (line2) {
+    const w2 = fonts.regular.widthOfTextAtSize(line2, footerSize);
+    page.drawText(line2, {
+      x: (A4_WIDTH - w2) / 2,
+      y: footerTopY - 36,
+      size: footerSize,
+      font: fonts.regular,
+      color: footerColor,
+    });
+  }
 
   return pdfToBlob(pdfDoc);
 }
@@ -387,8 +427,10 @@ export async function generateInvoicePdf(
   config?: PdfConfig,
   template?: InvoiceTemplate
 ): Promise<Blob> {
-  // If template is Fact2 (or compatible), draw PDF according to that structure
-  if (isFact2Template(template)) {
+  const useFact2 = isFact2Template(template);
+  console.log('[PDF] Invoice layout:', useFact2 ? 'Fact2' : 'Legacy', 'template=', template?.name);
+
+  if (useFact2) {
     return generateInvoicePdfFact2(invoice, company, config);
   }
 
