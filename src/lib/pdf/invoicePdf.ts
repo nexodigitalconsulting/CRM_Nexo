@@ -98,18 +98,10 @@ async function generateInvoicePdfFact2(
   let headerTopY = y;
 
   if (showLogo && company.logo_url) {
-    const logo = await (await import('./pdfUtils')).embedLogo(pdfDoc, company.logo_url);
+    const logo = await embedLogo(pdfDoc, company.logo_url);
     if (logo) {
-      // For Fact2, we draw logo on the left only (matches template)
-      // If user selected center/right, respect it.
-      const pos = logoPosition;
-      (await import('./pdfUtils')).drawLogo(page, logo, pos, headerTopY);
-
-      if (pos === 'left') {
-        headerTopY -= logo.height + 10;
-      } else {
-        headerTopY -= logo.height + 10;
-      }
+      drawLogo(page, logo, logoPosition, headerTopY);
+      headerTopY -= logo.height + 10;
     }
   }
 
