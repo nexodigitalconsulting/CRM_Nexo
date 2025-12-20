@@ -1,7 +1,7 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
-import { ExternalLink, AlertTriangle, Copy, CheckCircle2, Info } from 'lucide-react';
+import { ExternalLink, AlertTriangle, Copy, CheckCircle2, Info, Shield } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
 
@@ -11,6 +11,11 @@ interface GmailOAuthInstructionsProps {
   /** Permite sobreescribir la URL (útil en tests o casos especiales) */
   callbackUrl?: string;
   onClose?: () => void;
+  /** Muestra información de diagnóstico adicional */
+  diagnosticInfo?: {
+    clientIdPrefix?: string;
+    lastError?: string;
+  };
 }
 
 function getCallbackUrls() {
@@ -35,7 +40,7 @@ function getCloudProjectId(): string | null {
   return null;
 }
 
-export function GmailOAuthInstructions({ callbackUrl, onClose }: GmailOAuthInstructionsProps) {
+export function GmailOAuthInstructions({ callbackUrl, onClose, diagnosticInfo }: GmailOAuthInstructionsProps) {
   const [copiedUrl, setCopiedUrl] = useState<string | null>(null);
 
   const callbackUrls = getCallbackUrls();
@@ -70,8 +75,26 @@ export function GmailOAuthInstructions({ callbackUrl, onClose }: GmailOAuthInstr
           <AlertTriangle className="h-4 w-4" />
           <AlertTitle>Error 403: access_denied</AlertTitle>
           <AlertDescription>
-            Este error indica que falta configuración en Google Cloud Console.
-            <strong className="block mt-1">Sigue TODOS los pasos a continuación.</strong>
+            Este error indica que Google rechaza la autenticación.
+            <strong className="block mt-1">Las causas más comunes son:</strong>
+            <ul className="list-disc list-inside mt-1 text-sm">
+              <li>El email no está en "Test users" (si la app está en Testing)</li>
+              <li>El scope <code className="bg-background px-1 rounded">gmail.send</code> no está añadido a la pantalla de consentimiento</li>
+              <li>La URI de redirección no coincide EXACTAMENTE</li>
+            </ul>
+          </AlertDescription>
+        </Alert>
+
+        {/* Alerta sobre scopes sensibles */}
+        <Alert className="border-blue-500/50 bg-blue-500/5">
+          <Shield className="h-4 w-4 text-blue-500" />
+          <AlertTitle className="text-blue-700">Scope sensible: gmail.send</AlertTitle>
+          <AlertDescription className="text-sm">
+            El scope <code className="bg-background px-1 rounded">gmail.send</code> es considerado <strong>sensible</strong> por Google.
+            <ul className="list-disc list-inside mt-1">
+              <li><strong>Modo Testing:</strong> Solo funciona con emails añadidos en "Test users"</li>
+              <li><strong>Modo Production:</strong> Requiere verificación de Google (puede tardar semanas)</li>
+            </ul>
           </AlertDescription>
         </Alert>
 
@@ -85,7 +108,7 @@ export function GmailOAuthInstructions({ callbackUrl, onClose }: GmailOAuthInstr
           </CardHeader>
           <CardContent className="space-y-3">
             <p className="text-xs text-muted-foreground">
-              Copia y pega EXACTAMENTE estas URLs en "URIs de redirección autorizados" de tu cliente OAuth:
+              Copia y pega <strong>EXACTAMENTE</strong> estas URLs en "URIs de redirección autorizados" de tu cliente OAuth:
             </p>
             
             {/* Gmail Callback */}
@@ -134,6 +157,27 @@ export function GmailOAuthInstructions({ callbackUrl, onClose }: GmailOAuthInstr
           </CardContent>
         </Card>
 
+        {/* Información de diagnóstico */}
+        {diagnosticInfo && (diagnosticInfo.clientIdPrefix || diagnosticInfo.lastError) && (
+          <Card className="border-muted">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-xs text-muted-foreground">Información de diagnóstico</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-1">
+              {diagnosticInfo.clientIdPrefix && (
+                <p className="text-xs font-mono">
+                  Client ID: <span className="text-primary">{diagnosticInfo.clientIdPrefix}...</span>
+                </p>
+              )}
+              {diagnosticInfo.lastError && (
+                <p className="text-xs text-destructive">
+                  Último error: {diagnosticInfo.lastError}
+                </p>
+              )}
+            </CardContent>
+          </Card>
+        )}
+
         <div className="space-y-4">
           <div className="space-y-2">
             <h4 className="font-medium">1. Accede a las credenciales OAuth</h4>
@@ -156,17 +200,25 @@ export function GmailOAuthInstructions({ callbackUrl, onClose }: GmailOAuthInstr
             <ol className="text-sm text-muted-foreground list-decimal list-inside space-y-1">
               <li>Haz clic en tu cliente OAuth (tipo "Web application")</li>
               <li>En <strong>"URIs de redirección autorizados"</strong>, añade las URLs de arriba</li>
-              <li>Guarda los cambios</li>
+              <li>Guarda los cambios y <strong>espera 5 minutos</strong></li>
             </ol>
           </div>
 
           <div className="space-y-2">
-            <h4 className="font-medium">3. Configura la pantalla de consentimiento</h4>
-            <ul className="text-sm text-muted-foreground list-disc list-inside space-y-1">
-              <li><strong>Estado "Testing":</strong> Añade tu email en "Test users"</li>
-              <li><strong>Estado "Production":</strong> Cualquier usuario puede acceder</li>
-              <li>Verifica que los scopes incluyan: <code className="bg-muted px-1 rounded">gmail.send</code>, <code className="bg-muted px-1 rounded">userinfo.email</code></li>
-            </ul>
+            <h4 className="font-medium">3. Configura la pantalla de consentimiento (CRÍTICO)</h4>
+            <ol className="text-sm text-muted-foreground list-decimal list-inside space-y-1">
+              <li>Ve a "OAuth consent screen"</li>
+              <li>Click en <strong>"EDIT APP"</strong></li>
+              <li>En la sección <strong>"Scopes"</strong>, click en "ADD OR REMOVE SCOPES"</li>
+              <li>
+                Busca y añade estos scopes:
+                <ul className="list-disc list-inside ml-4 mt-1">
+                  <li><code className="bg-muted px-1 rounded text-xs">https://www.googleapis.com/auth/gmail.send</code></li>
+                  <li><code className="bg-muted px-1 rounded text-xs">https://www.googleapis.com/auth/userinfo.email</code></li>
+                </ul>
+              </li>
+              <li>Guarda los cambios</li>
+            </ol>
             <Button
               variant="outline"
               size="sm"
@@ -179,7 +231,17 @@ export function GmailOAuthInstructions({ callbackUrl, onClose }: GmailOAuthInstr
           </div>
 
           <div className="space-y-2">
-            <h4 className="font-medium">4. Habilita las APIs necesarias</h4>
+            <h4 className="font-medium">4. Añade tu email a Test Users</h4>
+            <ol className="text-sm text-muted-foreground list-decimal list-inside space-y-1">
+              <li>En la pantalla de consentimiento, ve a la sección <strong>"Test users"</strong></li>
+              <li>Click en <strong>"+ ADD USERS"</strong></li>
+              <li>Añade <strong>exactamente</strong> el email con el que vas a autenticarte</li>
+              <li>Guarda los cambios</li>
+            </ol>
+          </div>
+
+          <div className="space-y-2">
+            <h4 className="font-medium">5. Habilita las APIs necesarias</h4>
             <div className="flex gap-2 flex-wrap">
               <Button
                 variant="outline"
@@ -203,7 +265,7 @@ export function GmailOAuthInstructions({ callbackUrl, onClose }: GmailOAuthInstr
           </div>
 
           <div className="space-y-2">
-            <h4 className="font-medium">5. Verifica los secretos en Supabase</h4>
+            <h4 className="font-medium">6. Verifica los secretos en Supabase</h4>
             <p className="text-sm text-muted-foreground">
               Asegúrate de que <code className="bg-muted px-1 rounded">GOOGLE_CLIENT_ID</code> y{' '}
               <code className="bg-muted px-1 rounded">GOOGLE_CLIENT_SECRET</code> coinciden con los de tu cliente OAuth.

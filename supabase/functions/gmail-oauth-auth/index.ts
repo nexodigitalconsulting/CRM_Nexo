@@ -20,8 +20,17 @@ serve(async (req) => {
     const { action, code, redirectUri } = await req.json();
     console.log(`[gmail-oauth-auth] Action: ${action}`);
 
+    // Log de diagnóstico para verificar configuración
+    console.log(`[gmail-oauth-auth] SUPABASE_URL: ${SUPABASE_URL}`);
+    console.log(`[gmail-oauth-auth] CLIENT_ID configured: ${!!GOOGLE_CLIENT_ID}`);
+    console.log(`[gmail-oauth-auth] CLIENT_ID (first 20 chars): ${GOOGLE_CLIENT_ID?.substring(0, 20)}...`);
+    console.log(`[gmail-oauth-auth] CLIENT_SECRET configured: ${!!GOOGLE_CLIENT_SECRET}`);
+
     if (!GOOGLE_CLIENT_ID || !GOOGLE_CLIENT_SECRET) {
-      throw new Error("Google OAuth credentials not configured");
+      console.error("[gmail-oauth-auth] MISSING CREDENTIALS!");
+      console.error(`[gmail-oauth-auth] GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID ? 'SET' : 'NOT SET'}`);
+      console.error(`[gmail-oauth-auth] GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET ? 'SET' : 'NOT SET'}`);
+      throw new Error("Google OAuth credentials not configured. Check GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET in Supabase Edge Function secrets.");
     }
 
     const supabase = createClient(SUPABASE_URL!, SUPABASE_SERVICE_ROLE_KEY!);
@@ -36,6 +45,14 @@ serve(async (req) => {
         "https://www.googleapis.com/auth/userinfo.email",
       ].join(" ");
 
+      // Log detallado de la configuración
+      console.log(`[gmail-oauth-auth] ==================== OAUTH CONFIG ====================`);
+      console.log(`[gmail-oauth-auth] Callback URL: ${callbackUrl}`);
+      console.log(`[gmail-oauth-auth] Scopes: ${scopes}`);
+      console.log(`[gmail-oauth-auth] Client ID: ${GOOGLE_CLIENT_ID}`);
+      console.log(`[gmail-oauth-auth] ========================================================`);
+      console.log(`[gmail-oauth-auth] IMPORTANT: Verify this EXACT callback URL is in Google Cloud Console!`);
+
       const authUrl = new URL("https://accounts.google.com/o/oauth2/v2/auth");
       authUrl.searchParams.set("client_id", GOOGLE_CLIENT_ID);
       authUrl.searchParams.set("redirect_uri", callbackUrl);
@@ -43,11 +60,17 @@ serve(async (req) => {
       authUrl.searchParams.set("scope", scopes);
       authUrl.searchParams.set("access_type", "offline");
       authUrl.searchParams.set("prompt", "consent");
+      // Añadir parámetros adicionales para mejor compatibilidad
+      authUrl.searchParams.set("include_granted_scopes", "true");
 
-      console.log(`[gmail-oauth-auth] Generated auth URL with callback: ${callbackUrl}`);
+      console.log(`[gmail-oauth-auth] Generated auth URL: ${authUrl.toString()}`);
 
       return new Response(
-        JSON.stringify({ authUrl: authUrl.toString() }),
+        JSON.stringify({ 
+          authUrl: authUrl.toString(),
+          callbackUrl: callbackUrl, // Devolver para diagnóstico
+          clientIdPrefix: GOOGLE_CLIENT_ID.substring(0, 20)
+        }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -58,6 +81,7 @@ serve(async (req) => {
       }
 
       console.log(`[gmail-oauth-auth] Exchanging code for tokens`);
+      console.log(`[gmail-oauth-auth] Using callback URL: ${callbackUrl}`);
 
       // Exchange code for tokens
       const tokenResponse = await fetch("https://oauth2.googleapis.com/token", {
@@ -76,6 +100,7 @@ serve(async (req) => {
 
       if (tokenData.error) {
         console.error("[gmail-oauth-auth] Token exchange error:", tokenData);
+        console.error("[gmail-oauth-auth] Error description:", tokenData.error_description);
         throw new Error(tokenData.error_description || tokenData.error);
       }
 
