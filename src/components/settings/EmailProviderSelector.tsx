@@ -1,13 +1,13 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Mail, Server, CheckCircle2, AlertCircle, ExternalLink, HelpCircle } from 'lucide-react';
+import { Mail, Server, CheckCircle2, AlertCircle, ExternalLink, HelpCircle, Copy } from 'lucide-react';
 import { useGmailConfig } from '@/hooks/useEmailLogs';
 import { useEmailSettings } from '@/hooks/useEmailSettings';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase, SUPABASE_URL } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { GmailOAuthInstructions } from './GmailOAuthInstructions';
 
@@ -22,14 +22,54 @@ export function EmailProviderSelector({ onProviderChange, currentProvider }: Ema
   const [isConnecting, setIsConnecting] = useState(false);
   const [showInstructions, setShowInstructions] = useState(false);
   const [lastError, setLastError] = useState<string | null>(null);
+  const [clientIdPrefix, setClientIdPrefix] = useState<string | null>(null);
+  const [showCallbackUrl, setShowCallbackUrl] = useState(false);
 
   const smtpConfigured = emailSettings && emailSettings.smtp_host && emailSettings.smtp_user;
   const gmailConnected = gmailConfig && gmailConfig.refresh_token && gmailConfig.email_address;
+
+  // Generar la URL de callback
+  const callbackUrl = `${SUPABASE_URL}/functions/v1/gmail-oauth-callback`;
+
+  // Verificar parámetros de error en la URL (cuando vuelve de Google con error)
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const error = urlParams.get('error');
+    const errorDescription = urlParams.get('error_description');
+    
+    if (error) {
+      let errorMessage = `Error de Google: ${error}`;
+      if (error === 'access_denied') {
+        errorMessage = 'Acceso denegado. Tu email no está en "Test users" de Google Cloud Console.';
+      } else if (error === 'redirect_uri_mismatch') {
+        errorMessage = 'La URI de redirección no coincide. Verifica la configuración en Google Cloud Console.';
+      } else if (errorDescription) {
+        errorMessage = errorDescription;
+      }
+      
+      setLastError(errorMessage);
+      setShowInstructions(true);
+      
+      // Limpiar la URL
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
+  }, []);
+
+  const handleCopyCallbackUrl = async () => {
+    try {
+      await navigator.clipboard.writeText(callbackUrl);
+      toast.success('URL de callback copiada');
+    } catch {
+      toast.error('Error al copiar');
+    }
+  };
 
   const handleGmailConnect = async () => {
     setIsConnecting(true);
     setLastError(null);
     try {
+      console.log('[Gmail OAuth] Requesting auth URL...');
+      
       const { data, error } = await supabase.functions.invoke('gmail-oauth-auth', {
         body: { action: 'get_auth_url' }
       });
@@ -44,7 +84,15 @@ export function EmailProviderSelector({ onProviderChange, currentProvider }: Ema
       }
       
       if (data?.authUrl) {
-        console.log('[Gmail OAuth] Redirecting to:', data.authUrl);
+        console.log('[Gmail OAuth] Auth URL received');
+        console.log('[Gmail OAuth] Callback URL:', data.callbackUrl);
+        console.log('[Gmail OAuth] Client ID prefix:', data.clientIdPrefix);
+        
+        // Guardar información de diagnóstico
+        if (data.clientIdPrefix) {
+          setClientIdPrefix(data.clientIdPrefix);
+        }
+        
         // Redirect to Google OAuth - will callback to gmail-oauth-callback
         window.location.href = data.authUrl;
       } else {
@@ -80,7 +128,13 @@ export function EmailProviderSelector({ onProviderChange, currentProvider }: Ema
   return (
     <div className="space-y-4">
       {showInstructions && (
-        <GmailOAuthInstructions onClose={() => setShowInstructions(false)} />
+        <GmailOAuthInstructions 
+          onClose={() => setShowInstructions(false)} 
+          diagnosticInfo={{
+            clientIdPrefix: clientIdPrefix || undefined,
+            lastError: lastError || undefined
+          }}
+        />
       )}
 
       <Card>
@@ -165,6 +219,7 @@ export function EmailProviderSelector({ onProviderChange, currentProvider }: Ema
                 <p className="text-sm text-muted-foreground">
                   Conecta tu cuenta de Gmail con autenticación segura OAuth2
                 </p>
+                
                 {gmailConnected ? (
                   <div className="flex items-center gap-2">
                     <p className="text-xs text-muted-foreground">
@@ -180,30 +235,54 @@ export function EmailProviderSelector({ onProviderChange, currentProvider }: Ema
                     </Button>
                   </div>
                 ) : (
-                  <div className="flex items-center gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={handleGmailConnect}
-                      disabled={isConnecting}
-                      className="gap-2"
-                    >
-                      <ExternalLink className="h-3 w-3" />
-                      {isConnecting ? 'Conectando...' : 'Conectar Gmail'}
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => setShowInstructions(!showInstructions)}
-                      className="gap-1 text-muted-foreground"
-                    >
-                      <HelpCircle className="h-3 w-3" />
-                      Ayuda
-                    </Button>
+                  <div className="space-y-2">
+                    {/* Mostrar URL de callback antes de conectar */}
+                    {showCallbackUrl && (
+                      <div className="bg-muted p-2 rounded text-xs space-y-1">
+                        <p className="font-medium">URL de callback (debe estar en Google Cloud Console):</p>
+                        <div className="flex items-center gap-2">
+                          <code className="flex-1 break-all text-primary">{callbackUrl}</code>
+                          <Button variant="ghost" size="icon" className="h-6 w-6" onClick={handleCopyCallbackUrl}>
+                            <Copy className="h-3 w-3" />
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+                    
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={handleGmailConnect}
+                        disabled={isConnecting}
+                        className="gap-2"
+                      >
+                        <ExternalLink className="h-3 w-3" />
+                        {isConnecting ? 'Conectando...' : 'Conectar Gmail'}
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setShowCallbackUrl(!showCallbackUrl)}
+                        className="gap-1 text-muted-foreground text-xs"
+                      >
+                        {showCallbackUrl ? 'Ocultar URL' : 'Ver URL callback'}
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setShowInstructions(!showInstructions)}
+                        className="gap-1 text-muted-foreground"
+                      >
+                        <HelpCircle className="h-3 w-3" />
+                        Ayuda
+                      </Button>
+                    </div>
                   </div>
                 )}
+                
                 {lastError && (
-                  <p className="text-xs text-destructive">{lastError}</p>
+                  <p className="text-xs text-destructive bg-destructive/10 p-2 rounded">{lastError}</p>
                 )}
               </div>
             </div>
