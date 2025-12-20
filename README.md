@@ -117,19 +117,58 @@ npm run dev
 - [Guía de Despliegue en Easypanel](./easypanel/README.md)
 - [Arquitectura Híbrida PostgreSQL + Supabase](./docs/MIGRATION_HYBRID_ARCHITECTURE.md)
 
-## 🔐 Configuración de Google OAuth
+## 📧 Configuración de Correo Electrónico
 
-Para las integraciones de Gmail y Google Calendar, debes configurar las siguientes URLs de callback en Google Cloud Console:
+### Opción 1: Gmail SMTP con App Password (Recomendado)
+
+La forma más sencilla de enviar emails con Gmail:
+
+1. **Habilitar verificación en 2 pasos** en tu cuenta de Google
+2. **Generar App Password**:
+   - Ve a [https://myaccount.google.com/apppasswords](https://myaccount.google.com/apppasswords)
+   - Selecciona "Correo" y "Otro (nombre personalizado)"
+   - Copia la contraseña de 16 caracteres generada
+
+3. **Configuración SMTP** en el CRM:
+   | Campo | Valor |
+   |-------|-------|
+   | Host SMTP | `smtp.gmail.com` |
+   | Puerto | `587` (TLS) o `465` (SSL) |
+   | Usuario | tu-email@gmail.com |
+   | Contraseña | La App Password generada |
+   | Conexión segura | ✅ Activada |
+
+### Opción 2: SMTP Genérico
+
+Puedes usar cualquier proveedor SMTP (SendGrid, Mailgun, tu propio servidor):
+
+| Campo | Descripción |
+|-------|-------------|
+| Host SMTP | Servidor SMTP de tu proveedor |
+| Puerto | Generalmente 587 (TLS) o 465 (SSL) |
+| Usuario | Tu usuario SMTP |
+| Contraseña | Tu contraseña SMTP |
+
+### Opción 3: Resend (Alternativa moderna)
+
+1. Crea cuenta en [https://resend.com](https://resend.com) (100 emails/día gratis)
+2. Genera una API Key
+3. Verifica tu dominio (opcional, para enviar desde tu dominio)
+
+---
+
+## 🔐 Configuración de Google Calendar
+
+Para la integración con Google Calendar, configura la URL de callback en Google Cloud Console:
 
 | Integración | URL de Callback |
 |-------------|-----------------|
-| **Gmail OAuth** | `https://honfwrfkiukckyoelsdm.supabase.co/functions/v1/gmail-oauth-callback` |
 | **Google Calendar** | `https://honfwrfkiukckyoelsdm.supabase.co/functions/v1/google-calendar-callback` |
 
 **Pasos:**
 1. Ve a [Google Cloud Console → Credenciales](https://console.cloud.google.com/apis/credentials)
 2. Edita tu cliente OAuth 2.0
-3. En "URIs de redirección autorizados", añade las URLs de arriba
+3. En "URIs de redirección autorizados", añade la URL de arriba
 4. En "Pantalla de consentimiento OAuth", añade tu email como usuario de prueba si está en modo Testing
 
 ## 🔒 Seguridad

@@ -1,15 +1,9 @@
-import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Mail, Server, CheckCircle2, AlertCircle, ExternalLink, HelpCircle, Copy } from 'lucide-react';
-import { useGmailConfig } from '@/hooks/useEmailLogs';
+import { Mail, Server, CheckCircle2, AlertCircle } from 'lucide-react';
 import { useEmailSettings } from '@/hooks/useEmailSettings';
-import { supabase, SUPABASE_URL } from '@/integrations/supabase/client';
-import { toast } from 'sonner';
-import { GmailOAuthInstructions } from './GmailOAuthInstructions';
 
 interface EmailProviderSelectorProps {
   onProviderChange: (provider: 'smtp' | 'gmail' | 'outlook') => void;
@@ -17,126 +11,12 @@ interface EmailProviderSelectorProps {
 }
 
 export function EmailProviderSelector({ onProviderChange, currentProvider }: EmailProviderSelectorProps) {
-  const { data: gmailConfig, refetch: refetchGmail } = useGmailConfig();
   const { data: emailSettings } = useEmailSettings();
-  const [isConnecting, setIsConnecting] = useState(false);
-  const [showInstructions, setShowInstructions] = useState(false);
-  const [lastError, setLastError] = useState<string | null>(null);
-  const [clientIdPrefix, setClientIdPrefix] = useState<string | null>(null);
-  const [showCallbackUrl, setShowCallbackUrl] = useState(false);
 
   const smtpConfigured = emailSettings && emailSettings.smtp_host && emailSettings.smtp_user;
-  const gmailConnected = gmailConfig && gmailConfig.refresh_token && gmailConfig.email_address;
-
-  // Generar la URL de callback
-  const callbackUrl = `${SUPABASE_URL}/functions/v1/gmail-oauth-callback`;
-
-  // Verificar parámetros de error en la URL (cuando vuelve de Google con error)
-  useEffect(() => {
-    const urlParams = new URLSearchParams(window.location.search);
-    const error = urlParams.get('error');
-    const errorDescription = urlParams.get('error_description');
-    
-    if (error) {
-      let errorMessage = `Error de Google: ${error}`;
-      if (error === 'access_denied') {
-        errorMessage = 'Acceso denegado. Tu email no está en "Test users" de Google Cloud Console.';
-      } else if (error === 'redirect_uri_mismatch') {
-        errorMessage = 'La URI de redirección no coincide. Verifica la configuración en Google Cloud Console.';
-      } else if (errorDescription) {
-        errorMessage = errorDescription;
-      }
-      
-      setLastError(errorMessage);
-      setShowInstructions(true);
-      
-      // Limpiar la URL
-      window.history.replaceState({}, document.title, window.location.pathname);
-    }
-  }, []);
-
-  const handleCopyCallbackUrl = async () => {
-    try {
-      await navigator.clipboard.writeText(callbackUrl);
-      toast.success('URL de callback copiada');
-    } catch {
-      toast.error('Error al copiar');
-    }
-  };
-
-  const handleGmailConnect = async () => {
-    setIsConnecting(true);
-    setLastError(null);
-    try {
-      console.log('[Gmail OAuth] Requesting auth URL...');
-      
-      const { data, error } = await supabase.functions.invoke('gmail-oauth-auth', {
-        body: { action: 'get_auth_url' }
-      });
-
-      if (error) {
-        console.error('[Gmail OAuth] Error getting auth URL:', error);
-        if (error.message?.includes('Google OAuth credentials not configured')) {
-          setLastError('Las credenciales de Google OAuth no están configuradas en Supabase.');
-          setShowInstructions(true);
-        }
-        throw error;
-      }
-      
-      if (data?.authUrl) {
-        console.log('[Gmail OAuth] Auth URL received');
-        console.log('[Gmail OAuth] Callback URL:', data.callbackUrl);
-        console.log('[Gmail OAuth] Client ID prefix:', data.clientIdPrefix);
-        
-        // Guardar información de diagnóstico
-        if (data.clientIdPrefix) {
-          setClientIdPrefix(data.clientIdPrefix);
-        }
-        
-        // Redirect to Google OAuth - will callback to gmail-oauth-callback
-        window.location.href = data.authUrl;
-      } else {
-        throw new Error('No se recibió URL de autenticación');
-      }
-    } catch (error: any) {
-      console.error('Error connecting Gmail:', error);
-      toast.error(error.message || 'Error al conectar con Gmail');
-      setIsConnecting(false);
-    }
-  };
-
-  const handleGmailDisconnect = async () => {
-    try {
-      const { error } = await supabase
-        .from('gmail_config')
-        .delete()
-        .neq('id', '00000000-0000-0000-0000-000000000000');
-
-      if (error) throw error;
-      
-      toast.success('Gmail desconectado');
-      refetchGmail();
-      if (currentProvider === 'gmail') {
-        onProviderChange('smtp');
-      }
-    } catch (error) {
-      console.error('Error disconnecting Gmail:', error);
-      toast.error('Error al desconectar Gmail');
-    }
-  };
 
   return (
     <div className="space-y-4">
-      {showInstructions && (
-        <GmailOAuthInstructions 
-          onClose={() => setShowInstructions(false)} 
-          diagnosticInfo={{
-            clientIdPrefix: clientIdPrefix || undefined,
-            lastError: lastError || undefined
-          }}
-        />
-      )}
-
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -185,17 +65,12 @@ export function EmailProviderSelector({ onProviderChange, currentProvider }: Ema
               </div>
             </div>
 
-            {/* Gmail OAuth */}
-            <div className={`relative flex items-start space-x-4 rounded-lg border p-4 transition-colors ${currentProvider === 'gmail' ? 'border-primary bg-primary/5' : 'border-border'}`}>
-              <RadioGroupItem 
-                value="gmail" 
-                id="gmail" 
-                className="mt-1"
-                disabled={!gmailConnected}
-              />
+            {/* Gmail OAuth - Próximamente */}
+            <div className="relative flex items-start space-x-4 rounded-lg border border-dashed p-4 opacity-60">
+              <RadioGroupItem value="gmail" id="gmail" className="mt-1" disabled />
               <div className="flex-1 space-y-2">
                 <div className="flex items-center gap-2">
-                  <Label htmlFor="gmail" className="font-medium cursor-pointer">
+                  <Label htmlFor="gmail" className="font-medium cursor-not-allowed">
                     <svg className="h-4 w-4 inline mr-2" viewBox="0 0 24 24">
                       <path fill="#EA4335" d="M5.27 10.5L1 8.4V18.5C1 19.33 1.67 20 2.5 20H21.5C22.33 20 23 19.33 23 18.5V8.4L18.73 10.5L12 14.5L5.27 10.5Z"/>
                       <path fill="#34A853" d="M23 6.5V8.4L18.73 10.5L12 14.5V21L21.5 21C22.33 21 23 20.33 23 19.5V6.5Z"/>
@@ -204,86 +79,14 @@ export function EmailProviderSelector({ onProviderChange, currentProvider }: Ema
                     </svg>
                     Gmail (OAuth2)
                   </Label>
-                  {gmailConnected ? (
-                    <Badge variant="default" className="bg-green-500 gap-1">
-                      <CheckCircle2 className="h-3 w-3" />
-                      Conectado
-                    </Badge>
-                  ) : (
-                    <Badge variant="secondary" className="gap-1">
-                      <AlertCircle className="h-3 w-3" />
-                      No conectado
-                    </Badge>
-                  )}
+                  <Badge variant="outline">Próximamente</Badge>
                 </div>
                 <p className="text-sm text-muted-foreground">
-                  Conecta tu cuenta de Gmail con autenticación segura OAuth2
+                  Conexión directa con OAuth2 (requiere verificación de Google)
                 </p>
-                
-                {gmailConnected ? (
-                  <div className="flex items-center gap-2">
-                    <p className="text-xs text-muted-foreground">
-                      Cuenta: {gmailConfig.email_address}
-                    </p>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-6 text-xs text-destructive hover:text-destructive"
-                      onClick={handleGmailDisconnect}
-                    >
-                      Desconectar
-                    </Button>
-                  </div>
-                ) : (
-                  <div className="space-y-2">
-                    {/* Mostrar URL de callback antes de conectar */}
-                    {showCallbackUrl && (
-                      <div className="bg-muted p-2 rounded text-xs space-y-1">
-                        <p className="font-medium">URL de callback (debe estar en Google Cloud Console):</p>
-                        <div className="flex items-center gap-2">
-                          <code className="flex-1 break-all text-primary">{callbackUrl}</code>
-                          <Button variant="ghost" size="icon" className="h-6 w-6" onClick={handleCopyCallbackUrl}>
-                            <Copy className="h-3 w-3" />
-                          </Button>
-                        </div>
-                      </div>
-                    )}
-                    
-                    <div className="flex items-center gap-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={handleGmailConnect}
-                        disabled={isConnecting}
-                        className="gap-2"
-                      >
-                        <ExternalLink className="h-3 w-3" />
-                        {isConnecting ? 'Conectando...' : 'Conectar Gmail'}
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => setShowCallbackUrl(!showCallbackUrl)}
-                        className="gap-1 text-muted-foreground text-xs"
-                      >
-                        {showCallbackUrl ? 'Ocultar URL' : 'Ver URL callback'}
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => setShowInstructions(!showInstructions)}
-                        className="gap-1 text-muted-foreground"
-                      >
-                        <HelpCircle className="h-3 w-3" />
-                        Ayuda
-                      </Button>
-                    </div>
-                  </div>
-                )}
-                
-                {lastError && (
-                  <p className="text-xs text-destructive bg-destructive/10 p-2 rounded">{lastError}</p>
-                )}
+                <p className="text-xs text-muted-foreground">
+                  💡 Usa SMTP con App Password de Gmail como alternativa
+                </p>
               </div>
             </div>
 
