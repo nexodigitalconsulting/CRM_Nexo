@@ -41,6 +41,7 @@ const SAMPLE_DATA = {
     company_name: 'Mi Empresa S.L.',
     company_cif: 'B12345678',
     company_address: 'Calle Principal 123, 28001 Madrid',
+    company_iban: 'ES12 3456 7890 1234 5678 9012',
     client_name: 'Cliente Ejemplo S.A.',
     client_cif: 'A87654321',
     client_address: 'Av. Comercial 456, 08001 Barcelona',
@@ -56,8 +57,11 @@ const SAMPLE_DATA = {
     current_date: '18/12/2024',
     company_logo: '<div style="width:80px;height:40px;background:linear-gradient(135deg,#6366f1,#8b5cf6);border-radius:8px;display:flex;align-items:center;justify-content:center;color:white;font-weight:bold;font-size:12px;">LOGO</div>',
     services: [
-      { service_name: 'Consultoría mensual', service_price: '1.000,00' },
+      { name: 'Consultoría mensual', quantity: 1, unit_price: '1.000,00 €', total: '1.000,00 €' },
+      { name: 'Soporte técnico', quantity: 1, unit_price: '500,00 €', total: '500,00 €' },
     ],
+    services_rows: `<tr style="border-bottom: 1px solid #e5e7eb;"><td style="padding: 12px;">Consultoría mensual</td><td style="padding: 12px; text-align: center;">1</td><td style="padding: 12px; text-align: right;">1.000,00 €</td><td style="padding: 12px; text-align: right;">1.000,00 €</td></tr>`,
+    legal_clauses: `<div style="margin: 20px 0;"><p><strong>PRIMERA - OBJETO:</strong> El prestador se compromete a proporcionar los servicios descritos.</p><p><strong>SEGUNDA - DURACIÓN:</strong> El contrato tendrá vigencia desde la fecha de inicio hasta la fecha de fin.</p></div>`,
   },
   quote: {
     company_name: 'Mi Empresa S.L.',

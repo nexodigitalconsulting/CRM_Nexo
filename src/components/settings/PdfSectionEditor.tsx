@@ -20,12 +20,15 @@ import {
   FileSignature,
   Eye,
   EyeOff,
+  Scale,
+  PenTool,
 } from "lucide-react";
 import { PdfSections, getDefaultSections } from "@/lib/pdf/pdfUtils";
 
 interface PdfSectionEditorProps {
   sections: PdfSections;
   onChange: (sections: PdfSections) => void;
+  documentType?: 'invoice' | 'quote' | 'contract';
 }
 
 interface SectionItemProps {
@@ -119,7 +122,7 @@ function ColorControl({ label, value, onChange }: ColorControlProps) {
   );
 }
 
-export function PdfSectionEditor({ sections, onChange }: PdfSectionEditorProps) {
+export function PdfSectionEditor({ sections, onChange, documentType = 'invoice' }: PdfSectionEditorProps) {
   const updateSection = <K extends keyof PdfSections>(
     sectionKey: K,
     updates: Partial<PdfSections[K]>
@@ -129,6 +132,8 @@ export function PdfSectionEditor({ sections, onChange }: PdfSectionEditorProps) 
       [sectionKey]: { ...sections[sectionKey], ...updates },
     });
   };
+
+  const isContract = documentType === 'contract';
 
   return (
     <Card>
@@ -334,6 +339,70 @@ export function PdfSectionEditor({ sections, onChange }: PdfSectionEditorProps) 
               />
             )}
           </SectionItem>
+
+          {/* Contract-specific: Legal Clauses Section */}
+          {isContract && sections.legal && (
+            <SectionItem
+              title="Cláusulas Legales"
+              icon={<Scale className="h-4 w-4" />}
+              visible={sections.legal.visible}
+              onVisibilityChange={(v) => updateSection('legal', { visible: v })}
+            >
+              <SliderControl
+                label="Margen superior"
+                value={sections.legal.margin_top}
+                min={10}
+                max={60}
+                onChange={(v) => updateSection('legal', { margin_top: v })}
+              />
+              <SliderControl
+                label="Espaciado entre cláusulas"
+                value={sections.legal.clause_spacing}
+                min={10}
+                max={40}
+                onChange={(v) => updateSection('legal', { clause_spacing: v })}
+              />
+              <SliderControl
+                label="Tamaño título cláusula"
+                value={sections.legal.title_size || 10}
+                min={8}
+                max={14}
+                onChange={(v) => updateSection('legal', { title_size: v })}
+              />
+            </SectionItem>
+          )}
+
+          {/* Contract-specific: Signatures Section */}
+          {isContract && sections.signatures && (
+            <SectionItem
+              title="Firmas"
+              icon={<PenTool className="h-4 w-4" />}
+              visible={sections.signatures.visible}
+              onVisibilityChange={(v) => updateSection('signatures', { visible: v })}
+            >
+              <SliderControl
+                label="Margen superior"
+                value={sections.signatures.margin_top}
+                min={20}
+                max={100}
+                onChange={(v) => updateSection('signatures', { margin_top: v })}
+              />
+              <SliderControl
+                label="Ancho línea de firma"
+                value={sections.signatures.line_width}
+                min={120}
+                max={220}
+                onChange={(v) => updateSection('signatures', { line_width: v })}
+              />
+              <SliderControl
+                label="Tamaño etiqueta"
+                value={sections.signatures.label_size || 9}
+                min={7}
+                max={12}
+                onChange={(v) => updateSection('signatures', { label_size: v })}
+              />
+            </SectionItem>
+          )}
 
           {/* Footer Section */}
           <SectionItem
