@@ -916,7 +916,8 @@ export function PdfSettingsManager() {
                   onChange={(newSections) => {
                     setSections(newSections);
                     setHasUnsavedChanges(true);
-                  }} 
+                  }}
+                  documentType={selectedDocument}
                 />
               </TabsContent>
 

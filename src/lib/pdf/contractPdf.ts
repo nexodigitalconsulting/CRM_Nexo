@@ -19,9 +19,15 @@ import {
   drawDocumentTitle,
   drawTotals,
   drawFooter,
+  drawLegalClauses,
+  drawSignatureArea,
   CompanyData,
   ClientData,
   PdfConfig,
+  PdfSections,
+  getDefaultSections,
+  LegalClause,
+  DEFAULT_LEGAL_CLAUSES,
 } from './pdfUtils';
 
 export interface ContractService {
@@ -84,10 +90,34 @@ export async function generateContractPdf(
 ): Promise<Blob> {
   const pdfDoc = await createPdfDocument();
   const fonts = await embedFonts(pdfDoc);
-  const page = addPage(pdfDoc);
+  let page = addPage(pdfDoc);
   
   const pdfColors = createColorsFromConfig(config);
   const fontSize = config?.font_size_base || 10;
+  
+  // Get section configuration
+  const defaultSections = getDefaultSections();
+  const sections: PdfSections = config?.sections 
+    ? { 
+        ...defaultSections,
+        ...config.sections,
+        header: { ...defaultSections.header, ...config.sections.header },
+        title: { ...defaultSections.title, ...config.sections.title },
+        dates: { ...defaultSections.dates, ...config.sections.dates },
+        client: { ...defaultSections.client, ...config.sections.client },
+        table: { ...defaultSections.table, ...config.sections.table },
+        totals: { ...defaultSections.totals, ...config.sections.totals },
+        footer: { ...defaultSections.footer, ...config.sections.footer },
+        legal: { ...defaultSections.legal!, ...config.sections.legal },
+        signatures: { ...defaultSections.signatures!, ...config.sections.signatures },
+      }
+    : defaultSections;
+
+  // Get legal clauses (use config or defaults)
+  const legalClauses: LegalClause[] = config?.legal_clauses || DEFAULT_LEGAL_CLAUSES;
+  const showSignatures = config?.show_signatures !== false;
+  const showLegalClauses = sections.legal?.visible !== false;
+  
   const showDiscounts = config?.show_discounts_column !== false;
   const showNotes = config?.show_notes !== false;
   const showIban = config?.show_iban_footer !== false;
@@ -95,7 +125,15 @@ export async function generateContractPdf(
   const clientData: ClientData = contract.client || { name: 'Cliente' };
   let y = A4_HEIGHT - MARGIN;
   
-  // Company header with logo
+  // Helper function to check if we need a new page
+  const checkPageBreak = (neededSpace: number): void => {
+    if (y - neededSpace < MARGIN + 60) {
+      page = addPage(pdfDoc);
+      y = A4_HEIGHT - MARGIN;
+    }
+  };
+  
+  // ============ HEADER SECTION ============
   y = await drawCompanyHeaderWithLogo(pdfDoc, page, company, fonts, y, config);
   
   // Document title (right side)
@@ -106,7 +144,7 @@ export async function generateContractPdf(
   drawLine(page, MARGIN, y, A4_WIDTH - MARGIN, y, pdfColors.border, 1);
   y -= 25;
   
-  // Contract details (right side)
+  // ============ CONTRACT DETAILS ============
   const detailsX = A4_WIDTH - MARGIN - 150;
   let detailY = y + 10;
   
@@ -175,7 +213,7 @@ export async function generateContractPdf(
     color: pdfColors.text,
   });
   
-  // Client section
+  // ============ CLIENT SECTION ============
   y = drawClientSection(page, clientData, fonts, y, pdfColors, fontSize);
   
   // Contract name if exists
@@ -193,7 +231,7 @@ export async function generateContractPdf(
   
   y -= 10;
   
-  // Services table
+  // ============ SERVICES TABLE ============
   const columns = showDiscounts ? [
     { label: 'Servicio', x: MARGIN + 5, width: 250 },
     { label: 'Cant.', x: MARGIN + 260, width: 40 },
@@ -212,6 +250,7 @@ export async function generateContractPdf(
   // Service rows (only active services)
   const services = (contract.services || []).filter(s => s.is_active !== false);
   services.forEach((svc, index) => {
+    checkPageBreak(25);
     const serviceName = svc.service?.name || 'Servicio';
     
     const values = showDiscounts ? [
@@ -235,7 +274,7 @@ export async function generateContractPdf(
   drawLine(page, MARGIN, y, A4_WIDTH - MARGIN, y, pdfColors.border, 0.5);
   y -= 30;
   
-  // Totals
+  // ============ TOTALS ============
   y = drawTotals(
     page,
     contract.subtotal || 0,
@@ -259,7 +298,7 @@ export async function generateContractPdf(
     color: pdfColors.muted,
   });
   
-  // Notes
+  // ============ NOTES ============
   if (showNotes && contract.notes) {
     y -= 25;
     page.drawText('Observaciones:', {
@@ -284,7 +323,36 @@ export async function generateContractPdf(
     });
   }
   
-  // Footer
+  // ============ LEGAL CLAUSES ============
+  if (showLegalClauses) {
+    const visibleClauses = legalClauses.filter(c => c.visible);
+    if (visibleClauses.length > 0) {
+      // Check if we need a new page for clauses
+      checkPageBreak(150);
+      y -= (sections.legal?.margin_top || 30);
+      
+      y = drawLegalClauses(page, legalClauses, fonts, y, pdfColors, {
+        clauseSpacing: sections.legal?.clause_spacing || 20,
+        titleSize: sections.legal?.title_size || 10,
+        contentSize: fontSize - 1,
+      });
+    }
+  }
+  
+  // ============ SIGNATURES ============
+  if (showSignatures && sections.signatures?.visible !== false) {
+    checkPageBreak(80);
+    y -= (sections.signatures?.margin_top || 50);
+    
+    y = drawSignatureArea(page, fonts, y, pdfColors, {
+      lineWidth: sections.signatures?.line_width || 180,
+      labelSize: sections.signatures?.label_size || 9,
+      companyName: company.name || 'El Prestador',
+      clientName: clientData.name || 'El Cliente',
+    });
+  }
+  
+  // ============ FOOTER ============
   drawFooter(page, company, fonts, showIban, pdfColors);
   
   return pdfToBlob(pdfDoc);

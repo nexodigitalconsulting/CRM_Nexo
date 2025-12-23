@@ -47,6 +47,79 @@ export interface PdfFooterSection extends PdfSectionConfig {
   show_iban: boolean;      // Show IBAN in footer
 }
 
+// Contract-specific sections
+export interface PdfLegalSection extends PdfSectionConfig {
+  clause_spacing: number;  // Spacing between clauses
+  title_size?: number;     // Clause title font size
+}
+
+export interface PdfSignaturesSection extends PdfSectionConfig {
+  line_width: number;      // Width of signature line
+  label_size?: number;     // Label font size
+}
+
+// Legal clause structure for contracts
+export interface LegalClause {
+  id: string;
+  number: string;          // "PRIMERA", "SEGUNDA", etc.
+  title: string;           // "OBJETO DEL CONTRATO"
+  content: string;         // Clause body text
+  visible: boolean;
+}
+
+// Default legal clauses for contracts
+export const DEFAULT_LEGAL_CLAUSES: LegalClause[] = [
+  {
+    id: 'objeto',
+    number: 'PRIMERA',
+    title: 'OBJETO DEL CONTRATO',
+    content: 'El prestador se compromete a proporcionar al cliente los servicios detallados en el presente contrato, conforme a las condiciones aquí establecidas.',
+    visible: true,
+  },
+  {
+    id: 'duracion',
+    number: 'SEGUNDA',
+    title: 'DURACIÓN Y VIGENCIA',
+    content: 'El contrato tendrá la duración especificada, pudiendo ser renovado de mutuo acuerdo entre las partes.',
+    visible: true,
+  },
+  {
+    id: 'precio',
+    number: 'TERCERA',
+    title: 'PRECIO Y FORMA DE PAGO',
+    content: 'El cliente abonará al prestador el importe total acordado según la periodicidad de facturación establecida, mediante transferencia bancaria.',
+    visible: true,
+  },
+  {
+    id: 'obligaciones',
+    number: 'CUARTA',
+    title: 'OBLIGACIONES DE LAS PARTES',
+    content: 'Ambas partes se comprometen al cumplimiento de las obligaciones derivadas del presente contrato, actuando de buena fe.',
+    visible: true,
+  },
+  {
+    id: 'proteccion_datos',
+    number: 'QUINTA',
+    title: 'PROTECCIÓN DE DATOS',
+    content: 'Las partes se comprometen a cumplir con la normativa vigente en materia de protección de datos personales.',
+    visible: true,
+  },
+  {
+    id: 'resolucion',
+    number: 'SEXTA',
+    title: 'RESOLUCIÓN',
+    content: 'Cualquiera de las partes podrá resolver el contrato mediante comunicación escrita con un preaviso de 30 días.',
+    visible: true,
+  },
+  {
+    id: 'jurisdiccion',
+    number: 'SÉPTIMA',
+    title: 'JURISDICCIÓN',
+    content: 'Para cualquier controversia derivada del presente contrato, las partes se someten a los juzgados y tribunales de la ciudad correspondiente.',
+    visible: false,
+  },
+];
+
 export interface PdfSections {
   header: PdfHeaderSection;
   title: PdfTitleSection;
@@ -55,6 +128,9 @@ export interface PdfSections {
   table: PdfTableSection;
   totals: PdfTotalsSection;
   footer: PdfFooterSection;
+  // Contract-specific sections
+  legal?: PdfLegalSection;
+  signatures?: PdfSignaturesSection;
 }
 
 // Default section values
@@ -67,6 +143,9 @@ export function getDefaultSections(): PdfSections {
     table: { margin_top: 28, spacing: 0, visible: true, row_height: 22, header_height: 24, show_borders: true, border_color: '#e5e7eb' },
     totals: { margin_top: 10, spacing: 0, visible: true, line_spacing: 22, show_lines: true, line_color: '#e5e7eb' },
     footer: { margin_top: 40, spacing: 12, visible: true, show_iban: true },
+    // Contract-specific defaults
+    legal: { margin_top: 30, spacing: 12, visible: true, clause_spacing: 20, title_size: 10 },
+    signatures: { margin_top: 50, spacing: 8, visible: true, line_width: 180, label_size: 9 },
   };
 }
 
@@ -107,6 +186,10 @@ export interface PdfConfig {
 
   // Section-based configuration (NEW)
   sections?: PdfSections;
+
+  // Contract-specific configuration
+  legal_clauses?: LegalClause[];
+  show_signatures?: boolean;
 }
 
 export interface PdfColors {
@@ -705,4 +788,172 @@ export function drawFooter(
     font: fonts.regular,
     color: pdfColors.muted,
   });
+}
+
+// ============ CONTRACT-SPECIFIC FUNCTIONS ============
+
+/**
+ * Wrap text to fit within a maximum width
+ */
+export function wrapText(
+  text: string,
+  font: PDFFont,
+  fontSize: number,
+  maxWidth: number
+): string[] {
+  const words = text.split(' ');
+  const lines: string[] = [];
+  let currentLine = '';
+
+  words.forEach((word) => {
+    const testLine = currentLine ? `${currentLine} ${word}` : word;
+    const width = font.widthOfTextAtSize(testLine, fontSize);
+    
+    if (width <= maxWidth) {
+      currentLine = testLine;
+    } else {
+      if (currentLine) lines.push(currentLine);
+      currentLine = word;
+    }
+  });
+  
+  if (currentLine) lines.push(currentLine);
+  return lines;
+}
+
+/**
+ * Draw a legal clause with title and wrapped content
+ */
+export function drawLegalClause(
+  page: PDFPage,
+  clause: LegalClause,
+  fonts: PdfFonts,
+  startY: number,
+  pdfColors: PdfColors = colors,
+  config?: { titleSize?: number; contentSize?: number; maxWidth?: number }
+): number {
+  const titleSize = config?.titleSize || 10;
+  const contentSize = config?.contentSize || 9;
+  const maxWidth = config?.maxWidth || (A4_WIDTH - MARGIN * 2);
+  
+  let y = startY;
+  
+  // Draw clause title: "PRIMERA - OBJETO DEL CONTRATO"
+  const titleText = `${clause.number} - ${clause.title}`;
+  page.drawText(titleText, {
+    x: MARGIN,
+    y,
+    size: titleSize,
+    font: fonts.bold,
+    color: pdfColors.text,
+  });
+  y -= 14;
+  
+  // Draw wrapped content
+  const lines = wrapText(clause.content, fonts.regular, contentSize, maxWidth);
+  lines.forEach((line) => {
+    page.drawText(line, {
+      x: MARGIN,
+      y,
+      size: contentSize,
+      font: fonts.regular,
+      color: pdfColors.secondary,
+    });
+    y -= 12;
+  });
+  
+  return y;
+}
+
+/**
+ * Draw all visible legal clauses
+ */
+export function drawLegalClauses(
+  page: PDFPage,
+  clauses: LegalClause[],
+  fonts: PdfFonts,
+  startY: number,
+  pdfColors: PdfColors = colors,
+  config?: { clauseSpacing?: number; titleSize?: number; contentSize?: number }
+): number {
+  const clauseSpacing = config?.clauseSpacing || 20;
+  const visibleClauses = clauses.filter(c => c.visible);
+  
+  let y = startY;
+  
+  // Section title
+  page.drawText('CLÁUSULAS', {
+    x: MARGIN,
+    y,
+    size: 12,
+    font: fonts.bold,
+    color: pdfColors.primary,
+  });
+  y -= 20;
+  
+  // Draw each clause
+  visibleClauses.forEach((clause, index) => {
+    y = drawLegalClause(page, clause, fonts, y, pdfColors, {
+      titleSize: config?.titleSize,
+      contentSize: config?.contentSize,
+    });
+    
+    // Add spacing between clauses (not after last)
+    if (index < visibleClauses.length - 1) {
+      y -= clauseSpacing;
+    }
+  });
+  
+  return y;
+}
+
+/**
+ * Draw signature area for contracts
+ */
+export function drawSignatureArea(
+  page: PDFPage,
+  fonts: PdfFonts,
+  startY: number,
+  pdfColors: PdfColors = colors,
+  config?: { lineWidth?: number; labelSize?: number; companyName?: string; clientName?: string }
+): number {
+  const lineWidth = config?.lineWidth || 180;
+  const labelSize = config?.labelSize || 9;
+  const companyLabel = config?.companyName || 'El Prestador';
+  const clientLabel = config?.clientName || 'El Cliente';
+  
+  let y = startY;
+  const contentWidth = A4_WIDTH - MARGIN * 2;
+  const spacing = (contentWidth - lineWidth * 2) / 3;
+  
+  const leftX = MARGIN + spacing;
+  const rightX = A4_WIDTH - MARGIN - spacing - lineWidth;
+  
+  // Signature lines
+  drawLine(page, leftX, y, leftX + lineWidth, y, pdfColors.text, 0.5);
+  drawLine(page, rightX, y, rightX + lineWidth, y, pdfColors.text, 0.5);
+  
+  y -= 12;
+  
+  // Labels
+  const leftLabelWidth = fonts.regular.widthOfTextAtSize(companyLabel, labelSize);
+  const rightLabelWidth = fonts.regular.widthOfTextAtSize(clientLabel, labelSize);
+  
+  page.drawText(companyLabel, {
+    x: leftX + (lineWidth - leftLabelWidth) / 2,
+    y,
+    size: labelSize,
+    font: fonts.regular,
+    color: pdfColors.secondary,
+  });
+  
+  page.drawText(clientLabel, {
+    x: rightX + (lineWidth - rightLabelWidth) / 2,
+    y,
+    size: labelSize,
+    font: fonts.regular,
+    color: pdfColors.secondary,
+  });
+  
+  return y - 20;
 }
