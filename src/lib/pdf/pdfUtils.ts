@@ -63,8 +63,23 @@ export interface LegalClause {
   id: string;
   number: string;          // "PRIMERA", "SEGUNDA", etc.
   title: string;           // "OBJETO DEL CONTRATO"
-  content: string;         // Clause body text
+  content: string;         // Clause body text (supports variables like {{client_name}})
   visible: boolean;
+}
+
+// Replace variables in text with actual values
+export function replaceVariablesInText(
+  text: string, 
+  variables: Record<string, string | undefined>
+): string {
+  let result = text;
+  Object.entries(variables).forEach(([key, value]) => {
+    if (value !== undefined) {
+      const regex = new RegExp(`\\{\\{${key}\\}\\}`, 'g');
+      result = result.replace(regex, value);
+    }
+  });
+  return result;
 }
 
 // Default legal clauses for contracts
@@ -770,12 +785,27 @@ export function drawFooter(
   company: CompanyData,
   fonts: PdfFonts,
   showIban: boolean = true,
-  pdfColors: PdfColors = colors
+  pdfColors: PdfColors = colors,
+  pageInfo?: { current: number; total: number }
 ): void {
   const y = 40;
   
   drawLine(page, MARGIN, y + 20, A4_WIDTH - MARGIN, y + 20, pdfColors.border, 0.5);
   
+  // Page number (right side)
+  if (pageInfo && pageInfo.total > 1) {
+    const pageText = `Página ${pageInfo.current} de ${pageInfo.total}`;
+    const pageTextWidth = fonts.regular.widthOfTextAtSize(pageText, 8);
+    page.drawText(pageText, {
+      x: A4_WIDTH - MARGIN - pageTextWidth,
+      y,
+      size: 8,
+      font: fonts.regular,
+      color: pdfColors.muted,
+    });
+  }
+  
+  // IBAN or company name (center)
   const footerText = (showIban && company.iban)
     ? `IBAN: ${company.iban}`
     : company.name || '';
