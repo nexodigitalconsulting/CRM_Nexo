@@ -33,6 +33,7 @@ const expenseSchema = z.object({
   supplier_name: z.string().min(1, "El nombre del proveedor es requerido").max(200),
   supplier_cif: z.string().max(20).optional(),
   invoice_number: z.string().max(50).optional(),
+  id_factura: z.string().max(100).optional(),
   issue_date: z.string().min(1, "La fecha de emisión es requerida"),
   due_date: z.string().optional(),
   concept: z.string().max(500).optional(),
@@ -63,6 +64,7 @@ export function ExpenseFormDialog({ open, onOpenChange, expense }: ExpenseFormDi
       supplier_name: "",
       supplier_cif: "",
       invoice_number: "",
+      id_factura: "",
       issue_date: new Date().toISOString().split("T")[0],
       due_date: "",
       concept: "",
@@ -81,6 +83,7 @@ export function ExpenseFormDialog({ open, onOpenChange, expense }: ExpenseFormDi
         supplier_name: expense.supplier_name || "",
         supplier_cif: expense.supplier_cif || "",
         invoice_number: expense.invoice_number || "",
+        id_factura: (expense as any).id_factura || "",
         issue_date: expense.issue_date || new Date().toISOString().split("T")[0],
         due_date: expense.due_date || "",
         concept: expense.concept || "",
@@ -96,6 +99,7 @@ export function ExpenseFormDialog({ open, onOpenChange, expense }: ExpenseFormDi
         supplier_name: "",
         supplier_cif: "",
         invoice_number: "",
+        id_factura: "",
         issue_date: new Date().toISOString().split("T")[0],
         due_date: "",
         concept: "",
@@ -122,6 +126,7 @@ export function ExpenseFormDialog({ open, onOpenChange, expense }: ExpenseFormDi
       supplier_name: data.supplier_name,
       supplier_cif: data.supplier_cif || null,
       invoice_number: data.invoice_number || null,
+      id_factura: data.id_factura || null,
       issue_date: data.issue_date,
       due_date: data.due_date || null,
       concept: data.concept || null,
@@ -187,7 +192,7 @@ export function ExpenseFormDialog({ open, onOpenChange, expense }: ExpenseFormDi
             </div>
 
             {/* Invoice Info */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <FormField
                 control={form.control}
                 name="invoice_number"
@@ -201,6 +206,23 @@ export function ExpenseFormDialog({ open, onOpenChange, expense }: ExpenseFormDi
                   </FormItem>
                 )}
               />
+              <FormField
+                control={form.control}
+                name="id_factura"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>ID Factura</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Identificador interno" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            {/* Dates */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <FormField
                 control={form.control}
                 name="issue_date"
