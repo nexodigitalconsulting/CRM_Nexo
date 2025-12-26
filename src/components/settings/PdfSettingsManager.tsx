@@ -46,13 +46,14 @@ import {
   Loader2, FileText, Palette, Eye, Save, Layout, Type, Image, 
   CheckCircle, AlertCircle, PenTool, Plus, Trash2, Copy, Star,
   Building2, User, Calendar, DollarSign, Hash, Mail, Phone, MapPin,
-  Table2, FileSignature, Settings2, Layers
+  Table2, FileSignature, Settings2, Layers, Scale
 } from "lucide-react";
 import { toast } from "sonner";
 import { PdfPreview } from "./PdfPreview";
 import { PdfSectionEditor } from "./PdfSectionEditor";
+import { ContractClausesEditor } from "./ContractClausesEditor";
 import { embedPdfConfigInTemplate, extractPdfConfigFromTemplate } from "@/hooks/useDefaultTemplate";
-import { PdfConfig, PdfSections, getDefaultSections } from "@/lib/pdf/pdfUtils";
+import { PdfConfig, PdfSections, getDefaultSections, LegalClause, DEFAULT_LEGAL_CLAUSES } from "@/lib/pdf/pdfUtils";
 
 type DocumentType = 'invoice' | 'quote' | 'contract';
 
@@ -510,6 +511,9 @@ export function PdfSettingsManager() {
 
   // Section-based configuration
   const [sections, setSections] = useState<PdfSections>(getDefaultSections());
+  
+  // Legal clauses for contracts
+  const [legalClauses, setLegalClauses] = useState<LegalClause[]>(DEFAULT_LEGAL_CLAUSES);
 
   const { data: templates = [], isLoading } = usePdfTemplates(selectedDocument);
   const createTemplate = useCreatePdfTemplate();
@@ -553,6 +557,13 @@ export function PdfSettingsManager() {
       setSections({ ...getDefaultSections(), ...config.sections });
     } else {
       setSections(getDefaultSections());
+    }
+    
+    // Load legal clauses for contracts
+    if (config.legal_clauses) {
+      setLegalClauses(config.legal_clauses);
+    } else {
+      setLegalClauses(DEFAULT_LEGAL_CLAUSES);
     }
   }, [selectedDocument]);
 
@@ -662,6 +673,8 @@ export function PdfSettingsManager() {
         totals_line_color: totalsLineColor,
         // Section-based configuration
         sections: sections,
+        // Contract-specific: legal clauses
+        legal_clauses: selectedDocument === 'contract' ? legalClauses : undefined,
       };
 
       // Embed PDF_CONFIG comment in the content for reliable extraction
@@ -891,7 +904,13 @@ export function PdfSettingsManager() {
                   <Layers className="h-4 w-4" />
                   <span className="hidden sm:inline">Secciones</span>
                 </TabsTrigger>
-                <TabsTrigger value="colors" className="gap-1">
+              {selectedDocument === 'contract' && (
+                <TabsTrigger value="clauses" className="gap-1">
+                  <Scale className="h-4 w-4" />
+                  <span className="hidden sm:inline">Cláusulas</span>
+                </TabsTrigger>
+              )}
+              <TabsTrigger value="colors" className="gap-1">
                   <Palette className="h-4 w-4" />
                   <span className="hidden sm:inline">Colores</span>
                 </TabsTrigger>
@@ -1395,7 +1414,17 @@ export function PdfSettingsManager() {
                 <PdfPreview
                   content={editedContent}
                   documentType={selectedDocument}
+                  config={{
+                    primary_color: primaryColor,
+                    secondary_color: secondaryColor,
+                    title_text: titleText,
+                    legal_clauses: selectedDocument === 'contract' ? legalClauses : undefined,
+                  }}
                 />
+                <p className="text-xs text-muted-foreground text-center mt-3">
+                  Vista previa simplificada
+                </p>
+              </CardContent>
                 <p className="text-xs text-muted-foreground text-center mt-3">
                   Vista previa simplificada
                 </p>

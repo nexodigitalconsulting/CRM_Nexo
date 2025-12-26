@@ -21,6 +21,7 @@ import {
   drawFooter,
   drawLegalClauses,
   drawSignatureArea,
+  replaceClauseVariables,
   CompanyData,
   ClientData,
   PdfConfig,
@@ -28,6 +29,8 @@ import {
   getDefaultSections,
   LegalClause,
   DEFAULT_LEGAL_CLAUSES,
+  PdfFonts,
+  PdfColors,
 } from './pdfUtils';
 
 export interface ContractService {
@@ -90,7 +93,6 @@ export async function generateContractPdf(
 ): Promise<Blob> {
   const pdfDoc = await createPdfDocument();
   const fonts = await embedFonts(pdfDoc);
-  let page = addPage(pdfDoc);
   
   const pdfColors = createColorsFromConfig(config);
   const fontSize = config?.font_size_base || 10;
@@ -114,7 +116,7 @@ export async function generateContractPdf(
     : defaultSections;
 
   // Get legal clauses (use config or defaults)
-  const legalClauses: LegalClause[] = config?.legal_clauses || DEFAULT_LEGAL_CLAUSES;
+  const rawClauses: LegalClause[] = config?.legal_clauses || DEFAULT_LEGAL_CLAUSES;
   const showSignatures = config?.show_signatures !== false;
   const showLegalClauses = sections.legal?.visible !== false;
   
@@ -123,12 +125,49 @@ export async function generateContractPdf(
   const showIban = config?.show_iban_footer !== false;
   
   const clientData: ClientData = contract.client || { name: 'Cliente' };
+  
+  // Prepare variable data for clause replacement
+  const clauseVariables: Record<string, string> = {
+    company_name: company.name || '',
+    company_cif: company.cif || '',
+    company_address: company.address || '',
+    company_city: company.city || '',
+    company_email: company.email || '',
+    company_phone: company.phone || '',
+    company_iban: company.iban || '',
+    client_name: clientData.name || '',
+    client_cif: clientData.cif || '',
+    client_address: clientData.address || '',
+    client_city: clientData.city || '',
+    client_email: clientData.email || '',
+    contract_number: String(contract.contract_number),
+    contract_name: contract.name || '',
+    start_date: formatDate(contract.start_date),
+    end_date: formatDate(contract.end_date),
+    billing_period: getBillingPeriodLabel(contract.billing_period),
+    subtotal: formatCurrency(contract.subtotal),
+    iva_amount: formatCurrency(contract.iva_total),
+    total: formatCurrency(contract.total),
+    current_date: formatDate(new Date().toISOString()),
+  };
+  
+  // Replace variables in clause content
+  const legalClauses: LegalClause[] = rawClauses.map(clause => ({
+    ...clause,
+    content: replaceClauseVariables(clause.content, clauseVariables),
+  }));
+  
+  // Track pages for numbering
+  const pages: ReturnType<typeof addPage>[] = [];
+  let page = addPage(pdfDoc);
+  pages.push(page);
   let y = A4_HEIGHT - MARGIN;
   
   // Helper function to check if we need a new page
   const checkPageBreak = (neededSpace: number): void => {
     if (y - neededSpace < MARGIN + 60) {
       page = addPage(pdfDoc);
+      pages.push(page);
       y = A4_HEIGHT - MARGIN;
     }
   };
@@ -352,8 +391,11 @@ export async function generateContractPdf(
     });
   }
   
-  // ============ FOOTER ============
-  drawFooter(page, company, fonts, showIban, pdfColors);
+  // ============ FOOTER WITH PAGE NUMBERS ============
+  const totalPages = pages.length;
+  pages.forEach((p, index) => {
+    drawFooter(p, company, fonts, showIban, pdfColors, { current: index + 1, total: totalPages });
+  });
   
   return pdfToBlob(pdfDoc);
 }
