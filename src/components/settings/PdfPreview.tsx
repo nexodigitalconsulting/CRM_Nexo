@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { PdfConfig } from '@/lib/pdf/pdfUtils';
+import { PdfConfig, LegalClause, DEFAULT_LEGAL_CLAUSES } from '@/lib/pdf/pdfUtils';
 
 interface PdfPreviewProps {
   content: string;
@@ -31,7 +31,7 @@ const SAMPLE_DATA = {
     iva_amount: '262,50 €',
     total: '1.512,50 €',
     notes: 'Pago a 30 días. Gracias por confiar en nosotros.',
-    current_date: '18/12/2024',
+    current_date: '26/12/2024',
     services: [
       { name: 'Consultoría estratégica', quantity: 10, unit_price: '75,00 €', discount_percent: 0, total: '750,00 €' },
       { name: 'Desarrollo web', quantity: 1, unit_price: '500,00 €', discount_percent: 0, total: '500,00 €' },
@@ -54,14 +54,12 @@ const SAMPLE_DATA = {
     iva_amount: '2.520,00 €',
     total: '14.520,00 €',
     billing_period: 'Mensual',
-    current_date: '18/12/2024',
+    current_date: '26/12/2024',
     company_logo: '<div style="width:80px;height:40px;background:linear-gradient(135deg,#6366f1,#8b5cf6);border-radius:8px;display:flex;align-items:center;justify-content:center;color:white;font-weight:bold;font-size:12px;">LOGO</div>',
     services: [
       { name: 'Consultoría mensual', quantity: 1, unit_price: '1.000,00 €', total: '1.000,00 €' },
       { name: 'Soporte técnico', quantity: 1, unit_price: '500,00 €', total: '500,00 €' },
     ],
-    services_rows: `<tr style="border-bottom: 1px solid #e5e7eb;"><td style="padding: 12px;">Consultoría mensual</td><td style="padding: 12px; text-align: center;">1</td><td style="padding: 12px; text-align: right;">1.000,00 €</td><td style="padding: 12px; text-align: right;">1.000,00 €</td></tr>`,
-    legal_clauses: `<div style="margin: 20px 0;"><p><strong>PRIMERA - OBJETO:</strong> El prestador se compromete a proporcionar los servicios descritos.</p><p><strong>SEGUNDA - DURACIÓN:</strong> El contrato tendrá vigencia desde la fecha de inicio hasta la fecha de fin.</p></div>`,
   },
   quote: {
     company_name: 'Mi Empresa S.L.',
@@ -83,13 +81,25 @@ const SAMPLE_DATA = {
     iva_total: '735,00 €',
     total: '4.235,00 €',
     notes: 'Presupuesto válido por 30 días.',
-    current_date: '18/12/2024',
+    current_date: '26/12/2024',
     services: [
       { name: 'Diseño web', quantity: 1, unit_price: '2.000,00 €', discount_percent: 0, total: '2.000,00 €' },
       { name: 'SEO inicial', quantity: 1, unit_price: '1.500,00 €', discount_percent: 0, total: '1.500,00 €' },
     ],
   },
 };
+
+// Replace variables in clause content
+function replaceClauseVariables(content: string, data: Record<string, unknown>): string {
+  let result = content;
+  Object.entries(data).forEach(([key, value]) => {
+    if (typeof value === 'string') {
+      const regex = new RegExp(`\\{\\{${key}\\}\\}`, 'g');
+      result = result.replace(regex, value);
+    }
+  });
+  return result;
+}
 
 function replaceVariables(content: string, data: Record<string, unknown>): string {
   let result = content;
@@ -150,10 +160,35 @@ export function PdfPreview({ content, documentType, scale = 0.5, config }: PdfPr
     
     // Apply config overrides for visual preview consistency
     if (config?.title_text) {
-      // Replace title text in preview
       result = result.replace(/>FACTURA</g, `>${config.title_text}<`);
       result = result.replace(/>PRESUPUESTO</g, `>${config.title_text}<`);
       result = result.replace(/>CONTRATO</g, `>${config.title_text}<`);
+    }
+    
+    // For contracts, render legal clauses if in config
+    if (documentType === 'contract' && config?.legal_clauses) {
+      const visibleClauses = config.legal_clauses.filter(c => c.visible);
+      if (visibleClauses.length > 0) {
+        const clausesHtml = visibleClauses.map(clause => {
+          const processedContent = replaceClauseVariables(clause.content, data);
+          return `<div style="margin-bottom: 16px;">
+            <p style="font-weight: bold; margin: 0 0 6px 0; font-size: 10px;">${clause.number} - ${clause.title}</p>
+            <p style="margin: 0; font-size: 9px; color: #666; line-height: 1.4;">${processedContent}</p>
+          </div>`;
+        }).join('');
+        
+        const clausesSection = `<div style="margin: 24px 0;">
+          <h3 style="font-size: 12px; font-weight: bold; margin: 0 0 16px 0; color: ${config.primary_color || '#3366cc'};">CLÁUSULAS</h3>
+          ${clausesHtml}
+        </div>`;
+        
+        // Insert before signatures or at end
+        if (result.includes('El Prestador')) {
+          result = result.replace(/<div style="margin-top: 60px; display: flex; justify-content: space-around;">/, clausesSection + '<div style="margin-top: 60px; display: flex; justify-content: space-around;">');
+        } else {
+          result = result.replace(/<\/div>\s*$/, clausesSection + '</div>');
+        }
+      }
     }
     
     return result;
