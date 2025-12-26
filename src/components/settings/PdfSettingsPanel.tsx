@@ -9,7 +9,7 @@ import {
 } from "@/components/ui/collapsible";
 import { 
   ChevronDown, ChevronRight, PanelLeftClose, PanelLeft,
-  Settings
+  Settings, Save
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -32,13 +32,19 @@ interface PdfSettingsPanelProps {
   className?: string;
   collapsed?: boolean;
   onCollapsedChange?: (collapsed: boolean) => void;
+  onSave?: () => void;
+  isSaving?: boolean;
+  hasChanges?: boolean;
 }
 
 export function PdfSettingsPanel({ 
   sections, 
   className,
   collapsed = false,
-  onCollapsedChange 
+  onCollapsedChange,
+  onSave,
+  isSaving,
+  hasChanges
 }: PdfSettingsPanelProps) {
   const [openSections, setOpenSections] = useState<string[]>(
     sections.filter(s => s.defaultOpen).map(s => s.id)
@@ -53,8 +59,22 @@ export function PdfSettingsPanel({
     );
   };
 
+  const SaveButton = () => (
+    onSave && hasChanges ? (
+      <Button 
+        size="sm" 
+        onClick={onSave} 
+        disabled={isSaving}
+        className="w-full mt-3"
+      >
+        <Save className="h-4 w-4 mr-2" />
+        {isSaving ? 'Guardando...' : 'Guardar'}
+      </Button>
+    ) : null
+  );
+
   const PanelContent = () => (
-    <ScrollArea className="h-full">
+    <ScrollArea className="h-[calc(100vh-120px)]">
       <div className="space-y-1 p-3">
         {sections.map((section) => (
           <Collapsible
@@ -78,29 +98,30 @@ export function PdfSettingsPanel({
                 )}
               </Button>
             </CollapsibleTrigger>
-            <CollapsibleContent className="pt-1 pb-3">
+            <CollapsibleContent className="pt-2 pb-4 px-2">
               {section.content}
             </CollapsibleContent>
           </Collapsible>
         ))}
+        <SaveButton />
       </div>
     </ScrollArea>
   );
 
-  // Mobile: Sheet drawer
+  // Mobile: Sheet drawer with fixed floating button
   const MobilePanel = () => (
     <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
       <SheetTrigger asChild>
         <Button 
-          variant="outline" 
+          variant="default" 
           size="icon" 
-          className="lg:hidden fixed bottom-4 left-4 z-50 h-11 w-11 rounded-full shadow-lg bg-background border-border"
+          className="lg:hidden fixed bottom-4 left-4 z-50 h-12 w-12 rounded-full shadow-lg"
         >
           <Settings className="h-5 w-5" />
         </Button>
       </SheetTrigger>
       <SheetContent side="left" className="w-[300px] p-0">
-        <div className="h-12 border-b flex items-center px-4">
+        <div className="h-12 border-b flex items-center justify-between px-4">
           <h3 className="font-semibold text-sm">Configuración PDF</h3>
         </div>
         <PanelContent />
@@ -113,38 +134,43 @@ export function PdfSettingsPanel({
     <TooltipProvider delayDuration={0}>
       <div
         className={cn(
-          "hidden lg:flex flex-col border-r bg-background transition-all duration-200 ease-in-out relative",
-          collapsed ? "w-12" : "w-72",
+          "hidden lg:flex flex-col border-r bg-sidebar transition-all duration-200 ease-in-out relative shrink-0",
+          collapsed ? "w-14" : "w-72",
           className
         )}
       >
-        {/* Toggle button - positioned at edge like Lovable */}
-        <Button
-          variant="ghost"
-          size="icon"
-          className={cn(
-            "absolute top-3 z-10 h-7 w-7 rounded-md hover:bg-accent",
-            collapsed ? "right-2.5" : "right-2"
+        {/* Header with toggle button */}
+        <div className={cn(
+          "h-12 border-b flex items-center shrink-0",
+          collapsed ? "justify-center" : "justify-between px-4"
+        )}>
+          {!collapsed && (
+            <span className="font-semibold text-sm">Configuración</span>
           )}
-          onClick={() => onCollapsedChange?.(!collapsed)}
-        >
-          {collapsed ? (
-            <PanelLeft className="h-4 w-4" />
-          ) : (
-            <PanelLeftClose className="h-4 w-4" />
-          )}
-        </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8 rounded-md hover:bg-accent"
+            onClick={() => onCollapsedChange?.(!collapsed)}
+          >
+            {collapsed ? (
+              <PanelLeft className="h-4 w-4" />
+            ) : (
+              <PanelLeftClose className="h-4 w-4" />
+            )}
+          </Button>
+        </div>
 
         {/* Collapsed state: icons only with tooltips */}
         {collapsed ? (
-          <div className="flex flex-col items-center gap-1 pt-12 px-1.5">
+          <div className="flex flex-col items-center gap-1 pt-3 px-1.5">
             {sections.map((section) => (
               <Tooltip key={section.id}>
                 <TooltipTrigger asChild>
                   <Button
                     variant={openSections.includes(section.id) ? "secondary" : "ghost"}
                     size="icon"
-                    className="h-9 w-9"
+                    className="h-10 w-10"
                     onClick={() => {
                       onCollapsedChange?.(false);
                       setOpenSections([section.id]);
@@ -158,15 +184,27 @@ export function PdfSettingsPanel({
                 </TooltipContent>
               </Tooltip>
             ))}
+            {onSave && hasChanges && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="default"
+                    size="icon"
+                    className="h-10 w-10 mt-2"
+                    onClick={onSave}
+                    disabled={isSaving}
+                  >
+                    <Save className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="right" sideOffset={8}>
+                  Guardar cambios
+                </TooltipContent>
+              </Tooltip>
+            )}
           </div>
         ) : (
-          <>
-            {/* Header */}
-            <div className="h-12 border-b flex items-center px-4 shrink-0">
-              <span className="font-semibold text-sm">Configuración</span>
-            </div>
-            <PanelContent />
-          </>
+          <PanelContent />
         )}
       </div>
     </TooltipProvider>
@@ -183,7 +221,7 @@ export function PdfSettingsPanel({
 // Helper components for section content
 export function PanelSectionContent({ children }: { children: React.ReactNode }) {
   return (
-    <div className="px-3 space-y-3">
+    <div className="space-y-3">
       {children}
     </div>
   );
@@ -201,7 +239,7 @@ export function PanelRow({
   return (
     <div className="space-y-1">
       <div className="flex items-center justify-between gap-2">
-        <label className="text-sm font-medium">{label}</label>
+        <label className="text-xs font-medium">{label}</label>
         {children}
       </div>
       {description && (
