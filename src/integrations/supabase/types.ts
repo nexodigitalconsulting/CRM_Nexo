@@ -846,6 +846,7 @@ export type Database = {
           due_date: string | null
           expense_number: number
           id: string
+          id_factura: string | null
           invoice_number: string | null
           irpf_amount: number | null
           irpf_percent: number | null
@@ -869,6 +870,7 @@ export type Database = {
           due_date?: string | null
           expense_number?: number
           id?: string
+          id_factura?: string | null
           invoice_number?: string | null
           irpf_amount?: number | null
           irpf_percent?: number | null
@@ -892,6 +894,7 @@ export type Database = {
           due_date?: string | null
           expense_number?: number
           id?: string
+          id_factura?: string | null
           invoice_number?: string | null
           irpf_amount?: number | null
           irpf_percent?: number | null
