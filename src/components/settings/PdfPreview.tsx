@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { PdfConfig, LegalClause, DEFAULT_LEGAL_CLAUSES } from '@/lib/pdf/pdfUtils';
+import { PdfConfig } from '@/lib/pdf/pdfUtils';
 
 interface PdfPreviewProps {
   content: string;
@@ -24,14 +24,14 @@ const SAMPLE_DATA = {
     client_email: 'contacto@cliente.com',
     client_phone: '+34 934 567 890',
     invoice_number: 'F-2024-0042',
-    issue_date: '25/12/2024',
-    due_date: '25/01/2025',
+    issue_date: '18/12/2024',
+    due_date: '18/01/2025',
     subtotal: '1.250,00 €',
     iva_percent: '21',
     iva_amount: '262,50 €',
     total: '1.512,50 €',
     notes: 'Pago a 30 días. Gracias por confiar en nosotros.',
-    current_date: '25/12/2024',
+    current_date: '18/12/2024',
     services: [
       { name: 'Consultoría estratégica', quantity: 10, unit_price: '75,00 €', discount_percent: 0, total: '750,00 €' },
       { name: 'Desarrollo web', quantity: 1, unit_price: '500,00 €', discount_percent: 0, total: '500,00 €' },
@@ -54,12 +54,14 @@ const SAMPLE_DATA = {
     iva_amount: '2.520,00 €',
     total: '14.520,00 €',
     billing_period: 'Mensual',
-    current_date: '25/12/2024',
+    current_date: '18/12/2024',
     company_logo: '<div style="width:80px;height:40px;background:linear-gradient(135deg,#6366f1,#8b5cf6);border-radius:8px;display:flex;align-items:center;justify-content:center;color:white;font-weight:bold;font-size:12px;">LOGO</div>',
     services: [
       { name: 'Consultoría mensual', quantity: 1, unit_price: '1.000,00 €', total: '1.000,00 €' },
       { name: 'Soporte técnico', quantity: 1, unit_price: '500,00 €', total: '500,00 €' },
     ],
+    services_rows: `<tr style="border-bottom: 1px solid #e5e7eb;"><td style="padding: 12px;">Consultoría mensual</td><td style="padding: 12px; text-align: center;">1</td><td style="padding: 12px; text-align: right;">1.000,00 €</td><td style="padding: 12px; text-align: right;">1.000,00 €</td></tr>`,
+    legal_clauses: `<div style="margin: 20px 0;"><p><strong>PRIMERA - OBJETO:</strong> El prestador se compromete a proporcionar los servicios descritos.</p><p><strong>SEGUNDA - DURACIÓN:</strong> El contrato tendrá vigencia desde la fecha de inicio hasta la fecha de fin.</p></div>`,
   },
   quote: {
     company_name: 'Mi Empresa S.L.',
@@ -74,14 +76,14 @@ const SAMPLE_DATA = {
     client_phone: '+34 963 456 789',
     quote_number: 'P-2024-0089',
     quote_name: 'Propuesta de servicios digitales',
-    quote_date: '25/12/2024',
-    valid_until: '25/01/2025',
+    quote_date: '18/12/2024',
+    valid_until: '18/01/2025',
     subtotal: '3.500,00 €',
     iva_percent: '21',
     iva_total: '735,00 €',
     total: '4.235,00 €',
     notes: 'Presupuesto válido por 30 días.',
-    current_date: '25/12/2024',
+    current_date: '18/12/2024',
     services: [
       { name: 'Diseño web', quantity: 1, unit_price: '2.000,00 €', discount_percent: 0, total: '2.000,00 €' },
       { name: 'SEO inicial', quantity: 1, unit_price: '1.500,00 €', discount_percent: 0, total: '1.500,00 €' },
@@ -141,99 +143,6 @@ function replaceVariables(content: string, data: Record<string, unknown>): strin
   return result;
 }
 
-// Generate HTML for legal clauses matching PDF output
-function generateClausesHtml(
-  clauses: LegalClause[],
-  variables: Record<string, unknown>,
-  config?: PdfConfig
-): string {
-  const visibleClauses = clauses.filter(c => c.visible);
-  if (visibleClauses.length === 0) return '';
-
-  const primaryColor = config?.primary_color || '#3366cc';
-  const clauseSpacing = config?.sections?.legal?.clause_spacing || 20;
-
-  const clausesHtml = visibleClauses.map((clause) => {
-    // Replace variables in clause content
-    let content = clause.content;
-    Object.entries(variables).forEach(([key, value]) => {
-      if (typeof value === 'string') {
-        const regex = new RegExp(`\\{\\{${key}\\}\\}`, 'g');
-        content = content.replace(regex, value);
-      }
-    });
-
-    return `
-      <div style="margin-bottom: ${clauseSpacing}px;">
-        <p style="font-weight: bold; font-size: 10px; margin: 0 0 8px 0; color: #1f2937;">
-          ${clause.number} - ${clause.title}
-        </p>
-        <p style="font-size: 9px; color: #6b7280; margin: 0; line-height: 1.5;">
-          ${content}
-        </p>
-      </div>
-    `;
-  }).join('');
-
-  return `
-    <div style="margin-top: 30px;">
-      <p style="font-size: 12px; font-weight: bold; color: ${primaryColor}; margin: 0 0 16px 0;">
-        CLÁUSULAS
-      </p>
-      ${clausesHtml}
-    </div>
-  `;
-}
-
-// Generate HTML for signature area matching PDF output
-function generateSignaturesHtml(
-  companyName: string,
-  clientName: string,
-  config?: PdfConfig
-): string {
-  if (config?.show_signatures === false || config?.sections?.signatures?.visible === false) {
-    return '';
-  }
-
-  const lineWidth = config?.sections?.signatures?.line_width || 180;
-
-  return `
-    <div style="margin-top: 50px; display: flex; justify-content: space-around;">
-      <div style="text-align: center;">
-        <div style="width: ${lineWidth}px; border-bottom: 1px solid #000; height: 40px;"></div>
-        <p style="margin-top: 8px; font-size: 9px; color: #6b7280;">El Prestador</p>
-        <p style="font-size: 8px; color: #9ca3af;">${companyName}</p>
-      </div>
-      <div style="text-align: center;">
-        <div style="width: ${lineWidth}px; border-bottom: 1px solid #000; height: 40px;"></div>
-        <p style="margin-top: 8px; font-size: 9px; color: #6b7280;">El Cliente</p>
-        <p style="font-size: 8px; color: #9ca3af;">${clientName}</p>
-      </div>
-    </div>
-  `;
-}
-
-// Generate page footer with page number
-function generateFooterHtml(
-  iban: string | undefined,
-  companyName: string,
-  pageNum: number = 1,
-  totalPages: number = 1
-): string {
-  const pageInfo = totalPages > 1 ? `Página ${pageNum} de ${totalPages}` : '';
-  const footerText = iban ? `IBAN: ${iban}` : companyName;
-
-  return `
-    <div style="position: absolute; bottom: 30px; left: 40px; right: 40px; border-top: 1px solid #e5e7eb; padding-top: 10px;">
-      <div style="display: flex; justify-content: space-between; font-size: 8px; color: #9ca3af;">
-        <span></span>
-        <span>${footerText}</span>
-        <span>${pageInfo}</span>
-      </div>
-    </div>
-  `;
-}
-
 export function PdfPreview({ content, documentType, scale = 0.5, config }: PdfPreviewProps) {
   const renderedContent = useMemo(() => {
     const data = SAMPLE_DATA[documentType];
@@ -241,29 +150,10 @@ export function PdfPreview({ content, documentType, scale = 0.5, config }: PdfPr
     
     // Apply config overrides for visual preview consistency
     if (config?.title_text) {
+      // Replace title text in preview
       result = result.replace(/>FACTURA</g, `>${config.title_text}<`);
       result = result.replace(/>PRESUPUESTO</g, `>${config.title_text}<`);
-      result = result.replace(/>CONTRATO DE SERVICIOS</g, `>${config.title_text}<`);
       result = result.replace(/>CONTRATO</g, `>${config.title_text}<`);
-    }
-    
-    // For contracts, add legal clauses and signatures matching PDF output
-    if (documentType === 'contract') {
-      const clauses = config?.legal_clauses || DEFAULT_LEGAL_CLAUSES;
-      const clausesHtml = generateClausesHtml(clauses, data, config);
-      const signaturesHtml = generateSignaturesHtml(
-        data.company_name,
-        data.client_name,
-        config
-      );
-      
-      // Insert before closing div or at end
-      const insertionPoint = result.lastIndexOf('</div>');
-      if (insertionPoint > 0) {
-        result = result.slice(0, insertionPoint) + clausesHtml + signaturesHtml + result.slice(insertionPoint);
-      } else {
-        result += clausesHtml + signaturesHtml;
-      }
     }
     
     return result;
@@ -275,7 +165,7 @@ export function PdfPreview({ content, documentType, scale = 0.5, config }: PdfPr
 
   return (
     <div 
-      className="bg-white shadow-lg rounded border mx-auto relative"
+      className="bg-white shadow-lg rounded border mx-auto"
       style={{
         width: pageWidth * scale,
         minHeight: pageHeight * scale,
@@ -293,29 +183,9 @@ export function PdfPreview({ content, documentType, scale = 0.5, config }: PdfPr
           fontFamily: "'Segoe UI', Arial, sans-serif",
           color: '#1f2937',
           lineHeight: 1.5,
-          position: 'relative',
         }}
       >
         <div dangerouslySetInnerHTML={{ __html: renderedContent }} />
-        {/* Footer simulation */}
-        <div 
-          style={{
-            position: 'absolute',
-            bottom: 30,
-            left: 40,
-            right: 40,
-            borderTop: '1px solid #e5e7eb',
-            paddingTop: 8,
-            display: 'flex',
-            justifyContent: 'center',
-            fontSize: 8,
-            color: '#9ca3af',
-          }}
-        >
-          {'company_iban' in SAMPLE_DATA[documentType] 
-            ? `IBAN: ${(SAMPLE_DATA[documentType] as any).company_iban}` 
-            : SAMPLE_DATA[documentType].company_name}
-        </div>
       </div>
     </div>
   );

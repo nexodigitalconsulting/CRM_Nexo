@@ -28,9 +28,7 @@ import {
   getDefaultSections,
   LegalClause,
   DEFAULT_LEGAL_CLAUSES,
-  replaceVariablesInText,
 } from './pdfUtils';
-import { PDFPage } from 'pdf-lib';
 
 export interface ContractService {
   service_id: string;
@@ -92,17 +90,7 @@ export async function generateContractPdf(
 ): Promise<Blob> {
   const pdfDoc = await createPdfDocument();
   const fonts = await embedFonts(pdfDoc);
-  const pages: PDFPage[] = [];
-  let currentPageIndex = 0;
-  
-  const createNewPage = () => {
-    const newPage = addPage(pdfDoc);
-    pages.push(newPage);
-    currentPageIndex = pages.length - 1;
-    return newPage;
-  };
-  
-  let page = createNewPage();
+  let page = addPage(pdfDoc);
   
   const pdfColors = createColorsFromConfig(config);
   const fontSize = config?.font_size_base || 10;
@@ -125,33 +113,8 @@ export async function generateContractPdf(
       }
     : defaultSections;
 
-  // Variables for text replacement
-  const clientData: ClientData = contract.client || { name: 'Cliente' };
-  const variables: Record<string, string | undefined> = {
-    company_name: company.name,
-    company_cif: company.cif || undefined,
-    company_address: [company.address, company.city, company.postal_code].filter(Boolean).join(', '),
-    client_name: clientData.name,
-    client_cif: clientData.cif || undefined,
-    client_address: [clientData.address, clientData.city, clientData.postal_code].filter(Boolean).join(', '),
-    start_date: formatDate(contract.start_date),
-    end_date: formatDate(contract.end_date),
-    billing_period: getBillingPeriodLabel(contract.billing_period),
-    total: formatCurrency(contract.total),
-    subtotal: formatCurrency(contract.subtotal),
-    iva_amount: formatCurrency(contract.iva_total),
-    current_date: formatDate(new Date().toISOString()),
-    contract_number: String(contract.contract_number),
-  };
-
-  // Get legal clauses with variables replaced
-  const rawClauses: LegalClause[] = config?.legal_clauses || DEFAULT_LEGAL_CLAUSES;
-  const legalClauses: LegalClause[] = rawClauses.map(clause => ({
-    ...clause,
-    content: replaceVariablesInText(clause.content, variables),
-    title: replaceVariablesInText(clause.title, variables),
-  }));
-  
+  // Get legal clauses (use config or defaults)
+  const legalClauses: LegalClause[] = config?.legal_clauses || DEFAULT_LEGAL_CLAUSES;
   const showSignatures = config?.show_signatures !== false;
   const showLegalClauses = sections.legal?.visible !== false;
   
@@ -159,12 +122,13 @@ export async function generateContractPdf(
   const showNotes = config?.show_notes !== false;
   const showIban = config?.show_iban_footer !== false;
   
+  const clientData: ClientData = contract.client || { name: 'Cliente' };
   let y = A4_HEIGHT - MARGIN;
   
   // Helper function to check if we need a new page
   const checkPageBreak = (neededSpace: number): void => {
     if (y - neededSpace < MARGIN + 60) {
-      page = createNewPage();
+      page = addPage(pdfDoc);
       y = A4_HEIGHT - MARGIN;
     }
   };
@@ -388,14 +352,8 @@ export async function generateContractPdf(
     });
   }
   
-  // ============ FOOTER WITH PAGE NUMBERS ============
-  const totalPages = pages.length;
-  pages.forEach((p, index) => {
-    drawFooter(p, company, fonts, showIban, pdfColors, { 
-      current: index + 1, 
-      total: totalPages 
-    });
-  });
+  // ============ FOOTER ============
+  drawFooter(page, company, fonts, showIban, pdfColors);
   
   return pdfToBlob(pdfDoc);
 }
