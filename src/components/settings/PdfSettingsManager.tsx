@@ -940,6 +940,23 @@ export function PdfSettingsManager() {
                 />
               </TabsContent>
 
+              {/* Cláusulas Legales - Solo para contratos */}
+              {selectedDocument === 'contract' && (
+                <TabsContent value="clauses" className="mt-4">
+                  <Card>
+                    <CardContent className="pt-6">
+                      <ContractClausesEditor 
+                        clauses={legalClauses}
+                        onChange={(newClauses) => {
+                          setLegalClauses(newClauses);
+                          setHasUnsavedChanges(true);
+                        }}
+                      />
+                    </CardContent>
+                  </Card>
+                </TabsContent>
+              )}
+
               {/* Colores */}
               <TabsContent value="colors" className="mt-4">
                 <Card>
