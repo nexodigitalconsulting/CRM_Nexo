@@ -1425,10 +1425,6 @@ export function PdfSettingsManager() {
                   Vista previa simplificada
                 </p>
               </CardContent>
-                <p className="text-xs text-muted-foreground text-center mt-3">
-                  Vista previa simplificada
-                </p>
-              </CardContent>
             </Card>
           </div>
         </div>
