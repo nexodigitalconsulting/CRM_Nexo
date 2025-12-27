@@ -420,14 +420,14 @@ CREATE TABLE IF NOT EXISTS public.invoice_services (
   created_at timestamptz DEFAULT now()
 );
 
--- Gastos
-CREATE SEQUENCE IF NOT EXISTS expenses_expense_number_seq;
+-- Gastos (v1.6.0: expense_number es text, id_factura añadido)
 CREATE TABLE IF NOT EXISTS public.expenses (
   id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
-  expense_number integer NOT NULL DEFAULT nextval('expenses_expense_number_seq'),
+  expense_number text NOT NULL UNIQUE,
   supplier_name text NOT NULL,
   supplier_cif text,
   invoice_number text,
+  id_factura text,
   concept text,
   issue_date date NOT NULL,
   due_date date,
@@ -1140,11 +1140,12 @@ VALUES
   ('v1.2.0', 'Columna signature_html en email_settings', now()),
   ('v1.3.0', 'RLS para schema_versions - lectura pública', now()),
   ('v1.4.0', 'Columnas is_sent y sent_at en invoices, quotes, contracts', now()),
-  ('v1.5.0', 'Email logs, Gmail OAuth config, provider selector', now())
+  ('v1.5.0', 'Email logs, Gmail OAuth config, provider selector', now()),
+  ('v1.6.0', 'Expenses: expense_number text unique, id_factura', now())
 ON CONFLICT (version) DO NOTHING;
 
 -- ============================================
--- ✅ SCHEMA COMPLETO INSTALADO - v1.5.0
+-- ✅ SCHEMA COMPLETO INSTALADO - v1.6.0
 -- ============================================
 
 DO $$
@@ -1154,6 +1155,8 @@ DECLARE
   v_contracts_ok boolean;
   v_email_logs_ok boolean;
   v_gmail_config_ok boolean;
+  v_expense_number_ok boolean;
+  v_id_factura_ok boolean;
 BEGIN
   -- Verificar componentes v1.4.0
   SELECT EXISTS (
@@ -1182,9 +1185,20 @@ BEGIN
     WHERE table_name = 'gmail_config'
   ) INTO v_gmail_config_ok;
 
+  -- Verificar componentes v1.6.0
+  SELECT EXISTS (
+    SELECT 1 FROM information_schema.columns 
+    WHERE table_name = 'expenses' AND column_name = 'expense_number' AND data_type = 'text'
+  ) INTO v_expense_number_ok;
+  
+  SELECT EXISTS (
+    SELECT 1 FROM information_schema.columns 
+    WHERE table_name = 'expenses' AND column_name = 'id_factura'
+  ) INTO v_id_factura_ok;
+
   RAISE NOTICE '';
   RAISE NOTICE '[%] ════════════════════════════════════════════', clock_timestamp();
-  RAISE NOTICE '║  ✅ CRM Schema v1.5.0 instalado correctamente  ║';
+  RAISE NOTICE '║  ✅ CRM Schema v1.6.0 instalado correctamente  ║';
   RAISE NOTICE '════════════════════════════════════════════════════';
   RAISE NOTICE '';
   RAISE NOTICE '[%] VERIFICACIÓN DE COMPONENTES:', clock_timestamp();
@@ -1195,6 +1209,9 @@ BEGIN
   RAISE NOTICE '  v1.5.0:';
   RAISE NOTICE '  • email_logs tabla:          %', CASE WHEN v_email_logs_ok THEN '✓ OK' ELSE '✗ FALTA' END;
   RAISE NOTICE '  • gmail_config tabla:        %', CASE WHEN v_gmail_config_ok THEN '✓ OK' ELSE '✗ FALTA' END;
+  RAISE NOTICE '  v1.6.0:';
+  RAISE NOTICE '  • expenses.expense_number text: %', CASE WHEN v_expense_number_ok THEN '✓ OK' ELSE '✗ FALTA' END;
+  RAISE NOTICE '  • expenses.id_factura:       %', CASE WHEN v_id_factura_ok THEN '✓ OK' ELSE '✗ FALTA' END;
   RAISE NOTICE '';
   RAISE NOTICE '[%] ESTADÍSTICAS:', clock_timestamp();
   RAISE NOTICE '  • Tablas creadas: 30';

@@ -1,5 +1,5 @@
 -- ============================================
--- APLICADOR INTELIGENTE DE MIGRACIONES v1.5.0
+-- APLICADOR INTELIGENTE DE MIGRACIONES v1.6.0
 -- Archivo: apply_all.sql
 -- Uso: Ejecutar en cualquier instalación para sincronizar a la última versión
 -- IMPORTANTE: Este script NO depende de funciones previas
@@ -464,7 +464,77 @@ BEGIN
 END $$;
 
 -- ============================================
--- VERIFICACIÓN FINAL DE COMPONENTES v1.5.0
+-- MIGRACIÓN v1.6.0 - Expenses Improvements
+-- ============================================
+DO $$
+BEGIN
+  RAISE NOTICE '[%] ───────────────────────────────────────────', clock_timestamp();
+  RAISE NOTICE '[%] Verificando v1.6.0 (Expenses Improvements)...', clock_timestamp();
+  
+  IF EXISTS (SELECT 1 FROM schema_versions WHERE version = 'v1.6.0') THEN
+    RAISE NOTICE '[%] → v1.6.0 ya aplicada - omitiendo', clock_timestamp();
+    RETURN;
+  END IF;
+
+  RAISE NOTICE '[%] Aplicando v1.6.0 - Expenses Improvements...', clock_timestamp();
+
+  -- ═══════════════════════════════════════════
+  -- Cambiar expense_number de integer a text
+  -- ═══════════════════════════════════════════
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns 
+    WHERE table_schema = 'public' 
+    AND table_name = 'expenses' 
+    AND column_name = 'expense_number'
+    AND data_type = 'integer'
+  ) THEN
+    -- Convertir a text
+    ALTER TABLE public.expenses ALTER COLUMN expense_number TYPE text USING expense_number::text;
+    -- Eliminar default de secuencia
+    ALTER TABLE public.expenses ALTER COLUMN expense_number DROP DEFAULT;
+    RAISE NOTICE '[%]   • expense_number convertido a text', clock_timestamp();
+  ELSE
+    RAISE NOTICE '[%]   → expense_number ya es text o no existe', clock_timestamp();
+  END IF;
+
+  -- ═══════════════════════════════════════════
+  -- Añadir columna id_factura
+  -- ═══════════════════════════════════════════
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns 
+    WHERE table_schema = 'public' 
+    AND table_name = 'expenses' 
+    AND column_name = 'id_factura'
+  ) THEN
+    ALTER TABLE public.expenses ADD COLUMN id_factura text;
+    RAISE NOTICE '[%]   • Columna id_factura añadida', clock_timestamp();
+  ELSE
+    RAISE NOTICE '[%]   → Columna id_factura ya existe', clock_timestamp();
+  END IF;
+
+  -- ═══════════════════════════════════════════
+  -- Añadir constraint UNIQUE en expense_number
+  -- ═══════════════════════════════════════════
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint 
+    WHERE conname = 'expenses_expense_number_unique' 
+    OR conname = 'expenses_expense_number_key'
+  ) THEN
+    ALTER TABLE public.expenses ADD CONSTRAINT expenses_expense_number_unique UNIQUE (expense_number);
+    RAISE NOTICE '[%]   • Constraint UNIQUE añadido a expense_number', clock_timestamp();
+  ELSE
+    RAISE NOTICE '[%]   → Constraint UNIQUE ya existe', clock_timestamp();
+  END IF;
+
+  -- Registrar migración
+  INSERT INTO schema_versions (version, description, applied_at)
+  VALUES ('v1.6.0', 'Expenses: expense_number text unique, id_factura', now());
+
+  RAISE NOTICE '[%] ✓ v1.6.0 aplicada correctamente', clock_timestamp();
+END $$;
+
+-- ============================================
+-- VERIFICACIÓN FINAL DE COMPONENTES v1.6.0
 -- ============================================
 DO $$
 DECLARE
@@ -476,6 +546,9 @@ DECLARE
   v_invoices_is_sent boolean;
   v_quotes_is_sent boolean;
   v_contracts_is_sent boolean;
+  v_expense_number_text boolean;
+  v_id_factura boolean;
+  v_expense_unique boolean;
   v_all_ok boolean;
 BEGIN
   SELECT get_current_schema_version() INTO v_current;
@@ -491,7 +564,12 @@ BEGIN
   SELECT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'quotes' AND column_name = 'is_sent') INTO v_quotes_is_sent;
   SELECT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'contracts' AND column_name = 'is_sent') INTO v_contracts_is_sent;
   
-  v_all_ok := v_email_logs AND v_gmail_config AND v_provider_col AND v_invoices_is_sent AND v_quotes_is_sent AND v_contracts_is_sent;
+  -- Verificar componentes v1.6.0
+  SELECT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'expenses' AND column_name = 'expense_number' AND data_type = 'text') INTO v_expense_number_text;
+  SELECT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'expenses' AND column_name = 'id_factura') INTO v_id_factura;
+  SELECT EXISTS (SELECT 1 FROM pg_constraint WHERE conname IN ('expenses_expense_number_unique', 'expenses_expense_number_key')) INTO v_expense_unique;
+  
+  v_all_ok := v_email_logs AND v_gmail_config AND v_provider_col AND v_invoices_is_sent AND v_quotes_is_sent AND v_contracts_is_sent AND v_expense_number_text AND v_id_factura AND v_expense_unique;
   
   RAISE NOTICE '';
   RAISE NOTICE '[%] ═══════════════════════════════════════════════════════', clock_timestamp();
@@ -511,6 +589,10 @@ BEGIN
   RAISE NOTICE '[%]   email_logs tabla:     %', clock_timestamp(), CASE WHEN v_email_logs THEN '✓' ELSE '✗' END;
   RAISE NOTICE '[%]   gmail_config tabla:   %', clock_timestamp(), CASE WHEN v_gmail_config THEN '✓' ELSE '✗' END;
   RAISE NOTICE '[%]   email_settings.provider: %', clock_timestamp(), CASE WHEN v_provider_col THEN '✓' ELSE '✗' END;
+  RAISE NOTICE '[%] v1.6.0:', clock_timestamp();
+  RAISE NOTICE '[%]   expenses.expense_number text: %', clock_timestamp(), CASE WHEN v_expense_number_text THEN '✓' ELSE '✗' END;
+  RAISE NOTICE '[%]   expenses.id_factura:   %', clock_timestamp(), CASE WHEN v_id_factura THEN '✓' ELSE '✗' END;
+  RAISE NOTICE '[%]   expenses UNIQUE constraint: %', clock_timestamp(), CASE WHEN v_expense_unique THEN '✓' ELSE '✗' END;
   RAISE NOTICE '[%] ═══════════════════════════════════════════════════════', clock_timestamp();
   RAISE NOTICE '[%] ESTADO FINAL: %', clock_timestamp(), CASE WHEN v_all_ok THEN '✅ TODOS LOS COMPONENTES OK' ELSE '⚠️ FALTAN COMPONENTES' END;
   RAISE NOTICE '[%] ═══════════════════════════════════════════════════════', clock_timestamp();
