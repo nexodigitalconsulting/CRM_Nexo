@@ -844,7 +844,7 @@ export type Database = {
           currency: string | null
           document_url: string | null
           due_date: string | null
-          expense_number: number
+          expense_number: string
           id: string
           id_factura: string | null
           invoice_number: string | null
@@ -868,7 +868,7 @@ export type Database = {
           currency?: string | null
           document_url?: string | null
           due_date?: string | null
-          expense_number?: number
+          expense_number: string
           id?: string
           id_factura?: string | null
           invoice_number?: string | null
@@ -892,7 +892,7 @@ export type Database = {
           currency?: string | null
           document_url?: string | null
           due_date?: string | null
-          expense_number?: number
+          expense_number?: string
           id?: string
           id_factura?: string | null
           invoice_number?: string | null

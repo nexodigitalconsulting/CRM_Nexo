@@ -46,8 +46,7 @@ const formatCurrency = (amount: number) =>
 const formatDate = (dateStr: string) =>
   new Date(dateStr).toLocaleDateString("es-ES");
 
-const formatExpenseId = (expenseNumber: number) =>
-  `GT-${new Date().getFullYear()}-${String(expenseNumber).padStart(4, "0")}`;
+const formatExpenseId = (expenseNumber: string) => expenseNumber || "-";
 
 const columnConfigs: ColumnConfig[] = [
   { key: "id", label: "ID", defaultVisible: true },
