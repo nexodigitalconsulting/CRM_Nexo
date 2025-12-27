@@ -14,7 +14,7 @@
 --   ✅ No borra datos existentes
 --   ✅ Funciona en instalaciones nuevas y existentes
 --
--- Versión: v1.4.0
+-- Versión: v1.5.0
 -- ============================================
 
 -- ============================================
@@ -398,9 +398,43 @@ CREATE TABLE IF NOT EXISTS public.email_settings (
   from_email text NOT NULL,
   from_name text,
   signature_html text,
+  provider text DEFAULT 'smtp',
   is_active boolean DEFAULT false,
   created_at timestamptz DEFAULT now(),
   updated_at timestamptz DEFAULT now()
+);
+
+-- Gmail OAuth config (v1.5.0)
+CREATE TABLE IF NOT EXISTS public.gmail_config (
+  id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+  access_token text,
+  refresh_token text,
+  token_expiry timestamptz,
+  email_address text,
+  is_active boolean DEFAULT false,
+  created_at timestamptz DEFAULT now(),
+  updated_at timestamptz DEFAULT now()
+);
+
+-- Email logs (v1.5.0)
+CREATE TABLE IF NOT EXISTS public.email_logs (
+  id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id uuid,
+  sender_email text NOT NULL,
+  sender_name text,
+  recipient_email text NOT NULL,
+  recipient_name text,
+  subject text NOT NULL,
+  body_preview text,
+  entity_type text,
+  entity_id uuid,
+  provider text NOT NULL DEFAULT 'smtp',
+  status text NOT NULL DEFAULT 'sent',
+  error_message text,
+  attachments jsonb DEFAULT '[]',
+  attachment_count integer DEFAULT 0,
+  sent_at timestamptz DEFAULT now(),
+  created_at timestamptz DEFAULT now()
 );
 
 -- PDF settings
@@ -700,7 +734,8 @@ DO $$
 DECLARE
   tables text[] := ARRAY['email_settings', 'email_templates', 'notification_rules', 
     'notification_queue', 'client_notification_preferences', 'pdf_settings',
-    'document_templates', 'entity_configurations', 'documents_rag', 'schema_versions'];
+    'document_templates', 'entity_configurations', 'documents_rag', 'schema_versions',
+    'gmail_config'];
   t text;
 BEGIN
   FOREACH t IN ARRAY tables LOOP
@@ -708,6 +743,14 @@ BEGIN
     EXECUTE format('CREATE POLICY "Open %s" ON public.%I FOR ALL USING (true)', t, t);
   END LOOP;
 END $$;
+
+-- Email logs policies (v1.5.0)
+DROP POLICY IF EXISTS "System can insert email_logs" ON public.email_logs;
+DROP POLICY IF EXISTS "Users can view own email_logs" ON public.email_logs;
+DROP POLICY IF EXISTS "Admins can view all email_logs" ON public.email_logs;
+CREATE POLICY "System can insert email_logs" ON public.email_logs FOR INSERT WITH CHECK (true);
+CREATE POLICY "Users can view own email_logs" ON public.email_logs FOR SELECT USING (auth.uid() = user_id);
+CREATE POLICY "Admins can view all email_logs" ON public.email_logs FOR SELECT USING (has_role(auth.uid(), 'admin') OR has_role(auth.uid(), 'manager'));
 
 RAISE NOTICE '✓ Políticas RLS configuradas';
 
@@ -734,6 +777,9 @@ CREATE INDEX IF NOT EXISTS idx_contracts_status ON public.contracts(status);
 CREATE INDEX IF NOT EXISTS idx_invoices_status ON public.invoices(status);
 CREATE INDEX IF NOT EXISTS idx_invoices_issue_date ON public.invoices(issue_date DESC);
 CREATE INDEX IF NOT EXISTS idx_calendar_events_user ON public.calendar_events(user_id);
+CREATE INDEX IF NOT EXISTS idx_email_logs_user ON public.email_logs(user_id);
+CREATE INDEX IF NOT EXISTS idx_email_logs_entity ON public.email_logs(entity_type, entity_id);
+CREATE INDEX IF NOT EXISTS idx_email_logs_sent_at ON public.email_logs(sent_at DESC);
 
 RAISE NOTICE '✓ Índices creados';
 
@@ -753,7 +799,8 @@ INSERT INTO public.schema_versions (version, description) VALUES
   ('v1.1.0', 'PDF settings'),
   ('v1.2.0', 'Email signature'),
   ('v1.3.0', 'RLS schema_versions'),
-  ('v1.4.0', 'is_sent/sent_at columns')
+  ('v1.4.0', 'is_sent/sent_at columns'),
+  ('v1.5.0', 'Email logs, Gmail OAuth config')
 ON CONFLICT (version) DO NOTHING;
 
 RAISE NOTICE '✓ Datos iniciales insertados';
@@ -766,8 +813,13 @@ DO $$
 BEGIN
   RAISE NOTICE '';
   RAISE NOTICE '════════════════════════════════════════════════════';
-  RAISE NOTICE '  ✅ CRM Schema v1.4.0 - INSTALACIÓN COMPLETADA';
+  RAISE NOTICE '  ✅ CRM Schema v1.5.0 - INSTALACIÓN COMPLETADA';
   RAISE NOTICE '════════════════════════════════════════════════════';
+  RAISE NOTICE '';
+  RAISE NOTICE 'Nuevas características v1.5.0:';
+  RAISE NOTICE '  • Tabla email_logs para historial de envíos';
+  RAISE NOTICE '  • Tabla gmail_config para OAuth de Gmail';
+  RAISE NOTICE '  • Columna provider en email_settings';
   RAISE NOTICE '';
   RAISE NOTICE 'SIGUIENTE PASO:';
   RAISE NOTICE '  1. Crea un usuario en Authentication → Users';
