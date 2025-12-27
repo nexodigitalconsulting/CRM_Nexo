@@ -354,14 +354,14 @@ CREATE TABLE IF NOT EXISTS invoice_services (
   created_at timestamptz DEFAULT now()
 );
 
--- Gastos
-CREATE SEQUENCE IF NOT EXISTS expenses_expense_number_seq;
+-- Gastos (v1.6.0: expense_number es text, id_factura añadido)
 CREATE TABLE IF NOT EXISTS expenses (
   id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
-  expense_number integer NOT NULL DEFAULT nextval('expenses_expense_number_seq'),
+  expense_number text NOT NULL UNIQUE,
   supplier_name text NOT NULL,
   supplier_cif text,
   invoice_number text,
+  id_factura text,
   concept text,
   issue_date date NOT NULL,
   due_date date,
@@ -378,6 +378,7 @@ CREATE TABLE IF NOT EXISTS expenses (
   created_by uuid REFERENCES users(id),
   created_at timestamptz DEFAULT now(),
   updated_at timestamptz DEFAULT now()
+);
 );
 
 -- Campañas
@@ -799,28 +800,40 @@ CREATE TRIGGER update_pdf_settings_updated_at
   FOR EACH ROW
   EXECUTE FUNCTION update_updated_at_column();
 
--- Registrar versión del schema
+-- Registrar versiones del schema
 INSERT INTO schema_versions (version, description, applied_at)
-VALUES ('v1.2.0', 'Schema completo con pdf_settings y signature_html', now())
+VALUES 
+  ('v1.0.0', 'Schema base del CRM', now()),
+  ('v1.1.0', 'PDF settings', now()),
+  ('v1.2.0', 'Email signature', now()),
+  ('v1.3.0', 'RLS schema_versions', now()),
+  ('v1.4.0', 'is_sent/sent_at columns', now()),
+  ('v1.5.0', 'Email logs, Gmail OAuth config', now()),
+  ('v1.6.0', 'Expenses: expense_number text unique, id_factura', now())
 ON CONFLICT (version) DO NOTHING;
 
 -- ============================================
--- ✅ SCHEMA COMPLETO INSTALADO - v1.2.0
+-- ✅ SCHEMA COMPLETO INSTALADO - v1.6.0
 -- ============================================
 
 DO $$
 BEGIN
   RAISE NOTICE '';
   RAISE NOTICE '╔═══════════════════════════════════════════════════╗';
-  RAISE NOTICE '║  ✅ CRM Schema v1.2.0 (PostgreSQL Externo)        ║';
+  RAISE NOTICE '║  ✅ CRM Schema v1.6.0 (PostgreSQL Externo)        ║';
   RAISE NOTICE '╠═══════════════════════════════════════════════════╣';
-  RAISE NOTICE '║  Tablas creadas: 29 (incluye users)               ║';
+  RAISE NOTICE '║  Tablas creadas: 30 (incluye users)               ║';
   RAISE NOTICE '║  Triggers: 14                                     ║';
   RAISE NOTICE '║  Índices: 16                                      ║';
   RAISE NOTICE '║  Datos iniciales: Sí                              ║';
   RAISE NOTICE '║  Usuario admin: admin@tuempresa.com / admin123    ║';
+  RAISE NOTICE '║                                                   ║';
+  RAISE NOTICE '║  v1.6.0: expenses mejorado                        ║';
+  RAISE NOTICE '║    • expense_number: text UNIQUE                  ║';
+  RAISE NOTICE '║    • Nueva columna: id_factura                    ║';
   RAISE NOTICE '╚═══════════════════════════════════════════════════╝';
   RAISE NOTICE '';
   RAISE NOTICE 'IMPORTANTE: Cambia la contraseña del admin!';
   RAISE NOTICE '';
+END $$;
 END $$;

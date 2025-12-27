@@ -14,7 +14,7 @@
 --   ✅ No borra datos existentes
 --   ✅ Funciona en instalaciones nuevas y existentes
 --
--- Versión: v1.5.0
+-- Versión: v1.6.0
 -- ============================================
 
 -- ============================================
@@ -285,13 +285,12 @@ CREATE TABLE IF NOT EXISTS public.invoice_services (
   created_at timestamptz DEFAULT now()
 );
 
--- Expenses
-CREATE SEQUENCE IF NOT EXISTS expenses_expense_number_seq;
+-- Expenses (v1.6.0: expense_number es text, id_factura añadido)
 CREATE TABLE IF NOT EXISTS public.expenses (
   id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
-  expense_number integer NOT NULL DEFAULT nextval('expenses_expense_number_seq'),
+  expense_number text NOT NULL UNIQUE,
   supplier_name text NOT NULL,
-  supplier_cif text, invoice_number text, concept text,
+  supplier_cif text, invoice_number text, id_factura text, concept text,
   issue_date date NOT NULL,
   due_date date,
   subtotal numeric DEFAULT 0,
@@ -800,7 +799,8 @@ INSERT INTO public.schema_versions (version, description) VALUES
   ('v1.2.0', 'Email signature'),
   ('v1.3.0', 'RLS schema_versions'),
   ('v1.4.0', 'is_sent/sent_at columns'),
-  ('v1.5.0', 'Email logs, Gmail OAuth config')
+  ('v1.5.0', 'Email logs, Gmail OAuth config'),
+  ('v1.6.0', 'Expenses: expense_number text unique, id_factura')
 ON CONFLICT (version) DO NOTHING;
 
 RAISE NOTICE '✓ Datos iniciales insertados';
@@ -813,13 +813,13 @@ DO $$
 BEGIN
   RAISE NOTICE '';
   RAISE NOTICE '════════════════════════════════════════════════════';
-  RAISE NOTICE '  ✅ CRM Schema v1.5.0 - INSTALACIÓN COMPLETADA';
+  RAISE NOTICE '  ✅ CRM Schema v1.6.0 - INSTALACIÓN COMPLETADA';
   RAISE NOTICE '════════════════════════════════════════════════════';
   RAISE NOTICE '';
-  RAISE NOTICE 'Nuevas características v1.5.0:';
-  RAISE NOTICE '  • Tabla email_logs para historial de envíos';
-  RAISE NOTICE '  • Tabla gmail_config para OAuth de Gmail';
-  RAISE NOTICE '  • Columna provider en email_settings';
+  RAISE NOTICE 'Nuevas características v1.6.0:';
+  RAISE NOTICE '  • expenses.expense_number ahora es text (no secuencia)';
+  RAISE NOTICE '  • expenses.expense_number tiene constraint UNIQUE';
+  RAISE NOTICE '  • Nueva columna expenses.id_factura';
   RAISE NOTICE '';
   RAISE NOTICE 'SIGUIENTE PASO:';
   RAISE NOTICE '  1. Crea un usuario en Authentication → Users';
