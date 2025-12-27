@@ -30,6 +30,7 @@ import { useCreateExpense, useUpdateExpense, type Expense } from "@/hooks/useExp
 import { Receipt } from "lucide-react";
 
 const expenseSchema = z.object({
+  expense_number: z.string().min(1, "El número de gasto es requerido").max(50),
   supplier_name: z.string().min(1, "El nombre del proveedor es requerido").max(200),
   supplier_cif: z.string().max(20).optional(),
   invoice_number: z.string().max(50).optional(),
@@ -61,6 +62,7 @@ export function ExpenseFormDialog({ open, onOpenChange, expense }: ExpenseFormDi
   const form = useForm<ExpenseFormData>({
     resolver: zodResolver(expenseSchema),
     defaultValues: {
+      expense_number: "",
       supplier_name: "",
       supplier_cif: "",
       invoice_number: "",
@@ -78,12 +80,13 @@ export function ExpenseFormDialog({ open, onOpenChange, expense }: ExpenseFormDi
   });
 
   useEffect(() => {
-    if (expense) {
-      form.reset({
-        supplier_name: expense.supplier_name || "",
-        supplier_cif: expense.supplier_cif || "",
-        invoice_number: expense.invoice_number || "",
-        id_factura: (expense as any).id_factura || "",
+      if (expense) {
+        form.reset({
+          expense_number: expense.expense_number || "",
+          supplier_name: expense.supplier_name || "",
+          supplier_cif: expense.supplier_cif || "",
+          invoice_number: expense.invoice_number || "",
+          id_factura: expense.id_factura || "",
         issue_date: expense.issue_date || new Date().toISOString().split("T")[0],
         due_date: expense.due_date || "",
         concept: expense.concept || "",
@@ -94,12 +97,13 @@ export function ExpenseFormDialog({ open, onOpenChange, expense }: ExpenseFormDi
         status: expense.status || "pending",
         notes: expense.notes || "",
       });
-    } else {
-      form.reset({
-        supplier_name: "",
-        supplier_cif: "",
-        invoice_number: "",
-        id_factura: "",
+      } else {
+        form.reset({
+          expense_number: "",
+          supplier_name: "",
+          supplier_cif: "",
+          invoice_number: "",
+          id_factura: "",
         issue_date: new Date().toISOString().split("T")[0],
         due_date: "",
         concept: "",
@@ -123,6 +127,7 @@ export function ExpenseFormDialog({ open, onOpenChange, expense }: ExpenseFormDi
 
   const onSubmit = async (data: ExpenseFormData) => {
     const expenseData = {
+      expense_number: data.expense_number,
       supplier_name: data.supplier_name,
       supplier_cif: data.supplier_cif || null,
       invoice_number: data.invoice_number || null,
@@ -161,6 +166,21 @@ export function ExpenseFormDialog({ open, onOpenChange, expense }: ExpenseFormDi
 
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+            {/* Expense Number */}
+            <FormField
+              control={form.control}
+              name="expense_number"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Nº Gasto *</FormLabel>
+                  <FormControl>
+                    <Input placeholder="G-001" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
             {/* Supplier Info */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <FormField
