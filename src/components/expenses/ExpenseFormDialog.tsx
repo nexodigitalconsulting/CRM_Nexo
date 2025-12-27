@@ -117,9 +117,13 @@ export function ExpenseFormDialog({ open, onOpenChange, expense }: ExpenseFormDi
     }
   }, [expense, form]);
 
-  const subtotal = form.watch("subtotal");
-  const ivaPercent = form.watch("iva_percent");
-  const irpfPercent = form.watch("irpf_percent");
+  const watchSubtotal = form.watch("subtotal");
+  const watchIvaPercent = form.watch("iva_percent");
+  const watchIrpfPercent = form.watch("irpf_percent");
+
+  const subtotal = Number(watchSubtotal) || 0;
+  const ivaPercent = Number(watchIvaPercent) || 0;
+  const irpfPercent = Number(watchIrpfPercent) || 0;
 
   const ivaAmount = (subtotal * ivaPercent) / 100;
   const irpfAmount = (subtotal * irpfPercent) / 100;
