@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
 import { PdfConfig, LegalClause, DEFAULT_LEGAL_CLAUSES } from '@/lib/pdf/pdfUtils';
+import { ContractPdfPreview } from './ContractPdfPreview';
 
 interface PdfPreviewProps {
   content: string;
@@ -154,6 +155,11 @@ function replaceVariables(content: string, data: Record<string, unknown>): strin
 }
 
 export function PdfPreview({ content, documentType, scale = 0.5, config }: PdfPreviewProps) {
+  // For contracts, use the dedicated ContractPdfPreview that matches pdf-lib output
+  if (documentType === 'contract') {
+    return <ContractPdfPreview config={config} scale={scale} />;
+  }
+
   const renderedContent = useMemo(() => {
     const data = SAMPLE_DATA[documentType];
     let result = replaceVariables(content, data);
@@ -162,33 +168,6 @@ export function PdfPreview({ content, documentType, scale = 0.5, config }: PdfPr
     if (config?.title_text) {
       result = result.replace(/>FACTURA</g, `>${config.title_text}<`);
       result = result.replace(/>PRESUPUESTO</g, `>${config.title_text}<`);
-      result = result.replace(/>CONTRATO</g, `>${config.title_text}<`);
-    }
-    
-    // For contracts, render legal clauses if in config
-    if (documentType === 'contract' && config?.legal_clauses) {
-      const visibleClauses = config.legal_clauses.filter(c => c.visible);
-      if (visibleClauses.length > 0) {
-        const clausesHtml = visibleClauses.map(clause => {
-          const processedContent = replaceClauseVariables(clause.content, data);
-          return `<div style="margin-bottom: 16px;">
-            <p style="font-weight: bold; margin: 0 0 6px 0; font-size: 10px;">${clause.number} - ${clause.title}</p>
-            <p style="margin: 0; font-size: 9px; color: #666; line-height: 1.4;">${processedContent}</p>
-          </div>`;
-        }).join('');
-        
-        const clausesSection = `<div style="margin: 24px 0;">
-          <h3 style="font-size: 12px; font-weight: bold; margin: 0 0 16px 0; color: ${config.primary_color || '#3366cc'};">CLÁUSULAS</h3>
-          ${clausesHtml}
-        </div>`;
-        
-        // Insert before signatures or at end
-        if (result.includes('El Prestador')) {
-          result = result.replace(/<div style="margin-top: 60px; display: flex; justify-content: space-around;">/, clausesSection + '<div style="margin-top: 60px; display: flex; justify-content: space-around;">');
-        } else {
-          result = result.replace(/<\/div>\s*$/, clausesSection + '</div>');
-        }
-      }
     }
     
     return result;

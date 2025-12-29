@@ -97,6 +97,12 @@ export async function generateContractPdf(
   const pdfColors = createColorsFromConfig(config);
   const fontSize = config?.font_size_base || 10;
   
+  // Use dynamic margin from config (fallback to default MARGIN constant)
+  const margin = config?.margins || MARGIN;
+  const sectionSpacing = config?.section_spacing || 28;
+  const tableRowHeight = config?.row_height || 22;
+  const lineSpacing = config?.line_spacing || 14;
+  
   // Get section configuration
   const defaultSections = getDefaultSections();
   const sections: PdfSections = config?.sections 
@@ -162,22 +168,25 @@ export async function generateContractPdf(
   // =============================================
   const pages: ReturnType<typeof addPage>[] = [];
   let page1 = addPage(pdfDoc);
+  
+  // Use content width based on dynamic margin
+  const contentWidth = A4_WIDTH - margin * 2;
   pages.push(page1);
-  let y = A4_HEIGHT - MARGIN;
+  let y = A4_HEIGHT - margin;
   
   // ============ HEADER SECTION ============
   y = await drawCompanyHeaderWithLogo(pdfDoc, page1, company, fonts, y, config);
   
   // Document title (right side)
-  drawDocumentTitle(page1, 'CONTRATO', contract.contract_number, fonts, A4_HEIGHT - MARGIN - 20, pdfColors);
+  drawDocumentTitle(page1, 'CONTRATO', contract.contract_number, fonts, A4_HEIGHT - margin - 20, pdfColors);
   
   // Separator line
   y -= 10;
-  drawLine(page1, MARGIN, y, A4_WIDTH - MARGIN, y, pdfColors.border, 1);
-  y -= 25;
+  drawLine(page1, margin, y, A4_WIDTH - margin, y, pdfColors.border, 1);
+  y -= sectionSpacing;
   
   // ============ CONTRACT DETAILS ============
-  const detailsX = A4_WIDTH - MARGIN - 150;
+  const detailsX = A4_WIDTH - margin - 150;
   let detailY = y + 10;
   
   page1.drawText('Fecha inicio:', {
@@ -194,7 +203,7 @@ export async function generateContractPdf(
     font: fonts.bold,
     color: pdfColors.text,
   });
-  detailY -= 14;
+  detailY -= lineSpacing;
   
   if (contract.end_date) {
     page1.drawText('Fecha fin:', {
@@ -211,7 +220,7 @@ export async function generateContractPdf(
       font: fonts.bold,
       color: pdfColors.text,
     });
-    detailY -= 14;
+    detailY -= lineSpacing;
   }
   
   page1.drawText('Facturación:', {
@@ -228,7 +237,7 @@ export async function generateContractPdf(
     font: fonts.bold,
     color: pdfColors.text,
   });
-  detailY -= 14;
+  detailY -= lineSpacing;
   
   page1.drawText('Estado:', {
     x: detailsX,
@@ -252,7 +261,7 @@ export async function generateContractPdf(
   if (contract.name) {
     y -= 10;
     page1.drawText(contract.name, {
-      x: MARGIN,
+      x: margin,
       y,
       size: fontSize + 1,
       font: fonts.bold,
@@ -265,16 +274,16 @@ export async function generateContractPdf(
   
   // ============ SERVICES TABLE ============
   const columns = showDiscounts ? [
-    { label: 'Servicio', x: MARGIN + 5, width: 250 },
-    { label: 'Cant.', x: MARGIN + 260, width: 40 },
-    { label: 'Precio', x: MARGIN + 310, width: 70 },
-    { label: 'Dto.', x: MARGIN + 380, width: 50 },
-    { label: 'Total', x: MARGIN + 440, width: 70 },
+    { label: 'Servicio', x: margin + 5, width: 250 },
+    { label: 'Cant.', x: margin + 260, width: 40 },
+    { label: 'Precio', x: margin + 310, width: 70 },
+    { label: 'Dto.', x: margin + 380, width: 50 },
+    { label: 'Total', x: margin + 440, width: 70 },
   ] : [
-    { label: 'Servicio', x: MARGIN + 5, width: 280 },
-    { label: 'Cant.', x: MARGIN + 290, width: 50 },
-    { label: 'Precio', x: MARGIN + 350, width: 80 },
-    { label: 'Total', x: MARGIN + 440, width: 70 },
+    { label: 'Servicio', x: margin + 5, width: 280 },
+    { label: 'Cant.', x: margin + 290, width: 50 },
+    { label: 'Precio', x: margin + 350, width: 80 },
+    { label: 'Total', x: margin + 440, width: 70 },
   ];
   
   y = drawTableHeader(page1, y, columns, fonts, pdfColors, fontSize - 1);
@@ -302,8 +311,8 @@ export async function generateContractPdf(
   
   // Bottom line of table
   y -= 5;
-  drawLine(page1, MARGIN, y, A4_WIDTH - MARGIN, y, pdfColors.border, 0.5);
-  y -= 30;
+  drawLine(page1, margin, y, A4_WIDTH - margin, y, pdfColors.border, 0.5);
+  y -= sectionSpacing;
   
   // ============ TOTALS ============
   y = drawTotals(
@@ -322,7 +331,7 @@ export async function generateContractPdf(
   y -= 10;
   const periodNote = `Importe por período de facturación: ${getBillingPeriodLabel(contract.billing_period)}`;
   page1.drawText(periodNote, {
-    x: MARGIN,
+    x: margin,
     y,
     size: fontSize - 1,
     font: fonts.regular,
@@ -331,20 +340,20 @@ export async function generateContractPdf(
   
   // ============ NOTES ============
   if (showNotes && contract.notes) {
-    y -= 25;
+    y -= sectionSpacing;
     page1.drawText('Observaciones:', {
-      x: MARGIN,
+      x: margin,
       y,
       size: fontSize - 1,
       font: fonts.bold,
       color: pdfColors.muted,
     });
-    y -= 14;
+    y -= lineSpacing;
     
     const noteLines = contract.notes.split('\n').slice(0, 3);
     noteLines.forEach((line) => {
       page1.drawText(line.substring(0, 80), {
-        x: MARGIN,
+        x: margin,
         y,
         size: fontSize - 2,
         font: fonts.regular,
@@ -357,7 +366,7 @@ export async function generateContractPdf(
   // ============ SIGNATURE ON PAGE 1 ============
   if (showSignatures && sections.signatures?.visible !== false) {
     // Position signature at the bottom of page 1
-    y = Math.min(y - 40, MARGIN + 120);
+    y = Math.min(y - 40, margin + 120);
     
     y = drawSignatureArea(page1, fonts, y, pdfColors, {
       lineWidth: sections.signatures?.line_width || 180,
@@ -375,11 +384,11 @@ export async function generateContractPdf(
     if (visibleClauses.length > 0) {
       let page2 = addPage(pdfDoc);
       pages.push(page2);
-      let y2 = A4_HEIGHT - MARGIN;
+      let y2 = A4_HEIGHT - margin;
       
       // Small header for page 2
       page2.drawText(company.name || 'Empresa', {
-        x: MARGIN,
+        x: margin,
         y: y2,
         size: fontSize + 2,
         font: fonts.bold,
@@ -387,7 +396,7 @@ export async function generateContractPdf(
       });
       
       page2.drawText(`CONTRATO Nº ${contract.contract_number} - CONDICIONES GENERALES`, {
-        x: A4_WIDTH - MARGIN - 250,
+        x: A4_WIDTH - margin - 250,
         y: y2,
         size: fontSize,
         font: fonts.bold,
@@ -395,8 +404,8 @@ export async function generateContractPdf(
       });
       
       y2 -= 15;
-      drawLine(page2, MARGIN, y2, A4_WIDTH - MARGIN, y2, pdfColors.border, 1);
-      y2 -= 25;
+      drawLine(page2, margin, y2, A4_WIDTH - margin, y2, pdfColors.border, 1);
+      y2 -= sectionSpacing;
       
       // ============ LEGAL CLAUSES ============
       y2 = drawLegalClauses(page2, legalClauses, fonts, y2, pdfColors, {
@@ -408,10 +417,10 @@ export async function generateContractPdf(
       // ============ FINAL SIGNATURE ============
       if (showSignatures && sections.signatures?.visible !== false) {
         // Position signature at bottom of page 2
-        y2 = Math.min(y2 - 30, MARGIN + 100);
+        y2 = Math.min(y2 - 30, margin + 100);
         
         page2.drawText('ACEPTACIÓN DEL CONTRATO', {
-          x: MARGIN,
+          x: margin,
           y: y2 + 30,
           size: fontSize,
           font: fonts.bold,
@@ -419,7 +428,7 @@ export async function generateContractPdf(
         });
         
         page2.drawText('Ambas partes declaran haber leído y aceptado las condiciones del presente contrato.', {
-          x: MARGIN,
+          x: margin,
           y: y2 + 15,
           size: fontSize - 2,
           font: fonts.regular,
