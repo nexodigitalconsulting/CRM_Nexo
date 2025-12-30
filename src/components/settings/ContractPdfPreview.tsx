@@ -92,16 +92,25 @@ export function ContractPdfPreview({ config, scale = 0.5 }: ContractPdfPreviewPr
   const showIban = config?.show_iban_footer !== false;
   const showDiscounts = config?.show_discounts_column !== false;
 
+  // ===== SYNCHRONIZED WITH contractPdf.ts =====
+  // These values must match exactly what contractPdf.ts uses
   const primaryColor = config?.primary_color || '#3366cc';
   const secondaryColor = config?.secondary_color || '#666666';
   const fontSize = config?.font_size_base || 10;
   const margin = config?.margins || MARGIN;
+  const sectionSpacing = config?.section_spacing || 28;
+  const lineSpacing = config?.line_spacing || 14;
   const rowHeight = config?.row_height || sections.table.row_height || 22;
+  
+  // Element colors from config
+  const clientBoxColor = config?.client_box_color || sections.client.background_color || '#f8f9fa';
+  const tableHeaderColor = config?.table_header_color || 'rgb(242, 242, 242)';
+  const tableBorderColor = sections.table.border_color || '#e5e7eb';
 
   // Calculate content width
   const contentWidth = A4_WIDTH - margin * 2;
 
-  // Styles that mirror pdf-lib rendering
+  // Styles that mirror pdf-lib rendering exactly
   const pageStyle: React.CSSProperties = {
     width: A4_WIDTH,
     minHeight: A4_HEIGHT,
@@ -199,8 +208,8 @@ export function ContractPdfPreview({ config, scale = 0.5 }: ContractPdfPreviewPr
         </div>
       </div>
 
-      {/* CLIENT SECTION */}
-      <div style={{ marginBottom: 20 }}>
+      {/* CLIENT SECTION - Synchronized with contractPdf.ts drawClientSection() */}
+      <div style={{ marginBottom: sectionSpacing }}>
         <div style={{ fontSize: fontSize, fontWeight: 'bold', color: secondaryColor, marginBottom: 8 }}>
           CLIENTE
         </div>
@@ -222,15 +231,15 @@ export function ContractPdfPreview({ config, scale = 0.5 }: ContractPdfPreviewPr
         </div>
       )}
 
-      {/* SERVICES TABLE */}
+      {/* SERVICES TABLE - Synchronized with contractPdf.ts drawTableHeader/drawTableRow */}
       <table style={{
         width: '100%',
         borderCollapse: 'collapse',
-        marginBottom: 20,
+        marginBottom: sectionSpacing,
         fontSize: fontSize - 1,
       }}>
         <thead>
-          <tr style={{ backgroundColor: 'rgb(242, 242, 242)' }}>
+          <tr style={{ backgroundColor: tableHeaderColor }}>
             <th style={{ padding: '8px 5px', textAlign: 'left', fontWeight: 'bold' }}>Servicio</th>
             <th style={{ padding: '8px 5px', textAlign: 'center', width: 50 }}>Cant.</th>
             <th style={{ padding: '8px 5px', textAlign: 'right', width: 80 }}>Precio</th>
@@ -255,7 +264,7 @@ export function ContractPdfPreview({ config, scale = 0.5 }: ContractPdfPreviewPr
       </table>
 
       {/* Table bottom line */}
-      <div style={{ borderBottom: '0.5px solid #ccc', marginBottom: 30 }} />
+      <div style={{ borderBottom: `0.5px solid ${tableBorderColor}`, marginBottom: sectionSpacing }} />
 
       {/* TOTALS */}
       <div style={{
@@ -284,13 +293,13 @@ export function ContractPdfPreview({ config, scale = 0.5 }: ContractPdfPreviewPr
         Importe por período de facturación: {SAMPLE_CONTRACT.billing_period}
       </div>
 
-      {/* NOTES */}
+      {/* NOTES - Synchronized with contractPdf.ts notes section */}
       {showNotes && SAMPLE_CONTRACT.notes && (
-        <div style={{ marginTop: 25 }}>
-          <div style={{ fontSize: fontSize - 1, fontWeight: 'bold', color: secondaryColor, marginBottom: 8 }}>
+        <div style={{ marginTop: sectionSpacing }}>
+          <div style={{ fontSize: fontSize - 1, fontWeight: 'bold', color: secondaryColor, marginBottom: lineSpacing / 2 }}>
             Observaciones:
           </div>
-          <div style={{ fontSize: fontSize - 2, color: secondaryColor }}>
+          <div style={{ fontSize: fontSize - 2, color: secondaryColor, lineHeight: 1.4 }}>
             {SAMPLE_CONTRACT.notes}
           </div>
         </div>
@@ -362,18 +371,18 @@ export function ContractPdfPreview({ config, scale = 0.5 }: ContractPdfPreviewPr
 
         <div style={{ borderBottom: '1px solid #ccc', marginTop: 15, marginBottom: 25 }} />
 
-        {/* LEGAL CLAUSES */}
-        <div style={{ marginBottom: 20 }}>
-          <div style={{ fontSize: 12, fontWeight: 'bold', color: primaryColor, marginBottom: 15 }}>
+        {/* LEGAL CLAUSES - Synchronized with contractPdf.ts drawLegalClauses */}
+        <div style={{ marginBottom: sectionSpacing }}>
+          <div style={{ fontSize: 12, fontWeight: 'bold', color: primaryColor, marginBottom: sectionSpacing * 0.7 }}>
             CLÁUSULAS
           </div>
           
           {visibleClauses.map((clause, idx) => (
-            <div key={clause.id} style={{ marginBottom: sections.legal?.clause_spacing || 15 }}>
+            <div key={clause.id} style={{ marginBottom: sections.legal?.clause_spacing || 20 }}>
               <div style={{ 
                 fontSize: sections.legal?.title_size || 10, 
                 fontWeight: 'bold', 
-                marginBottom: 6 
+                marginBottom: lineSpacing / 2 
               }}>
                 {clause.number} - {clause.title}
               </div>
