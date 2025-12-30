@@ -228,68 +228,9 @@ const HTML_BLOCKS = {
 </div>`,
     },
   ],
-  contract: [
-    {
-      id: 'contract_title',
-      label: 'Título Contrato',
-      icon: FileText,
-      category: 'header',
-      html: `<div style="text-align: center; margin: 30px 0; padding: 20px; background: {{primary_color}}; color: white; border-radius: 8px;">
-  <h1 style="margin: 0; font-size: 24px;">CONTRATO DE SERVICIOS</h1>
-  <p style="margin: 8px 0 0 0; opacity: 0.9;">Nº {{contract_number}}</p>
-</div>`,
-    },
-    {
-      id: 'contract_parties',
-      label: 'Partes Contratantes',
-      icon: User,
-      category: 'content',
-      html: `<div style="margin: 30px 0;">
-  <h2 style="font-size: 16px; border-bottom: 2px solid {{primary_color}}; padding-bottom: 8px;">PARTES</h2>
-  <p><strong>PRESTADOR:</strong> {{company_name}}, CIF {{company_cif}}</p>
-  <p><strong>CLIENTE:</strong> {{client_name}}, CIF {{client_cif}}</p>
-</div>`,
-    },
-    {
-      id: 'contract_duration',
-      label: 'Duración',
-      icon: Calendar,
-      category: 'content',
-      html: `<div style="margin: 30px 0;">
-  <h2 style="font-size: 16px; border-bottom: 2px solid {{primary_color}}; padding-bottom: 8px;">DURACIÓN</h2>
-  <p>Vigencia desde <strong>{{start_date}}</strong> hasta <strong>{{end_date}}</strong>.</p>
-  <p>Facturación: <strong>{{billing_period}}</strong></p>
-</div>`,
-    },
-    {
-      id: 'contract_totals',
-      label: 'Condiciones Económicas',
-      icon: DollarSign,
-      category: 'totals',
-      html: `<div style="margin: 30px 0; padding: 20px; background: #f9fafb; border-radius: 8px;">
-  <h2 style="font-size: 16px; margin: 0 0 15px 0;">CONDICIONES ECONÓMICAS</h2>
-  <p><span style="color: {{secondary_color}};">Subtotal:</span> <strong>{{subtotal}}</strong></p>
-  <p><span style="color: {{secondary_color}};">IVA:</span> <strong>{{iva_amount}}</strong></p>
-  <p style="font-size: 18px; color: {{primary_color}};"><strong>TOTAL: {{total}}</strong></p>
-</div>`,
-    },
-    {
-      id: 'signatures',
-      label: 'Firmas',
-      icon: FileSignature,
-      category: 'footer',
-      html: `<div style="margin-top: 60px; display: flex; justify-content: space-around;">
-  <div style="text-align: center;">
-    <div style="width: 200px; border-bottom: 1px solid #000; height: 60px;"></div>
-    <p style="margin-top: 8px;">El Prestador</p>
-  </div>
-  <div style="text-align: center;">
-    <div style="width: 200px; border-bottom: 1px solid #000; height: 60px;"></div>
-    <p style="margin-top: 8px;">El Cliente</p>
-  </div>
-</div>`,
-    },
-  ],
+  // NOTA: Los contratos usan ContractPdfPreview + contractPdf.ts (pdf-lib)
+  // Los bloques HTML no se usan para contratos - se usa PdfConfig
+  contract: [],
 };
 
 // Variables disponibles
@@ -898,19 +839,21 @@ export function PdfSettingsManager() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Editor Panel */}
           <div className="lg:col-span-2">
+            {/* Para contratos: solo tabs relevantes (Secciones, Cláusulas, Colores, Diseño) */}
+            {/* Para facturas/presupuestos: todas las tabs */}
             <Tabs defaultValue="sections" className="w-full">
-              <TabsList className="grid w-full grid-cols-5">
+              <TabsList className={`grid w-full ${selectedDocument === 'contract' ? 'grid-cols-4' : 'grid-cols-6'}`}>
                 <TabsTrigger value="sections" className="gap-1">
                   <Layers className="h-4 w-4" />
                   <span className="hidden sm:inline">Secciones</span>
                 </TabsTrigger>
-              {selectedDocument === 'contract' && (
-                <TabsTrigger value="clauses" className="gap-1">
-                  <Scale className="h-4 w-4" />
-                  <span className="hidden sm:inline">Cláusulas</span>
-                </TabsTrigger>
-              )}
-              <TabsTrigger value="colors" className="gap-1">
+                {selectedDocument === 'contract' && (
+                  <TabsTrigger value="clauses" className="gap-1">
+                    <Scale className="h-4 w-4" />
+                    <span className="hidden sm:inline">Cláusulas</span>
+                  </TabsTrigger>
+                )}
+                <TabsTrigger value="colors" className="gap-1">
                   <Palette className="h-4 w-4" />
                   <span className="hidden sm:inline">Colores</span>
                 </TabsTrigger>
@@ -918,14 +861,19 @@ export function PdfSettingsManager() {
                   <Settings2 className="h-4 w-4" />
                   <span className="hidden sm:inline">Diseño</span>
                 </TabsTrigger>
-                <TabsTrigger value="content" className="gap-1">
-                  <Layout className="h-4 w-4" />
-                  <span className="hidden sm:inline">Variables</span>
-                </TabsTrigger>
-                <TabsTrigger value="blocks" className="gap-1">
-                  <Table2 className="h-4 w-4" />
-                  <span className="hidden sm:inline">Bloques</span>
-                </TabsTrigger>
+                {/* Variables y Bloques solo para facturas/presupuestos (usan HTML templates) */}
+                {selectedDocument !== 'contract' && (
+                  <>
+                    <TabsTrigger value="content" className="gap-1">
+                      <Layout className="h-4 w-4" />
+                      <span className="hidden sm:inline">Variables</span>
+                    </TabsTrigger>
+                    <TabsTrigger value="blocks" className="gap-1">
+                      <Table2 className="h-4 w-4" />
+                      <span className="hidden sm:inline">Bloques</span>
+                    </TabsTrigger>
+                  </>
+                )}
               </TabsList>
 
               {/* Secciones - Nueva pestaña */}

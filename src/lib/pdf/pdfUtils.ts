@@ -275,10 +275,12 @@ export function addPage(pdfDoc: PDFDocument): PDFPage {
   return pdfDoc.addPage([A4_WIDTH, A4_HEIGHT]);
 }
 
-// Embed logo from URL
+// Embed logo from URL with configurable max dimensions
 export async function embedLogo(
   pdfDoc: PDFDocument,
-  logoUrl: string | null | undefined
+  logoUrl: string | null | undefined,
+  maxHeight: number = 60,
+  maxWidth: number = 150
 ): Promise<{ image: Awaited<ReturnType<typeof pdfDoc.embedPng | typeof pdfDoc.embedJpg>>; width: number; height: number } | null> {
   if (!logoUrl) return null;
   
@@ -300,9 +302,7 @@ export async function embedLogo(
       image = await pdfDoc.embedJpg(uint8Array);
     }
     
-    // Calculate dimensions - max height 60, maintain aspect ratio
-    const maxHeight = 60;
-    const maxWidth = 150;
+    // Calculate dimensions using configurable max values
     const aspectRatio = image.width / image.height;
     
     let width = image.width;
@@ -386,15 +386,19 @@ export function drawLine(
   });
 }
 
+// Draw table header with configurable height and background color
 export function drawTableHeader(
   page: PDFPage,
   y: number,
   columns: { label: string; x: number; width: number }[],
   fonts: PdfFonts,
   pdfColors: PdfColors = colors,
-  fontSize: number = 9
+  fontSize: number = 9,
+  headerHeight: number = 25,
+  backgroundColor?: { r: number; g: number; b: number }
 ): number {
-  const headerHeight = 25;
+  // Use provided background color or default gray
+  const bgColor = backgroundColor || { r: 0.95, g: 0.95, b: 0.95 };
   
   // Background
   page.drawRectangle({
@@ -402,7 +406,7 @@ export function drawTableHeader(
     y: y - headerHeight + 5,
     width: A4_WIDTH - MARGIN * 2,
     height: headerHeight,
-    color: rgb(0.95, 0.95, 0.95),
+    color: rgb(bgColor.r, bgColor.g, bgColor.b),
   });
   
   // Header text
@@ -419,16 +423,16 @@ export function drawTableHeader(
   return y - headerHeight - 5;
 }
 
+// Draw table row with configurable height
 export function drawTableRow(
   page: PDFPage,
   y: number,
   values: { text: string; x: number }[],
   fonts: PdfFonts,
   isAlternate = false,
-  fontSize: number = 9
+  fontSize: number = 9,
+  rowHeight: number = 20
 ): number {
-  const rowHeight = 20;
-  
   if (isAlternate) {
     page.drawRectangle({
       x: MARGIN,

@@ -22,6 +22,7 @@ import {
   drawLegalClauses,
   drawSignatureArea,
   replaceClauseVariables,
+  hexToRgb,
   CompanyData,
   ClientData,
   PdfConfig,
@@ -175,7 +176,15 @@ export async function generateContractPdf(
   let y = A4_HEIGHT - margin;
   
   // ============ HEADER SECTION ============
-  y = await drawCompanyHeaderWithLogo(pdfDoc, page1, company, fonts, y, config);
+  // Use logo_size from sections config
+  const logoMaxHeight = sections.header.logo_size || 60;
+  y = await drawCompanyHeaderWithLogo(pdfDoc, page1, company, fonts, y, {
+    ...config,
+    sections: {
+      ...sections,
+      header: { ...sections.header, logo_size: logoMaxHeight },
+    },
+  });
   
   // Document title (right side)
   drawDocumentTitle(page1, 'CONTRATO', contract.contract_number, fonts, A4_HEIGHT - margin - 20, pdfColors);
@@ -286,7 +295,12 @@ export async function generateContractPdf(
     { label: 'Total', x: margin + 440, width: 70 },
   ];
   
-  y = drawTableHeader(page1, y, columns, fonts, pdfColors, fontSize - 1);
+  // Use headerHeight from sections config
+  const tableHeaderHeight = sections.table.header_height || 25;
+  const tableHeaderColorHex = config?.table_header_color;
+  const tableHeaderBg = tableHeaderColorHex ? hexToRgb(tableHeaderColorHex) : undefined;
+  
+  y = drawTableHeader(page1, y, columns, fonts, pdfColors, fontSize - 1, tableHeaderHeight, tableHeaderBg);
   
   // Service rows (only active services)
   const services = (contract.services || []).filter(s => s.is_active !== false);
@@ -306,7 +320,8 @@ export async function generateContractPdf(
       { text: formatCurrency(svc.total), x: columns[3].x },
     ];
     
-    y = drawTableRow(page1, y, values, fonts, index % 2 === 1, fontSize - 1);
+    // Use tableRowHeight from config
+    y = drawTableRow(page1, y, values, fonts, index % 2 === 1, fontSize - 1, tableRowHeight);
   });
   
   // Bottom line of table
