@@ -1796,19 +1796,19 @@ export type Database = {
         Row: {
           created_at: string | null
           id: string
-          role: Database["public"]["Enums"]["app_role"]
+          role: Database["public"]["Enums"]["app_role"] | null
           user_id: string
         }
         Insert: {
           created_at?: string | null
           id?: string
-          role?: Database["public"]["Enums"]["app_role"]
+          role?: Database["public"]["Enums"]["app_role"] | null
           user_id: string
         }
         Update: {
           created_at?: string | null
           id?: string
-          role?: Database["public"]["Enums"]["app_role"]
+          role?: Database["public"]["Enums"]["app_role"] | null
           user_id?: string
         }
         Relationships: []
@@ -1886,22 +1886,26 @@ export type Database = {
     }
     Enums: {
       app_role: "admin" | "manager" | "user" | "readonly"
-      billing_period: "monthly" | "quarterly" | "annual" | "one_time" | "other"
-      client_segment: "corporate" | "pyme" | "entrepreneur" | "individual"
-      client_status: "active" | "inactive"
+      billing_period: "mensual" | "trimestral" | "anual" | "unico" | "otro"
+      client_segment: "corporativo" | "pyme" | "autonomo" | "particular"
+      client_status: "activo" | "inactivo"
       contact_status:
-        | "new"
-        | "contacted"
-        | "follow_up"
-        | "discarded"
-        | "converted"
-      contract_status: "active" | "expired" | "cancelled" | "pending_activation"
-      event_importance: "high" | "medium" | "low"
-      invoice_status: "draft" | "issued" | "paid" | "cancelled"
-      payment_status: "paid" | "pending" | "partial" | "claimed"
-      quote_status: "draft" | "sent" | "approved" | "rejected"
-      remittance_status: "pending" | "paid" | "partial" | "overdue"
-      service_status: "active" | "inactive" | "development"
+        | "nuevo"
+        | "contactado"
+        | "seguimiento"
+        | "descartado"
+        | "convertido"
+      contract_status:
+        | "vigente"
+        | "expirado"
+        | "cancelado"
+        | "pendiente_activacion"
+      event_importance: "alta" | "media" | "baja"
+      invoice_status: "borrador" | "emitida" | "pagada" | "cancelada"
+      payment_status: "pagado" | "pendiente" | "parcial" | "reclamado"
+      quote_status: "borrador" | "enviado" | "aceptado" | "rechazado"
+      remittance_status: "pendiente" | "cobrada" | "parcial" | "vencida"
+      service_status: "activo" | "inactivo" | "desarrollo"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -2030,23 +2034,28 @@ export const Constants = {
   public: {
     Enums: {
       app_role: ["admin", "manager", "user", "readonly"],
-      billing_period: ["monthly", "quarterly", "annual", "one_time", "other"],
-      client_segment: ["corporate", "pyme", "entrepreneur", "individual"],
-      client_status: ["active", "inactive"],
+      billing_period: ["mensual", "trimestral", "anual", "unico", "otro"],
+      client_segment: ["corporativo", "pyme", "autonomo", "particular"],
+      client_status: ["activo", "inactivo"],
       contact_status: [
-        "new",
-        "contacted",
-        "follow_up",
-        "discarded",
-        "converted",
+        "nuevo",
+        "contactado",
+        "seguimiento",
+        "descartado",
+        "convertido",
       ],
-      contract_status: ["active", "expired", "cancelled", "pending_activation"],
-      event_importance: ["high", "medium", "low"],
-      invoice_status: ["draft", "issued", "paid", "cancelled"],
-      payment_status: ["paid", "pending", "partial", "claimed"],
-      quote_status: ["draft", "sent", "approved", "rejected"],
-      remittance_status: ["pending", "paid", "partial", "overdue"],
-      service_status: ["active", "inactive", "development"],
+      contract_status: [
+        "vigente",
+        "expirado",
+        "cancelado",
+        "pendiente_activacion",
+      ],
+      event_importance: ["alta", "media", "baja"],
+      invoice_status: ["borrador", "emitida", "pagada", "cancelada"],
+      payment_status: ["pagado", "pendiente", "parcial", "reclamado"],
+      quote_status: ["borrador", "enviado", "aceptado", "rechazado"],
+      remittance_status: ["pendiente", "cobrada", "parcial", "vencida"],
+      service_status: ["activo", "inactivo", "desarrollo"],
     },
   },
 } as const
