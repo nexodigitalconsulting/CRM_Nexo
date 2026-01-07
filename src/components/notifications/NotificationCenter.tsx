@@ -40,7 +40,7 @@ function useNotifications() {
       const { data: expiringContracts } = await supabase
         .from("contracts")
         .select("id, contract_number, name, end_date, client:clients(name)")
-        .eq("status", "active")
+        .eq("status", "vigente")
         .gte("end_date", today.toISOString())
         .lte("end_date", in30Days.toISOString());
 
@@ -61,7 +61,7 @@ function useNotifications() {
       const { data: dueInvoices } = await supabase
         .from("invoices")
         .select("id, invoice_number, due_date, total, client:clients(name)")
-        .eq("status", "issued")
+        .eq("status", "emitida")
         .gte("due_date", today.toISOString())
         .lte("due_date", in7Days.toISOString());
 
@@ -82,7 +82,7 @@ function useNotifications() {
       const { data: pendingBilling } = await supabase
         .from("contracts")
         .select("id, contract_number, name, next_billing_date, total, client:clients(name)")
-        .eq("status", "active")
+        .eq("status", "vigente")
         .gte("next_billing_date", today.toISOString())
         .lte("next_billing_date", in7Days.toISOString());
 
@@ -103,7 +103,7 @@ function useNotifications() {
       const { data: pendingQuotes } = await supabase
         .from("quotes")
         .select("id, quote_number, name, valid_until, total, client:clients(name)")
-        .in("status", ["draft", "sent"])
+        .in("status", ["borrador", "enviado"])
         .gte("valid_until", today.toISOString())
         .lte("valid_until", in7Days.toISOString());
 

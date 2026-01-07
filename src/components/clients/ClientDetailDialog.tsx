@@ -53,16 +53,16 @@ export function ClientDetailDialog({ open, onOpenChange, client, onEdit }: Clien
   const clientQuotes = allQuotes?.filter((q) => q.client_id === client.id) || [];
 
   const totalRevenue = clientInvoices
-    .filter((i) => i.status === "paid")
+    .filter((i) => i.status === "pagada")
     .reduce((sum, i) => sum + (Number(i.total) || 0), 0);
 
-  const activeContracts = clientContracts.filter((c) => c.status === "active").length;
+  const activeContracts = clientContracts.filter((c) => c.status === "vigente").length;
 
   const segmentLabels: Record<string, string> = {
-    corporate: "Corporativo",
+    corporativo: "Corporativo",
     pyme: "PYME",
-    entrepreneur: "Autónomo",
-    individual: "Particular",
+    autonomo: "Autónomo",
+    particular: "Particular",
   };
 
   const handleOpenContract = (contract: ContractWithDetails) => {
@@ -93,8 +93,8 @@ export function ClientDetailDialog({ open, onOpenChange, client, onEdit }: Clien
                 <div>
                   <DialogTitle className="text-xl">{client.name}</DialogTitle>
                   <div className="flex items-center gap-2 mt-1">
-                    <Badge variant={client.status === "active" ? "default" : "secondary"}>
-                      {client.status === "active" ? "Activo" : "Inactivo"}
+                    <Badge variant={client.status === "activo" ? "default" : "secondary"}>
+                      {client.status === "activo" ? "Activo" : "Inactivo"}
                     </Badge>
                     <Badge variant="outline">{segmentLabels[client.segment || "pyme"]}</Badge>
                     <span className="text-sm text-muted-foreground">CL-{String(client.client_number).padStart(4, "0")}</span>
@@ -225,8 +225,8 @@ export function ClientDetailDialog({ open, onOpenChange, client, onEdit }: Clien
                           </div>
                           <div className="flex items-center gap-3">
                             <div className="text-right">
-                              <Badge variant={contract.status === "active" ? "default" : "secondary"}>
-                                {contract.status === "active" ? "Activo" : contract.status}
+                              <Badge variant={contract.status === "vigente" ? "default" : "secondary"}>
+                                {contract.status === "vigente" ? "Activo" : contract.status}
                               </Badge>
                               <p className="text-sm font-medium mt-1">
                                 {Number(contract.total || 0).toLocaleString("es-ES", { style: "currency", currency: "EUR" })}
@@ -269,18 +269,18 @@ export function ClientDetailDialog({ open, onOpenChange, client, onEdit }: Clien
                             <div className="text-right">
                               <Badge
                                 variant={
-                                  invoice.status === "paid"
+                                  invoice.status === "pagada"
                                     ? "default"
-                                    : invoice.status === "issued"
+                                    : invoice.status === "emitida"
                                     ? "secondary"
                                     : "outline"
                                 }
                               >
-                                {invoice.status === "paid"
+                                {invoice.status === "pagada"
                                   ? "Pagada"
-                                  : invoice.status === "issued"
+                                  : invoice.status === "emitida"
                                   ? "Emitida"
-                                  : invoice.status === "draft"
+                                  : invoice.status === "borrador"
                                   ? "Borrador"
                                   : "Cancelada"}
                               </Badge>
@@ -327,18 +327,18 @@ export function ClientDetailDialog({ open, onOpenChange, client, onEdit }: Clien
                             <div className="text-right">
                               <Badge
                                 variant={
-                                  quote.status === "approved"
+                                  quote.status === "aceptado"
                                     ? "default"
-                                    : quote.status === "sent"
+                                    : quote.status === "enviado"
                                     ? "secondary"
                                     : "outline"
                                 }
                               >
-                                {quote.status === "approved"
+                                {quote.status === "aceptado"
                                   ? "Aprobado"
-                                  : quote.status === "sent"
+                                  : quote.status === "enviado"
                                   ? "Enviado"
-                                  : quote.status === "draft"
+                                  : quote.status === "borrador"
                                   ? "Borrador"
                                   : "Rechazado"}
                               </Badge>

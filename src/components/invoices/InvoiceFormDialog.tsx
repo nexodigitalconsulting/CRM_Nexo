@@ -52,7 +52,7 @@ const formSchema = z.object({
   contract_id: z.string().optional(),
   issue_date: z.string().min(1, "Fecha de emisión requerida"),
   due_date: z.string().optional(),
-  status: z.enum(["draft", "issued", "paid", "cancelled"]),
+  status: z.enum(["borrador", "emitida", "pagada", "cancelada"]),
   notes: z.string().optional(),
   services: z.array(serviceLineSchema).min(1, "Añade al menos un servicio"),
 });
@@ -82,7 +82,7 @@ export function InvoiceFormDialog({ open, onOpenChange, invoice }: Props) {
       contract_id: "",
       issue_date: new Date().toISOString().split("T")[0],
       due_date: "",
-      status: "draft",
+      status: "borrador",
       notes: "",
       services: [],
     },
@@ -128,7 +128,7 @@ export function InvoiceFormDialog({ open, onOpenChange, invoice }: Props) {
         contract_id: "",
         issue_date: new Date().toISOString().split("T")[0],
         due_date: "",
-        status: "draft",
+        status: "borrador",
         notes: "",
         services: [],
       });
@@ -404,7 +404,7 @@ export function InvoiceFormDialog({ open, onOpenChange, invoice }: Props) {
                             </FormControl>
                             <SelectContent>
                               {services
-                                .filter((s) => s.status === "active")
+                                .filter((s) => s.status === "activo")
                                 .map((s) => (
                                   <SelectItem key={s.id} value={s.id}>
                                     {s.name}

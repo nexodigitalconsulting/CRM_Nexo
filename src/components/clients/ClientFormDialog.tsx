@@ -32,7 +32,7 @@ const initialFormState: ClientInsert = {
   country: "España",
   iban: "",
   segment: "pyme",
-  status: "active",
+  status: "activo",
   source: "",
   notes: "",
 };
@@ -59,7 +59,7 @@ export function ClientFormDialog({ open, onOpenChange, client }: ClientFormDialo
         country: client.country || "España",
         iban: client.iban || "",
         segment: client.segment || "pyme",
-        status: client.status || "active",
+        status: client.status || "activo",
         source: client.source || "",
         notes: client.notes || "",
       });
@@ -206,25 +206,25 @@ export function ClientFormDialog({ open, onOpenChange, client }: ClientFormDialo
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="corporate">Corporativo</SelectItem>
+                  <SelectItem value="corporativo">Corporativo</SelectItem>
                   <SelectItem value="pyme">PYME</SelectItem>
-                  <SelectItem value="entrepreneur">Autónomo</SelectItem>
-                  <SelectItem value="individual">Particular</SelectItem>
+                  <SelectItem value="autonomo">Autónomo</SelectItem>
+                  <SelectItem value="particular">Particular</SelectItem>
                 </SelectContent>
               </Select>
             </div>
             <div className="space-y-2">
               <Label>Estado</Label>
               <Select
-                value={formData.status || "active"}
+                value={formData.status || "activo"}
                 onValueChange={(value) => handleChange("status", value as ClientInsert["status"])}
               >
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="active">Activo</SelectItem>
-                  <SelectItem value="inactive">Inactivo</SelectItem>
+                  <SelectItem value="activo">Activo</SelectItem>
+                  <SelectItem value="inactivo">Inactivo</SelectItem>
                 </SelectContent>
               </Select>
             </div>

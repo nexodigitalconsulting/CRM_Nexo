@@ -25,7 +25,7 @@ const initialFormState: ContactInsert = {
   email: "",
   phone: "",
   source: "web",
-  status: "new",
+  status: "nuevo",
   notes: "",
   meeting_date: null,
   presentation_url: "",
@@ -47,7 +47,7 @@ export function ContactFormDialog({ open, onOpenChange, contact }: ContactFormDi
         email: contact.email || "",
         phone: contact.phone || "",
         source: contact.source || "web",
-        status: contact.status || "new",
+        status: contact.status || "nuevo",
         notes: contact.notes || "",
         meeting_date: contact.meeting_date,
         presentation_url: contact.presentation_url || "",
@@ -139,18 +139,18 @@ export function ContactFormDialog({ open, onOpenChange, contact }: ContactFormDi
             <div className="space-y-2">
               <Label>Estado</Label>
               <Select
-                value={formData.status || "new"}
+                value={formData.status || "nuevo"}
                 onValueChange={(value) => handleChange("status", value as ContactInsert["status"])}
               >
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="new">Nuevo</SelectItem>
-                  <SelectItem value="contacted">Contactado</SelectItem>
-                  <SelectItem value="follow_up">Seguimiento</SelectItem>
-                  <SelectItem value="discarded">Descartado</SelectItem>
-                  <SelectItem value="converted">Convertido</SelectItem>
+                  <SelectItem value="nuevo">Nuevo</SelectItem>
+                  <SelectItem value="contactado">Contactado</SelectItem>
+                  <SelectItem value="seguimiento">Seguimiento</SelectItem>
+                  <SelectItem value="descartado">Descartado</SelectItem>
+                  <SelectItem value="convertido">Convertido</SelectItem>
                 </SelectContent>
               </Select>
             </div>

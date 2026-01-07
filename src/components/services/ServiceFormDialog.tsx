@@ -26,7 +26,7 @@ const initialFormState: ServiceInsert = {
   category: "",
   price: 0,
   iva_percent: 21,
-  status: "active",
+  status: "activo",
 };
 
 export function ServiceFormDialog({ open, onOpenChange, service }: ServiceFormDialogProps) {
@@ -45,7 +45,7 @@ export function ServiceFormDialog({ open, onOpenChange, service }: ServiceFormDi
         category: service.category || "",
         price: service.price,
         iva_percent: service.iva_percent || 21,
-        status: service.status || "active",
+        status: service.status || "activo",
       });
     } else {
       setFormData(initialFormState);
@@ -140,16 +140,16 @@ export function ServiceFormDialog({ open, onOpenChange, service }: ServiceFormDi
           <div className="space-y-2">
             <Label>Estado</Label>
             <Select
-              value={formData.status || "active"}
+              value={formData.status || "activo"}
               onValueChange={(value) => setFormData((prev) => ({ ...prev, status: value as ServiceInsert["status"] }))}
             >
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="active">Activo</SelectItem>
-                <SelectItem value="inactive">Inactivo</SelectItem>
-                <SelectItem value="development">En desarrollo</SelectItem>
+                <SelectItem value="activo">Activo</SelectItem>
+                <SelectItem value="inactivo">Inactivo</SelectItem>
+                <SelectItem value="desarrollo">En desarrollo</SelectItem>
               </SelectContent>
             </Select>
           </div>

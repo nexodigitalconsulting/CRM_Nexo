@@ -54,7 +54,7 @@ export function RecentActivityWidget() {
     quotes?.slice(0, 5).forEach((q) => {
       items.push({
         id: `quote-${q.id}`,
-        action: q.status === "sent" ? "Presupuesto enviado" : q.status === "approved" ? "Presupuesto aprobado" : "Presupuesto creado",
+        action: q.status === "enviado" ? "Presupuesto enviado" : q.status === "aceptado" ? "Presupuesto aprobado" : "Presupuesto creado",
         entity: `PP-${String(q.quote_number).padStart(4, "0")}`,
         time: new Date(q.updated_at || q.created_at || Date.now()),
         type: "quote",
@@ -64,7 +64,7 @@ export function RecentActivityWidget() {
     invoices?.slice(0, 5).forEach((inv) => {
       items.push({
         id: `invoice-${inv.id}`,
-        action: inv.status === "paid" ? "Factura cobrada" : "Factura emitida",
+        action: inv.status === "pagada" ? "Factura cobrada" : "Factura emitida",
         entity: `FF-${String(inv.invoice_number).padStart(4, "0")}`,
         time: new Date(inv.updated_at || inv.created_at || Date.now()),
         type: "invoice",
@@ -74,7 +74,7 @@ export function RecentActivityWidget() {
     contracts?.slice(0, 5).forEach((c) => {
       items.push({
         id: `contract-${c.id}`,
-        action: c.status === "active" ? "Contrato activo" : "Contrato creado",
+        action: c.status === "vigente" ? "Contrato activo" : "Contrato creado",
         entity: c.name || `CN-${String(c.contract_number).padStart(4, "0")}`,
         time: new Date(c.updated_at || c.created_at || Date.now()),
         type: "contract",
