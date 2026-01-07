@@ -33,7 +33,7 @@ export function UpcomingTasksWidget() {
 
     // Billing tasks from contracts
     contracts?.forEach((contract) => {
-      if (contract.status === "active" && contract.next_billing_date) {
+      if (contract.status === "vigente" && contract.next_billing_date) {
         const billingDate = new Date(contract.next_billing_date);
         if (isWithinInterval(billingDate, { start: now, end: nextWeek })) {
           items.push({
@@ -47,7 +47,7 @@ export function UpcomingTasksWidget() {
       }
 
       // Renewal reminders
-      if (contract.status === "active" && contract.end_date) {
+      if (contract.status === "vigente" && contract.end_date) {
         const endDate = new Date(contract.end_date);
         if (isWithinInterval(endDate, { start: now, end: nextMonth })) {
           items.push({
@@ -63,7 +63,7 @@ export function UpcomingTasksWidget() {
 
     // Invoice due dates
     invoices?.forEach((invoice) => {
-      if (invoice.status === "issued" && invoice.due_date) {
+      if (invoice.status === "emitida" && invoice.due_date) {
         const dueDate = new Date(invoice.due_date);
         if (isWithinInterval(dueDate, { start: now, end: nextWeek })) {
           items.push({
@@ -79,7 +79,7 @@ export function UpcomingTasksWidget() {
 
     // Follow-up contacts
     contacts?.forEach((contact) => {
-      if (contact.status === "follow_up" && contact.meeting_date) {
+      if (contact.status === "seguimiento" && contact.meeting_date) {
         const meetingDate = new Date(contact.meeting_date);
         if (isWithinInterval(meetingDate, { start: now, end: nextWeek })) {
           items.push({

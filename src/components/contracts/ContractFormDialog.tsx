@@ -42,9 +42,9 @@ const formSchema = z.object({
   quote_id: z.string().optional(),
   start_date: z.string().min(1, "La fecha de inicio es requerida"),
   end_date: z.string().optional(),
-  billing_period: z.enum(["monthly", "quarterly", "annual", "one_time", "other"]),
-  status: z.enum(["pending_activation", "active", "expired", "cancelled"]).optional(),
-  payment_status: z.enum(["pending", "paid", "partial", "claimed"]).optional(),
+  billing_period: z.enum(["mensual", "trimestral", "anual", "unico", "otro"]),
+  status: z.enum(["pendiente_activacion", "vigente", "expirado", "cancelado"]).optional(),
+  payment_status: z.enum(["pendiente", "pagado", "parcial", "reclamado"]).optional(),
   notes: z.string().optional(),
 });
 
@@ -68,11 +68,11 @@ interface ContractFormDialogProps {
 }
 
 const billingPeriodLabels: Record<string, string> = {
-  monthly: "Mensual",
-  quarterly: "Trimestral",
-  annual: "Anual",
-  one_time: "Puntual",
-  other: "Otro",
+  mensual: "Mensual",
+  trimestral: "Trimestral",
+  anual: "Anual",
+  unico: "Puntual",
+  otro: "Otro",
 };
 
 export function ContractFormDialog({ open, onOpenChange, contract }: ContractFormDialogProps) {
@@ -99,9 +99,9 @@ export function ContractFormDialog({ open, onOpenChange, contract }: ContractFor
       quote_id: "",
       start_date: format(new Date(), "yyyy-MM-dd"),
       end_date: "",
-      billing_period: "monthly",
-      status: "pending_activation",
-      payment_status: "pending",
+      billing_period: "mensual",
+      status: "pendiente_activacion",
+      payment_status: "pendiente",
       notes: "",
     },
   });
@@ -115,9 +115,9 @@ export function ContractFormDialog({ open, onOpenChange, contract }: ContractFor
         quote_id: contractData.quote_id || "",
         start_date: contractData.start_date,
         end_date: contractData.end_date || "",
-        billing_period: contractData.billing_period || "monthly",
-        status: contractData.status || "pending_activation",
-        payment_status: contractData.payment_status || "pending",
+        billing_period: contractData.billing_period || "mensual",
+        status: contractData.status || "pendiente_activacion",
+        payment_status: contractData.payment_status || "pendiente",
         notes: contractData.notes || "",
       });
       if (contractData.services) {
@@ -155,17 +155,17 @@ export function ContractFormDialog({ open, onOpenChange, contract }: ContractFor
       let endDate = startDate;
       
       switch (billingPeriod) {
-        case "monthly":
+        case "mensual":
           endDate = addMonths(startDate, 1);
           break;
-        case "quarterly":
+        case "trimestral":
           endDate = addMonths(startDate, 3);
           break;
-        case "annual":
+        case "anual":
           endDate = addYears(startDate, 1);
           break;
-        case "one_time":
-        case "other":
+        case "unico":
+        case "otro":
           endDate = addMonths(startDate, 1);
           break;
       }

@@ -28,7 +28,7 @@ export interface InvoiceWithDetails {
   contract_id: string | null;
   issue_date: string;
   due_date: string | null;
-  status: "draft" | "issued" | "paid" | "cancelled";
+  status: "borrador" | "emitida" | "pagada" | "cancelada";
   subtotal: number | null;
   iva_percent: number | null;
   iva_amount: number | null;
@@ -58,7 +58,7 @@ export interface InvoiceInsert {
   contract_id?: string | null;
   issue_date: string;
   due_date?: string | null;
-  status?: "draft" | "issued" | "paid" | "cancelled";
+  status?: "borrador" | "emitida" | "pagada" | "cancelada";
   subtotal?: number;
   iva_percent?: number;
   iva_amount?: number;
@@ -72,7 +72,7 @@ export interface InvoiceUpdate {
   contract_id?: string | null;
   issue_date?: string;
   due_date?: string | null;
-  status?: "draft" | "issued" | "paid" | "cancelled";
+  status?: "borrador" | "emitida" | "pagada" | "cancelada";
   subtotal?: number;
   iva_percent?: number;
   iva_amount?: number;

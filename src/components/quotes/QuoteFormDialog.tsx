@@ -252,7 +252,7 @@ export function QuoteFormDialog({ open, onOpenChange, quote }: QuoteFormDialogPr
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="none">Sin contacto</SelectItem>
-                  {contacts?.filter(c => c.status !== "converted" && c.id).map((contact) => (
+                  {contacts?.filter(c => c.status !== "convertido" && c.id).map((contact) => (
                     <SelectItem key={contact.id} value={contact.id}>
                       {contact.name} {contact.email && `(${contact.email})`}
                     </SelectItem>

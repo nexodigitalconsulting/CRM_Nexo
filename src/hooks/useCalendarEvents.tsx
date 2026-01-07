@@ -11,7 +11,7 @@ export interface CalendarEvent {
   end_datetime: string;
   all_day: boolean;
   category_id: string | null;
-  importance: "high" | "medium" | "low";
+  importance: "alta" | "media" | "baja";
   location: string | null;
   client_id: string | null;
   contact_id: string | null;
@@ -35,7 +35,7 @@ export interface CalendarCategory {
   user_id: string;
   name: string;
   color: string;
-  importance: "high" | "medium" | "low";
+  importance: "alta" | "media" | "baja";
   is_default: boolean;
   created_at: string;
   updated_at: string;
@@ -59,7 +59,7 @@ export interface CalendarEventInsert {
   end_datetime: string;
   all_day?: boolean;
   category_id?: string | null;
-  importance?: "high" | "medium" | "low";
+  importance?: "alta" | "media" | "baja";
   location?: string | null;
   client_id?: string | null;
   contact_id?: string | null;
