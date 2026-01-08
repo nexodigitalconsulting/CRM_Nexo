@@ -54,7 +54,7 @@ export function CategoryManager() {
 
   const [name, setName] = useState("");
   const [color, setColor] = useState(PRESET_COLORS[0]);
-  const [importance, setImportance] = useState<"high" | "medium" | "low">("medium");
+  const [importance, setImportance] = useState<"alta" | "media" | "baja">("media");
 
   const openDialog = (category?: CalendarCategory) => {
     if (category) {
@@ -66,7 +66,7 @@ export function CategoryManager() {
       setEditingCategory(null);
       setName("");
       setColor(PRESET_COLORS[0]);
-      setImportance("medium");
+      setImportance("media");
     }
     setDialogOpen(true);
   };
@@ -131,7 +131,7 @@ export function CategoryManager() {
                     <div>
                       <p className="font-medium">{category.name}</p>
                       <p className="text-xs text-muted-foreground">
-                        Importancia: {category.importance === "high" ? "Alta" : category.importance === "medium" ? "Media" : "Baja"}
+                        Importancia: {category.importance === "alta" ? "Alta" : category.importance === "media" ? "Media" : "Baja"}
                       </p>
                     </div>
                   </div>
@@ -210,14 +210,14 @@ export function CategoryManager() {
 
             <div className="space-y-2">
               <Label>Importancia por defecto</Label>
-              <Select value={importance} onValueChange={(v: "high" | "medium" | "low") => setImportance(v)}>
+              <Select value={importance} onValueChange={(v: "alta" | "media" | "baja") => setImportance(v)}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="high">Alta</SelectItem>
-                  <SelectItem value="medium">Media</SelectItem>
-                  <SelectItem value="low">Baja</SelectItem>
+                  <SelectItem value="alta">Alta</SelectItem>
+                  <SelectItem value="media">Media</SelectItem>
+                  <SelectItem value="baja">Baja</SelectItem>
                 </SelectContent>
               </Select>
             </div>

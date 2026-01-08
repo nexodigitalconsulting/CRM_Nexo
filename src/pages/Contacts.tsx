@@ -36,19 +36,19 @@ import {
 } from "@/components/ui/tooltip";
 
 const statusMap: Record<string, "new" | "active" | "pending" | "success" | "inactive"> = {
-  new: "new",
-  contacted: "pending",
-  follow_up: "pending",
-  converted: "success",
-  discarded: "inactive",
+  nuevo: "new",
+  contactado: "pending",
+  seguimiento: "pending",
+  convertido: "success",
+  descartado: "inactive",
 };
 
 const statusLabels: Record<string, string> = {
-  new: "Nuevo",
-  contacted: "Contactado",
-  follow_up: "Seguimiento",
-  converted: "Convertido",
-  discarded: "Descartado",
+  nuevo: "Nuevo",
+  contactado: "Contactado",
+  seguimiento: "Seguimiento",
+  convertido: "Convertido",
+  descartado: "Descartado",
 };
 
 const columnConfigs: ColumnConfig[] = [
@@ -164,8 +164,8 @@ export default function Contacts() {
       key: "status",
       label: "Estado",
       render: (contact: Contact) => (
-        <StatusBadge variant={statusMap[contact.status || "new"]}>
-          {statusLabels[contact.status || "new"]}
+        <StatusBadge variant={statusMap[contact.status || "nuevo"]}>
+          {statusLabels[contact.status || "nuevo"]}
         </StatusBadge>
       ),
     },
@@ -222,7 +222,7 @@ export default function Contacts() {
       render: (contact: Contact) => (
         <TooltipProvider>
           <div className="flex gap-1">
-            {contact.status !== "converted" && (
+            {contact.status !== "convertido" && (
               <Tooltip>
                 <TooltipTrigger asChild>
                   <Button 
@@ -287,25 +287,25 @@ export default function Contacts() {
           <div className="bg-card rounded-lg border border-border p-4">
             <p className="text-sm text-muted-foreground">Nuevos</p>
             <p className="text-2xl font-semibold mt-1 text-primary">
-              {contacts?.filter((c) => c.status === "new").length || 0}
+              {contacts?.filter((c) => c.status === "nuevo").length || 0}
             </p>
           </div>
           <div className="bg-card rounded-lg border border-border p-4">
             <p className="text-sm text-muted-foreground">Seguimiento</p>
             <p className="text-2xl font-semibold mt-1 text-warning">
-              {contacts?.filter((c) => c.status === "follow_up").length || 0}
+              {contacts?.filter((c) => c.status === "seguimiento").length || 0}
             </p>
           </div>
           <div className="bg-card rounded-lg border border-border p-4">
             <p className="text-sm text-muted-foreground">Convertidos</p>
             <p className="text-2xl font-semibold mt-1 text-success">
-              {contacts?.filter((c) => c.status === "converted").length || 0}
+              {contacts?.filter((c) => c.status === "convertido").length || 0}
             </p>
           </div>
           <div className="bg-card rounded-lg border border-border p-4">
             <p className="text-sm text-muted-foreground">Tasa Conversión</p>
             <p className="text-2xl font-semibold mt-1">
-              {contacts?.length ? Math.round((contacts.filter((c) => c.status === "converted").length / contacts.length) * 100) : 0}%
+              {contacts?.length ? Math.round((contacts.filter((c) => c.status === "convertido").length / contacts.length) * 100) : 0}%
             </p>
           </div>
         </div>
@@ -324,11 +324,11 @@ export default function Contacts() {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Todos</SelectItem>
-              <SelectItem value="new">Nuevo</SelectItem>
-              <SelectItem value="contacted">Contactado</SelectItem>
-              <SelectItem value="follow_up">Seguimiento</SelectItem>
-              <SelectItem value="converted">Convertido</SelectItem>
-              <SelectItem value="discarded">Descartado</SelectItem>
+              <SelectItem value="nuevo">Nuevo</SelectItem>
+              <SelectItem value="contactado">Contactado</SelectItem>
+              <SelectItem value="seguimiento">Seguimiento</SelectItem>
+              <SelectItem value="convertido">Convertido</SelectItem>
+              <SelectItem value="descartado">Descartado</SelectItem>
             </SelectContent>
           </Select>
           <Select value={sourceFilter} onValueChange={setSourceFilter}>

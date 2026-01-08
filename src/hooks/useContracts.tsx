@@ -69,7 +69,7 @@ export function useApprovedQuotes() {
           contact:contacts(*),
           services:quote_services(*, service:services(*))
         `)
-        .eq("status", "approved")
+        .eq("status", "aceptado")
         .order("quote_number", { ascending: false });
       
       if (error) throw error;

@@ -183,7 +183,7 @@ export function useCreateCalendarCategory() {
   const queryClient = useQueryClient();
   
   return useMutation({
-    mutationFn: async (category: { name: string; color: string; importance?: "high" | "medium" | "low" }) => {
+    mutationFn: async (category: { name: string; color: string; importance?: "alta" | "media" | "baja" }) => {
       const { data: userData } = await supabase.auth.getUser();
       if (!userData.user) throw new Error("No autenticado");
       
@@ -210,7 +210,7 @@ export function useUpdateCalendarCategory() {
   const queryClient = useQueryClient();
   
   return useMutation({
-    mutationFn: async ({ id, category }: { id: string; category: Partial<{ name: string; color: string; importance: "high" | "medium" | "low" }> }) => {
+    mutationFn: async ({ id, category }: { id: string; category: Partial<{ name: string; color: string; importance: "alta" | "media" | "baja" }> }) => {
       const { data, error } = await supabase
         .from("calendar_categories")
         .update(category)

@@ -130,7 +130,7 @@ export default function Calendar() {
           details: contract.client?.name,
         });
         
-        if (contract.status === "active") {
+        if (contract.status === "vigente") {
           allEvents.push({
             id: `renewal-${contract.id}`,
             title: `Renovación: ${contract.name || `Contrato #${contract.contract_number}`}`,
@@ -142,7 +142,7 @@ export default function Calendar() {
         }
       }
       
-      if (contract.next_billing_date && contract.status === "active") {
+      if (contract.next_billing_date && contract.status === "vigente") {
         allEvents.push({
           id: `billing-${contract.id}`,
           title: `Facturar: ${contract.name || `Contrato #${contract.contract_number}`}`,
@@ -156,7 +156,7 @@ export default function Calendar() {
     
     // Invoice due dates
     invoices.forEach((invoice) => {
-      if (invoice.due_date && invoice.status === "issued") {
+      if (invoice.due_date && invoice.status === "emitida") {
         allEvents.push({
           id: `due-${invoice.id}`,
           title: `Vence: FF-${String(invoice.invoice_number).padStart(4, "0")}`,
@@ -234,13 +234,13 @@ export default function Calendar() {
     .slice(0, 8);
 
   const expiringContracts = contracts.filter((c) => {
-    if (!c.end_date || c.status !== "active") return false;
+    if (!c.end_date || c.status !== "vigente") return false;
     const endDate = new Date(c.end_date);
     return isWithinInterval(endDate, { start: new Date(), end: addDays(new Date(), 30) });
   });
 
   const pendingBilling = contracts.filter((c) => {
-    if (!c.next_billing_date || c.status !== "active") return false;
+    if (!c.next_billing_date || c.status !== "vigente") return false;
     const billingDate = new Date(c.next_billing_date);
     return isWithinInterval(billingDate, { start: new Date(), end: addDays(new Date(), 7) });
   });

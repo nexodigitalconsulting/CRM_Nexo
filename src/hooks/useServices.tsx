@@ -29,7 +29,7 @@ export function useActiveServices() {
       const { data, error } = await supabase
         .from("services")
         .select("*")
-        .eq("status", "active")
+        .eq("status", "activo")
         .order("name");
       
       if (error) throw error;

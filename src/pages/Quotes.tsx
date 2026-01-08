@@ -35,24 +35,24 @@ import { SendEmailDialog } from "@/components/common/SendEmailDialog";
 import { toast } from "sonner";
 
 const statusMap: Record<string, "inactive" | "new" | "active" | "danger"> = {
-  draft: "inactive",
-  sent: "new",
-  approved: "active",
-  rejected: "danger",
+  borrador: "inactive",
+  enviado: "new",
+  aceptado: "active",
+  rechazado: "danger",
 };
 
 const statusLabels: Record<string, string> = {
-  draft: "Borrador",
-  sent: "Enviado",
-  approved: "Aprobado",
-  rejected: "Rechazado",
+  borrador: "Borrador",
+  enviado: "Enviado",
+  aceptado: "Aprobado",
+  rechazado: "Rechazado",
 };
 
 const statusIcons: Record<string, React.ElementType> = {
-  draft: FileText,
-  sent: Send,
-  approved: Check,
-  rejected: X,
+  borrador: FileText,
+  enviado: Send,
+  aceptado: Check,
+  rechazado: X,
 };
 
 const formatCurrency = (amount: number) =>
@@ -132,7 +132,7 @@ export default function Quotes() {
   const getQuotesByStatus = (status: string) => 
     filteredQuotes.filter((q) => q.status === status);
 
-  const statuses = ["draft", "sent", "approved", "rejected"];
+  const statuses = ["borrador", "enviado", "aceptado", "rechazado"];
 
   const columns = [
     {
@@ -158,8 +158,8 @@ export default function Quotes() {
       key: "status",
       label: "Estado",
       render: (quote: QuoteWithDetails) => (
-        <StatusBadge variant={statusMap[quote.status || "draft"]}>
-          {statusLabels[quote.status || "draft"]}
+        <StatusBadge variant={statusMap[quote.status || "borrador"]}>
+          {statusLabels[quote.status || "borrador"]}
         </StatusBadge>
       ),
     },
@@ -290,19 +290,19 @@ export default function Quotes() {
           <div className="bg-card rounded-lg border border-border p-4">
             <p className="text-sm text-muted-foreground">Borradores</p>
             <p className="text-2xl font-semibold mt-1 text-muted-foreground">
-              {quotes?.filter((q) => q.status === "draft").length || 0}
+              {quotes?.filter((q) => q.status === "borrador").length || 0}
             </p>
           </div>
           <div className="bg-card rounded-lg border border-border p-4">
             <p className="text-sm text-muted-foreground">Enviados</p>
             <p className="text-2xl font-semibold mt-1 text-primary">
-              {quotes?.filter((q) => q.status === "sent").length || 0}
+              {quotes?.filter((q) => q.status === "enviado").length || 0}
             </p>
           </div>
           <div className="bg-card rounded-lg border border-border p-4">
             <p className="text-sm text-muted-foreground">Aprobados</p>
             <p className="text-2xl font-semibold mt-1 text-success">
-              {quotes?.filter((q) => q.status === "approved").length || 0}
+              {quotes?.filter((q) => q.status === "aceptado").length || 0}
             </p>
           </div>
           <div className="bg-card rounded-lg border border-border p-4">
@@ -417,17 +417,17 @@ export default function Quotes() {
                                   setDialogOpen(true);
                                 }}>Duplicar</DropdownMenuItem>
                                 <DropdownMenuSeparator />
-                                {status === "draft" && (
-                                  <DropdownMenuItem onClick={() => handleStatusChange(quote, "sent")}>
+                                {status === "borrador" && (
+                                  <DropdownMenuItem onClick={() => handleStatusChange(quote, "enviado")}>
                                     <Send className="h-4 w-4 mr-2" /> Marcar como Enviado
                                   </DropdownMenuItem>
                                 )}
-                                {status === "sent" && (
+                                {status === "enviado" && (
                                   <>
-                                    <DropdownMenuItem onClick={() => handleStatusChange(quote, "approved")}>
+                                    <DropdownMenuItem onClick={() => handleStatusChange(quote, "aceptado")}>
                                       <Check className="h-4 w-4 mr-2" /> Aprobar
                                     </DropdownMenuItem>
-                                    <DropdownMenuItem onClick={() => handleStatusChange(quote, "rejected")}>
+                                    <DropdownMenuItem onClick={() => handleStatusChange(quote, "rechazado")}>
                                       <X className="h-4 w-4 mr-2" /> Rechazar
                                     </DropdownMenuItem>
                                   </>
