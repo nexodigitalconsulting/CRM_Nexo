@@ -36,15 +36,15 @@ const categoryColors: Record<string, string> = {
 };
 
 const statusMap: Record<string, "active" | "pending" | "inactive"> = {
-  active: "active",
-  development: "pending",
-  inactive: "inactive",
+  activo: "active",
+  desarrollo: "pending",
+  inactivo: "inactive",
 };
 
 const statusLabels: Record<string, string> = {
-  active: "Activo",
-  development: "En desarrollo",
-  inactive: "Inactivo",
+  activo: "Activo",
+  desarrollo: "En desarrollo",
+  inactivo: "Inactivo",
 };
 
 const columnConfigs: ColumnConfig[] = [
@@ -139,8 +139,8 @@ export default function Services() {
       key: "status",
       label: "Estado",
       render: (service: Service) => (
-        <StatusBadge variant={statusMap[service.status || "active"]}>
-          {statusLabels[service.status || "active"]}
+        <StatusBadge variant={statusMap[service.status || "activo"]}>
+          {statusLabels[service.status || "activo"]}
         </StatusBadge>
       ),
     },
@@ -242,13 +242,13 @@ export default function Services() {
           <div className="bg-card rounded-lg border border-border p-4">
             <p className="text-sm text-muted-foreground">Activos</p>
             <p className="text-2xl font-semibold mt-1 text-success">
-              {services?.filter((s) => s.status === "active").length || 0}
+              {services?.filter((s) => s.status === "activo").length || 0}
             </p>
           </div>
           <div className="bg-card rounded-lg border border-border p-4">
             <p className="text-sm text-muted-foreground">En Desarrollo</p>
             <p className="text-2xl font-semibold mt-1 text-warning">
-              {services?.filter((s) => s.status === "development").length || 0}
+              {services?.filter((s) => s.status === "desarrollo").length || 0}
             </p>
           </div>
           <div className="bg-card rounded-lg border border-border p-4">
@@ -348,8 +348,8 @@ export default function Services() {
                       <span className={`status-badge ${categoryColors[service.category || ""] || categoryColors.default}`}>
                         {service.category || "Sin categoría"}
                       </span>
-                      <StatusBadge variant={statusMap[service.status || "active"]}>
-                        {statusLabels[service.status || "active"]}
+                      <StatusBadge variant={statusMap[service.status || "activo"]}>
+                        {statusLabels[service.status || "activo"]}
                       </StatusBadge>
                     </div>
                     <h3 className="mt-3 text-lg font-semibold text-foreground">

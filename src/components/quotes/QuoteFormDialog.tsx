@@ -164,7 +164,7 @@ export function QuoteFormDialog({ open, onOpenChange, quote }: QuoteFormDialogPr
       subtotal: totals.subtotal,
       iva_total: totals.iva,
       total: totals.total,
-      status: quote?.status || "draft" as const,
+      status: quote?.status || "borrador" as const,
     };
 
     const servicesData = serviceLines.map(line => {

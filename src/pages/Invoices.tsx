@@ -45,17 +45,17 @@ import {
 } from "@/components/ui/tooltip";
 
 const statusMap: Record<string, "active" | "pending" | "inactive" | "danger"> = {
-  draft: "inactive",
-  issued: "pending",
-  paid: "active",
-  cancelled: "danger",
+  borrador: "inactive",
+  emitida: "pending",
+  pagada: "active",
+  cancelada: "danger",
 };
 
 const statusLabels: Record<string, string> = {
-  draft: "Borrador",
-  issued: "Emitida",
-  paid: "Cobrada",
-  cancelled: "Cancelada",
+  borrador: "Borrador",
+  emitida: "Emitida",
+  pagada: "Cobrada",
+  cancelada: "Cancelada",
 };
 
 const formatCurrency = (amount: number | null) => {
@@ -362,11 +362,11 @@ export default function Invoices() {
   ];
 
   const totalEmitidas = invoices
-    .filter((i) => i.status === "issued")
+    .filter((i) => i.status === "emitida")
     .reduce((sum, i) => sum + (i.total || 0), 0);
 
   const totalCobrado = invoices
-    .filter((i) => i.status === "paid")
+    .filter((i) => i.status === "pagada")
     .reduce((sum, i) => sum + (i.total || 0), 0);
 
   return (
@@ -433,10 +433,10 @@ export default function Invoices() {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Todos</SelectItem>
-              <SelectItem value="draft">Borrador</SelectItem>
-              <SelectItem value="issued">Emitida</SelectItem>
-              <SelectItem value="paid">Cobrada</SelectItem>
-              <SelectItem value="cancelled">Cancelada</SelectItem>
+              <SelectItem value="borrador">Borrador</SelectItem>
+              <SelectItem value="emitida">Emitida</SelectItem>
+              <SelectItem value="pagada">Cobrada</SelectItem>
+              <SelectItem value="cancelada">Cancelada</SelectItem>
             </SelectContent>
           </Select>
           

@@ -31,22 +31,22 @@ import {
 } from "@/components/ui/alert-dialog";
 
 const statusMap: Record<string, "active" | "inactive"> = {
-  active: "active",
-  inactive: "inactive",
+  activo: "active",
+  inactivo: "inactive",
 };
 
 const segmentLabels: Record<string, string> = {
-  corporate: "Corporativo",
+  corporativo: "Corporativo",
   pyme: "PYME",
-  entrepreneur: "Autónomo",
-  individual: "Particular",
+  autonomo: "Autónomo",
+  particular: "Particular",
 };
 
 const segmentColors: Record<string, string> = {
-  corporate: "bg-primary/10 text-primary",
+  corporativo: "bg-primary/10 text-primary",
   pyme: "bg-success/10 text-success",
-  entrepreneur: "bg-warning/10 text-warning",
-  individual: "bg-muted text-muted-foreground",
+  autonomo: "bg-warning/10 text-warning",
+  particular: "bg-muted text-muted-foreground",
 };
 
 // Define ALL column configurations for visibility control (includes all DB fields)
@@ -218,8 +218,8 @@ export default function Clients() {
       key: "status",
       label: "Estado",
       render: (client: Client) => (
-        <StatusBadge variant={statusMap[client.status || "active"]}>
-          {client.status === "active" ? "Activo" : "Inactivo"}
+        <StatusBadge variant={statusMap[client.status || "activo"]}>
+          {client.status === "activo" ? "Activo" : "Inactivo"}
         </StatusBadge>
       ),
     },
@@ -265,7 +265,7 @@ export default function Clients() {
     },
   ];
 
-  const activeCount = clients?.filter((c) => c.status === "active").length || 0;
+  const activeCount = clients?.filter((c) => c.status === "activo").length || 0;
 
   if (error) {
     return <div className="p-6 text-destructive">Error al cargar clientes: {error.message}</div>;
@@ -298,7 +298,7 @@ export default function Clients() {
           <div className="bg-card rounded-lg border border-border p-4">
             <p className="text-sm text-muted-foreground">Corporativos</p>
             <p className="text-2xl font-semibold mt-1 text-primary">
-              {clients?.filter((c) => c.segment === "corporate").length || 0}
+              {clients?.filter((c) => c.segment === "corporativo").length || 0}
             </p>
           </div>
           <div className="bg-card rounded-lg border border-border p-4">
@@ -323,10 +323,10 @@ export default function Clients() {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Todos</SelectItem>
-              <SelectItem value="corporate">Corporativo</SelectItem>
+              <SelectItem value="corporativo">Corporativo</SelectItem>
               <SelectItem value="pyme">PYME</SelectItem>
-              <SelectItem value="entrepreneur">Autónomo</SelectItem>
-              <SelectItem value="individual">Particular</SelectItem>
+              <SelectItem value="autonomo">Autónomo</SelectItem>
+              <SelectItem value="particular">Particular</SelectItem>
             </SelectContent>
           </Select>
           <Select value={statusFilter} onValueChange={setStatusFilter}>
@@ -335,8 +335,8 @@ export default function Clients() {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Todos</SelectItem>
-              <SelectItem value="active">Activo</SelectItem>
-              <SelectItem value="inactive">Inactivo</SelectItem>
+              <SelectItem value="activo">Activo</SelectItem>
+              <SelectItem value="inactivo">Inactivo</SelectItem>
             </SelectContent>
           </Select>
           <div className="flex gap-2 ml-auto">

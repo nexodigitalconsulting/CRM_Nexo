@@ -44,39 +44,39 @@ import {
 } from "@/components/ui/tooltip";
 
 const statusMap: Record<string, "active" | "pending" | "inactive" | "danger"> = {
-  active: "active",
-  pending_activation: "pending",
-  expired: "danger",
-  cancelled: "inactive",
+  vigente: "active",
+  pendiente_activacion: "pending",
+  expirado: "danger",
+  cancelado: "inactive",
 };
 
 const paymentStatusMap: Record<string, "active" | "pending" | "danger"> = {
-  paid: "active",
-  pending: "pending",
-  partial: "pending",
-  claimed: "danger",
+  pagado: "active",
+  pendiente: "pending",
+  parcial: "pending",
+  reclamado: "danger",
 };
 
 const statusLabels: Record<string, string> = {
-  active: "Vigente",
-  pending_activation: "Pendiente",
-  expired: "Vencido",
-  cancelled: "Cancelado",
+  vigente: "Vigente",
+  pendiente_activacion: "Pendiente",
+  expirado: "Vencido",
+  cancelado: "Cancelado",
 };
 
 const paymentLabels: Record<string, string> = {
-  paid: "Pagado",
-  pending: "Pendiente",
-  partial: "Pago Parcial",
-  claimed: "Reclamado",
+  pagado: "Pagado",
+  pendiente: "Pendiente",
+  parcial: "Pago Parcial",
+  reclamado: "Reclamado",
 };
 
 const billingLabels: Record<string, string> = {
-  monthly: "Mensual",
-  quarterly: "Trimestral",
-  annual: "Anual",
-  one_time: "Puntual",
-  other: "Otro",
+  mensual: "Mensual",
+  trimestral: "Trimestral",
+  anual: "Anual",
+  unico: "Puntual",
+  otro: "Otro",
 };
 
 const columnConfigs: ColumnConfig[] = [
@@ -195,7 +195,7 @@ export default function Contracts() {
       label: "Facturación",
       render: (contract: ContractWithDetails) => (
         <span className="text-sm">
-          {billingLabels[contract.billing_period || "monthly"]}
+          {billingLabels[contract.billing_period || "mensual"]}
         </span>
       ),
     },
@@ -233,8 +233,8 @@ export default function Contracts() {
       key: "status",
       label: "Estado",
       render: (contract: ContractWithDetails) => (
-        <StatusBadge variant={statusMap[contract.status || "pending_activation"]}>
-          {statusLabels[contract.status || "pending_activation"]}
+        <StatusBadge variant={statusMap[contract.status || "pendiente_activacion"]}>
+          {statusLabels[contract.status || "pendiente_activacion"]}
         </StatusBadge>
       ),
     },
@@ -242,8 +242,8 @@ export default function Contracts() {
       key: "paymentStatus",
       label: "Estado Pago",
       render: (contract: ContractWithDetails) => (
-        <StatusBadge variant={paymentStatusMap[contract.payment_status || "pending"]}>
-          {paymentLabels[contract.payment_status || "pending"]}
+        <StatusBadge variant={paymentStatusMap[contract.payment_status || "pendiente"]}>
+          {paymentLabels[contract.payment_status || "pendiente"]}
         </StatusBadge>
       ),
     },
@@ -351,14 +351,14 @@ export default function Contracts() {
     },
   ];
 
-  const activeContracts = contracts.filter((c) => c.status === "active");
-  const pendingPayment = contracts.filter((c) => c.payment_status === "pending");
+  const activeContracts = contracts.filter((c) => c.status === "vigente");
+  const pendingPayment = contracts.filter((c) => c.payment_status === "pendiente");
   const expiringContracts = contracts.filter((c) => {
     if (!c.end_date) return false;
     const endDate = new Date(c.end_date);
     const thirtyDaysFromNow = new Date();
     thirtyDaysFromNow.setDate(thirtyDaysFromNow.getDate() + 30);
-    return endDate <= thirtyDaysFromNow && endDate >= new Date() && c.status === "active";
+    return endDate <= thirtyDaysFromNow && endDate >= new Date() && c.status === "vigente";
   });
 
   return (
@@ -417,10 +417,10 @@ export default function Contracts() {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Todos</SelectItem>
-              <SelectItem value="active">Vigente</SelectItem>
-              <SelectItem value="pending_activation">Pendiente</SelectItem>
-              <SelectItem value="expired">Vencido</SelectItem>
-              <SelectItem value="cancelled">Cancelado</SelectItem>
+              <SelectItem value="vigente">Vigente</SelectItem>
+              <SelectItem value="pendiente_activacion">Pendiente</SelectItem>
+              <SelectItem value="expirado">Vencido</SelectItem>
+              <SelectItem value="cancelado">Cancelado</SelectItem>
             </SelectContent>
           </Select>
           <Select value={billingFilter} onValueChange={setBillingFilter}>
@@ -429,10 +429,10 @@ export default function Contracts() {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Todas</SelectItem>
-              <SelectItem value="monthly">Mensual</SelectItem>
-              <SelectItem value="quarterly">Trimestral</SelectItem>
-              <SelectItem value="annual">Anual</SelectItem>
-              <SelectItem value="one_time">Puntual</SelectItem>
+              <SelectItem value="mensual">Mensual</SelectItem>
+              <SelectItem value="trimestral">Trimestral</SelectItem>
+              <SelectItem value="anual">Anual</SelectItem>
+              <SelectItem value="unico">Puntual</SelectItem>
             </SelectContent>
           </Select>
           <div className="flex gap-2 ml-auto">

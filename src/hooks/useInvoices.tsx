@@ -242,7 +242,7 @@ export function useUpdateInvoiceStatus() {
   const queryClient = useQueryClient();
   
   return useMutation({
-    mutationFn: async ({ id, status }: { id: string; status: "draft" | "issued" | "paid" | "cancelled" }) => {
+    mutationFn: async ({ id, status }: { id: string; status: "borrador" | "emitida" | "pagada" | "cancelada" }) => {
       const { data, error } = await supabase
         .from("invoices")
         .update({ status })
@@ -306,7 +306,7 @@ export function useContractsForInvoice() {
           status,
           client:clients(id, name, cif)
         `)
-        .in("status", ["active", "pending_activation"])
+        .in("status", ["vigente", "pendiente_activacion"])
         .order("contract_number", { ascending: false });
       
       if (error) throw error;

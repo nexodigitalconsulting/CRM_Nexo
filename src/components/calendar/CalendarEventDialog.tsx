@@ -38,7 +38,7 @@ export function CalendarEventDialog({ open, onOpenChange, event, defaultDate }: 
   const [endTime, setEndTime] = useState("10:00");
   const [allDay, setAllDay] = useState(false);
   const [categoryId, setCategoryId] = useState("");
-  const [importance, setImportance] = useState<"high" | "medium" | "low">("medium");
+  const [importance, setImportance] = useState<"alta" | "media" | "baja">("media");
   const [location, setLocation] = useState("");
   const [clientId, setClientId] = useState("");
   const [contactId, setContactId] = useState("");
@@ -74,7 +74,7 @@ export function CalendarEventDialog({ open, onOpenChange, event, defaultDate }: 
       setEndTime("10:00");
       setAllDay(false);
       setCategoryId("");
-      setImportance("medium");
+      setImportance("media");
       setLocation("");
       setClientId("");
       setContactId("");
@@ -148,7 +148,7 @@ export function CalendarEventDialog({ open, onOpenChange, event, defaultDate }: 
       end_datetime: endDatetime,
       all_day: allDay,
       category_id: categoryId || null,
-      importance: createAsAlert ? "high" : importance,
+      importance: createAsAlert ? "alta" : importance,
       location: location || null,
       client_id: clientId || null,
       contact_id: contactId || null,
@@ -274,14 +274,14 @@ export function CalendarEventDialog({ open, onOpenChange, event, defaultDate }: 
 
               <div className="space-y-2">
                 <Label>Importancia</Label>
-                <Select value={importance} onValueChange={(v: "high" | "medium" | "low") => setImportance(v)}>
+                <Select value={importance} onValueChange={(v: "alta" | "media" | "baja") => setImportance(v)}>
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="high">Alta</SelectItem>
-                    <SelectItem value="medium">Media</SelectItem>
-                    <SelectItem value="low">Baja</SelectItem>
+                    <SelectItem value="alta">Alta</SelectItem>
+                    <SelectItem value="media">Media</SelectItem>
+                    <SelectItem value="baja">Baja</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

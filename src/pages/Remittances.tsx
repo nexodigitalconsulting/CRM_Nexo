@@ -37,17 +37,17 @@ import {
 import { format } from "date-fns";
 
 const statusMap: Record<string, "active" | "pending" | "danger"> = {
-  paid: "active",
-  pending: "pending",
-  partial: "pending",
-  overdue: "danger",
+  cobrada: "active",
+  pendiente: "pending",
+  parcial: "pending",
+  vencida: "danger",
 };
 
 const statusLabels: Record<string, string> = {
-  paid: "Cobrada",
-  pending: "Pendiente",
-  partial: "Parcial",
-  overdue: "Vencida",
+  cobrada: "Cobrada",
+  pendiente: "Pendiente",
+  parcial: "Parcial",
+  vencida: "Vencida",
 };
 
 const formatCurrency = (amount: number) =>
@@ -84,7 +84,7 @@ export default function Remittances() {
         issue_date: format(new Date(), "yyyy-MM-dd"),
         invoice_count: selectedInvoices.length,
         total_amount: totalAmount,
-        status: "pending",
+        status: "pendiente",
       },
       invoiceIds: selectedInvoices,
     });
@@ -120,11 +120,11 @@ export default function Remittances() {
   ) || [];
 
   const totalPending = filteredRemittances
-    .filter((r) => r.status === "pending" || r.status === "partial")
+    .filter((r) => r.status === "pendiente" || r.status === "parcial")
     .reduce((sum, r) => sum + Number(r.total_amount || 0), 0);
 
   const totalPaid = filteredRemittances
-    .filter((r) => r.status === "paid")
+    .filter((r) => r.status === "cobrada")
     .reduce((sum, r) => sum + Number(r.total_amount || 0), 0);
 
   const columns = [
@@ -163,8 +163,8 @@ export default function Remittances() {
       key: "status",
       label: "Estado",
       render: (remittance: Remittance) => (
-        <StatusBadge variant={statusMap[remittance.status || "pending"]}>
-          {statusLabels[remittance.status || "pending"]}
+        <StatusBadge variant={statusMap[remittance.status || "pendiente"]}>
+          {statusLabels[remittance.status || "pendiente"]}
         </StatusBadge>
       ),
     },

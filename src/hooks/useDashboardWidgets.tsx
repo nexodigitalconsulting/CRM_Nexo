@@ -100,22 +100,22 @@ export function useDashboardStats() {
         },
         clients: {
           count: clients.count || 0,
-          active: clients.data?.filter((c) => c.status === "active").length || 0,
+          active: clients.data?.filter((c) => c.status === "activo").length || 0,
         },
         quotes: {
           count: quotes.count || 0,
-          pending: quotes.data?.filter((q) => q.status === "draft" || q.status === "sent").length || 0,
-          pendingAmount: quotes.data?.filter((q) => q.status === "draft" || q.status === "sent").reduce((sum, q) => sum + Number(q.total || 0), 0) || 0,
+          pending: quotes.data?.filter((q) => q.status === "borrador" || q.status === "enviado").length || 0,
+          pendingAmount: quotes.data?.filter((q) => q.status === "borrador" || q.status === "enviado").reduce((sum, q) => sum + Number(q.total || 0), 0) || 0,
         },
         invoices: {
           count: invoices.count || 0,
           monthlyTotal: monthlyInvoices.reduce((sum, inv) => sum + Number(inv.total || 0), 0),
-          pending: invoices.data?.filter((inv) => inv.status === "issued").length || 0,
+          pending: invoices.data?.filter((inv) => inv.status === "emitida").length || 0,
         },
         expenses: {
           count: expenses.count || 0,
           monthlyTotal: monthlyExpenses.reduce((sum, exp) => sum + Number(exp.total || 0), 0),
-          pending: expenses.data?.filter((exp) => exp.status === "pending").length || 0,
+          pending: expenses.data?.filter((exp) => exp.status === "pendiente").length || 0,
         },
       };
     },

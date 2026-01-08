@@ -65,7 +65,7 @@ export function useAvailableInvoicesForRemittance() {
           id, invoice_number, total, issue_date, due_date, status,
           client:clients(id, name, iban)
         `)
-        .eq("status", "issued")
+        .eq("status", "emitida")
         .is("remittance_id", null)
         .order("invoice_number", { ascending: false });
 
