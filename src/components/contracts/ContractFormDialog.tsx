@@ -254,17 +254,17 @@ export function ContractFormDialog({ open, onOpenChange, contract }: ContractFor
       let endDate = startDate;
       
       switch (value) {
-        case "monthly":
+        case "mensual":
           endDate = addMonths(startDate, 1);
           break;
-        case "quarterly":
+        case "trimestral":
           endDate = addMonths(startDate, 3);
           break;
-        case "annual":
+        case "anual":
           endDate = addYears(startDate, 1);
           break;
-        case "one_time":
-        case "other":
+        case "unico":
+        case "otro":
           endDate = addMonths(startDate, 1);
           break;
       }
