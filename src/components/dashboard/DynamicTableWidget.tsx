@@ -18,21 +18,21 @@ interface DynamicTableWidgetProps {
 }
 
 const statusMaps = {
-  clients: { active: "active", inactive: "inactive" },
-  contacts: { new: "new", contacted: "pending", follow_up: "pending", discarded: "inactive", converted: "active" },
-  contracts: { active: "active", pending_activation: "pending", expired: "danger", cancelled: "inactive" },
-  invoices: { draft: "inactive", issued: "pending", paid: "active", cancelled: "danger" },
-  quotes: { draft: "inactive", sent: "new", approved: "active", rejected: "danger" },
-  expenses: { pending: "pending", paid: "active", cancelled: "inactive" },
+  clients: { activo: "active", inactivo: "inactive" },
+  contacts: { nuevo: "new", contactado: "pending", seguimiento: "pending", descartado: "inactive", convertido: "active" },
+  contracts: { vigente: "active", pendiente_activacion: "pending", expirado: "danger", cancelado: "inactive" },
+  invoices: { borrador: "inactive", emitida: "pending", pagada: "active", cancelada: "danger" },
+  quotes: { borrador: "inactive", enviado: "new", aceptado: "active", rechazado: "danger" },
+  expenses: { pendiente: "pending", pagado: "active", cancelado: "inactive" },
 };
 
 const statusLabels: Record<string, Record<string, string>> = {
-  clients: { active: "Activo", inactive: "Inactivo" },
-  contacts: { new: "Nuevo", contacted: "Contactado", follow_up: "Seguimiento", discarded: "Descartado", converted: "Convertido" },
-  contracts: { active: "Vigente", pending_activation: "Pendiente", expired: "Vencido", cancelled: "Cancelado" },
-  invoices: { draft: "Borrador", issued: "Emitida", paid: "Cobrada", cancelled: "Cancelada" },
-  quotes: { draft: "Borrador", sent: "Enviado", approved: "Aprobado", rejected: "Rechazado" },
-  expenses: { pending: "Pendiente", paid: "Pagado", cancelled: "Cancelado" },
+  clients: { activo: "Activo", inactivo: "Inactivo" },
+  contacts: { nuevo: "Nuevo", contactado: "Contactado", seguimiento: "Seguimiento", descartado: "Descartado", convertido: "Convertido" },
+  contracts: { vigente: "Vigente", pendiente_activacion: "Pendiente", expirado: "Vencido", cancelado: "Cancelado" },
+  invoices: { borrador: "Borrador", emitida: "Emitida", pagada: "Cobrada", cancelada: "Cancelada" },
+  quotes: { borrador: "Borrador", enviado: "Enviado", aceptado: "Aprobado", rechazado: "Rechazado" },
+  expenses: { pendiente: "Pendiente", pagado: "Pagado", cancelado: "Cancelado" },
 };
 
 export function DynamicTableWidget({ title, entity }: DynamicTableWidgetProps) {

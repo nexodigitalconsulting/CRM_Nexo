@@ -128,9 +128,9 @@ export function useExpenseStats() {
       const stats = {
         total: data.length,
         totalAmount: data.reduce((sum, e) => sum + Number(e.total || 0), 0),
-        pending: data.filter((e) => e.status === "pending").reduce((sum, e) => sum + Number(e.total || 0), 0),
-        paid: data.filter((e) => e.status === "paid").reduce((sum, e) => sum + Number(e.total || 0), 0),
-        overdue: data.filter((e) => e.status === "overdue").length,
+        pending: data.filter((e) => e.status === "pendiente").reduce((sum, e) => sum + Number(e.total || 0), 0),
+        paid: data.filter((e) => e.status === "pagado").reduce((sum, e) => sum + Number(e.total || 0), 0),
+        overdue: data.filter((e) => e.status === "vencido").length,
         thisMonth: data.filter((e) => {
           const date = new Date(e.issue_date);
           return date.getMonth() === currentMonth && date.getFullYear() === currentYear;

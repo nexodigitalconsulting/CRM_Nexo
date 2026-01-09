@@ -21,10 +21,10 @@ const formatCurrency = (value: number) =>
   }).format(value);
 
 const statusConfig = {
-  draft: { label: "Borrador", color: "hsl(var(--muted-foreground))" },
-  sent: { label: "Enviado", color: "hsl(var(--primary))" },
-  approved: { label: "Aprobado", color: "hsl(var(--success))" },
-  rejected: { label: "Rechazado", color: "hsl(var(--destructive))" },
+  borrador: { label: "Borrador", color: "hsl(var(--muted-foreground))" },
+  enviado: { label: "Enviado", color: "hsl(var(--primary))" },
+  aceptado: { label: "Aprobado", color: "hsl(var(--success))" },
+  rechazado: { label: "Rechazado", color: "hsl(var(--destructive))" },
 };
 
 export function SalesPipelineChart() {
@@ -34,7 +34,7 @@ export function SalesPipelineChart() {
     if (!quotes) return [];
 
     const statusGroups = quotes.reduce((acc, quote) => {
-      const status = quote.status || "draft";
+      const status = quote.status || "borrador";
       if (!acc[status]) {
         acc[status] = { count: 0, total: 0 };
       }
