@@ -27,24 +27,24 @@ const formatDate = (dateStr: string) =>
   new Date(dateStr).toLocaleDateString("es-ES");
 
 const invoiceStatusMap: Record<string, "active" | "pending" | "inactive" | "danger"> = {
-  draft: "inactive",
-  issued: "pending",
-  paid: "active",
-  cancelled: "danger",
+  borrador: "inactive",
+  emitida: "pending",
+  pagada: "active",
+  cancelada: "danger",
 };
 
 const quoteStatusMap: Record<string, "inactive" | "new" | "active" | "danger"> = {
-  draft: "inactive",
-  sent: "new",
-  approved: "active",
-  rejected: "danger",
+  borrador: "inactive",
+  enviado: "new",
+  aceptado: "active",
+  rechazado: "danger",
 };
 
 const contractStatusMap: Record<string, "active" | "pending" | "inactive" | "danger"> = {
-  active: "active",
-  pending_activation: "pending",
-  expired: "inactive",
-  cancelled: "danger",
+  vigente: "active",
+  pendiente_activacion: "pending",
+  expirado: "inactive",
+  cancelado: "danger",
 };
 
 const invoiceColumnConfigs: ColumnConfig[] = [

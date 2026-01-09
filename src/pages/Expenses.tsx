@@ -29,15 +29,15 @@ import {
 } from "@/components/ui/dropdown-menu";
 
 const statusMap: Record<string, "active" | "pending" | "danger"> = {
-  paid: "active",
-  pending: "pending",
-  overdue: "danger",
+  pagado: "active",
+  pendiente: "pending",
+  vencido: "danger",
 };
 
 const statusLabels: Record<string, string> = {
-  paid: "Pagado",
-  pending: "Pendiente",
-  overdue: "Vencido",
+  pagado: "Pagado",
+  pendiente: "Pendiente",
+  vencido: "Vencido",
 };
 
 const formatCurrency = (amount: number) =>
@@ -207,8 +207,8 @@ export default function Expenses() {
       key: "status",
       label: "Estado",
       render: (expense: Expense) => (
-        <StatusBadge variant={statusMap[expense.status || "pending"]}>
-          {statusLabels[expense.status || "pending"]}
+        <StatusBadge variant={statusMap[expense.status || "pendiente"]}>
+          {statusLabels[expense.status || "pendiente"]}
         </StatusBadge>
       ),
     },

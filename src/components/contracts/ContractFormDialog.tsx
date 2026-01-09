@@ -498,10 +498,10 @@ export function ContractFormDialog({ open, onOpenChange, contract }: ContractFor
                               </SelectTrigger>
                             </FormControl>
                             <SelectContent>
-                              <SelectItem value="pending_activation">Pendiente de Activación</SelectItem>
-                              <SelectItem value="active">Vigente</SelectItem>
-                              <SelectItem value="expired">Vencido</SelectItem>
-                              <SelectItem value="cancelled">Cancelado</SelectItem>
+                              <SelectItem value="pendiente_activacion">Pendiente de Activación</SelectItem>
+                              <SelectItem value="vigente">Vigente</SelectItem>
+                              <SelectItem value="expirado">Vencido</SelectItem>
+                              <SelectItem value="cancelado">Cancelado</SelectItem>
                             </SelectContent>
                           </Select>
                           <FormMessage />
@@ -522,10 +522,10 @@ export function ContractFormDialog({ open, onOpenChange, contract }: ContractFor
                               </SelectTrigger>
                             </FormControl>
                             <SelectContent>
-                              <SelectItem value="pending">Pendiente</SelectItem>
-                              <SelectItem value="paid">Pagado</SelectItem>
-                              <SelectItem value="partial">Pago Parcial</SelectItem>
-                              <SelectItem value="claimed">Reclamado</SelectItem>
+                              <SelectItem value="pendiente">Pendiente</SelectItem>
+                              <SelectItem value="pagado">Pagado</SelectItem>
+                              <SelectItem value="parcial">Pago Parcial</SelectItem>
+                              <SelectItem value="reclamado">Reclamado</SelectItem>
                             </SelectContent>
                           </Select>
                           <FormMessage />
