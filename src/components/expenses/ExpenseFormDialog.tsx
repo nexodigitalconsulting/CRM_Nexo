@@ -42,7 +42,7 @@ const expenseSchema = z.object({
   iva_percent: z.coerce.number().min(0).max(100).default(21),
   irpf_percent: z.coerce.number().min(0).max(100).default(0),
   currency: z.string().default("EUR"),
-  status: z.string().default("pending"),
+  status: z.string().default("pendiente"),
   notes: z.string().max(1000).optional(),
 });
 
@@ -74,7 +74,7 @@ export function ExpenseFormDialog({ open, onOpenChange, expense }: ExpenseFormDi
       iva_percent: 21,
       irpf_percent: 0,
       currency: "EUR",
-      status: "pending",
+      status: "pendiente",
       notes: "",
     },
   });
@@ -94,7 +94,7 @@ export function ExpenseFormDialog({ open, onOpenChange, expense }: ExpenseFormDi
         iva_percent: Number(expense.iva_percent) || 21,
         irpf_percent: Number(expense.irpf_percent) || 0,
         currency: expense.currency || "EUR",
-        status: expense.status || "pending",
+        status: expense.status || "pendiente",
         notes: expense.notes || "",
       });
       } else {
@@ -111,7 +111,7 @@ export function ExpenseFormDialog({ open, onOpenChange, expense }: ExpenseFormDi
         iva_percent: 21,
         irpf_percent: 0,
         currency: "EUR",
-        status: "pending",
+        status: "pendiente",
         notes: "",
       });
     }
@@ -389,9 +389,9 @@ export function ExpenseFormDialog({ open, onOpenChange, expense }: ExpenseFormDi
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      <SelectItem value="pending">Pendiente</SelectItem>
-                      <SelectItem value="paid">Pagado</SelectItem>
-                      <SelectItem value="overdue">Vencido</SelectItem>
+                      <SelectItem value="pendiente">Pendiente</SelectItem>
+                      <SelectItem value="pagado">Pagado</SelectItem>
+                      <SelectItem value="vencido">Vencido</SelectItem>
                     </SelectContent>
                   </Select>
                   <FormMessage />

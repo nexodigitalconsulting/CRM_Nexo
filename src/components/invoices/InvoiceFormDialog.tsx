@@ -213,10 +213,10 @@ export function InvoiceFormDialog({ open, onOpenChange, invoice }: Props) {
   };
 
   const statusLabels: Record<string, string> = {
-    draft: "Borrador",
-    issued: "Emitida",
-    paid: "Cobrada",
-    cancelled: "Cancelada",
+    borrador: "Borrador",
+    emitida: "Emitida",
+    pagada: "Cobrada",
+    cancelada: "Cancelada",
   };
 
   return (
