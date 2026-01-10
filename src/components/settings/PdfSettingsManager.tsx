@@ -6,7 +6,6 @@ import { Switch } from "@/components/ui/switch";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import {
   Select,
@@ -40,13 +39,11 @@ import {
   useUpdatePdfTemplate,
   useDeletePdfTemplate,
   useSetDefaultTemplate,
-  PdfTemplate,
 } from "@/hooks/usePdfTemplates";
 import { 
-  Loader2, FileText, Palette, Eye, Save, Layout, Type, Image, 
-  CheckCircle, AlertCircle, PenTool, Plus, Trash2, Copy, Star,
-  Building2, User, Calendar, DollarSign, Hash, Mail, Phone, MapPin,
-  Table2, FileSignature, Settings2, Layers, Scale
+  Loader2, FileText, Palette, Eye, Save, Layout, Type, 
+  Plus, Trash2, Copy, Star,
+  FileSignature, Settings2, Layers, Scale
 } from "lucide-react";
 import { toast } from "sonner";
 import { PdfPreview } from "./PdfPreview";
@@ -63,364 +60,16 @@ const documentLabels: Record<DocumentType, string> = {
   contract: 'Contrato',
 };
 
-// Bloques HTML predefinidos
-const HTML_BLOCKS = {
-  common: [
-    {
-      id: 'company_header',
-      label: 'Cabecera Empresa',
-      icon: Building2,
-      category: 'header',
-      html: `<div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 30px;">
-  <div>
-    {{company_logo}}
-    <h2 style="margin: 10px 0 0 0; color: #333;">{{company_name}}</h2>
-  </div>
-  <div style="text-align: right; font-size: 12px; color: #666;">
-    <p style="margin: 4px 0;">{{company_address}}</p>
-    <p style="margin: 4px 0;">CIF: {{company_cif}}</p>
-    <p style="margin: 4px 0;">{{company_email}}</p>
-  </div>
-</div>`,
-    },
-    {
-      id: 'client_box',
-      label: 'Datos Cliente',
-      icon: User,
-      category: 'content',
-      html: `<div style="background: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0;">
-  <h3 style="margin: 0 0 10px 0; font-size: 12px; color: #666; text-transform: uppercase;">Cliente</h3>
-  <p style="margin: 4px 0; font-weight: bold;">{{client_name}}</p>
-  <p style="margin: 4px 0; font-size: 13px;">{{client_address}}</p>
-  <p style="margin: 4px 0; font-size: 13px;">CIF: {{client_cif}}</p>
-</div>`,
-    },
-    {
-      id: 'notes_section',
-      label: 'Notas / Observaciones',
-      icon: FileText,
-      category: 'content',
-      html: `<div style="margin: 30px 0; padding: 15px; background: #fffbeb; border-left: 4px solid #f59e0b;">
-  <h4 style="margin: 0 0 8px 0; font-size: 13px; color: #92400e;">Observaciones</h4>
-  <p style="margin: 0; font-size: 13px;">{{notes}}</p>
-</div>`,
-    },
-    {
-      id: 'footer',
-      label: 'Pie de Página',
-      icon: FileSignature,
-      category: 'footer',
-      html: `<div style="margin-top: 40px; padding-top: 20px; border-top: 1px solid #e5e7eb; text-align: center; font-size: 11px; color: #9ca3af;">
-  <p>{{company_name}} · {{company_address}}</p>
-  <p>IBAN: {{company_iban}}</p>
-</div>`,
-    },
-  ],
-  invoice: [
-    {
-      id: 'invoice_title',
-      label: 'Título Factura',
-      icon: FileText,
-      category: 'header',
-      html: `<div style="text-align: center; margin: 30px 0;">
-  <h1 style="margin: 0; color: {{primary_color}}; font-size: 28px;">FACTURA</h1>
-  <p style="margin: 8px 0 0 0; font-size: 16px; color: {{secondary_color}};">Nº {{invoice_number}}</p>
-</div>`,
-    },
-    {
-      id: 'invoice_dates',
-      label: 'Fechas Factura',
-      icon: Calendar,
-      category: 'content',
-      html: `<div style="display: flex; gap: 30px; margin: 20px 0;">
-  <div><span style="font-size: 12px; color: {{secondary_color}};">Fecha emisión:</span> <strong>{{issue_date}}</strong></div>
-  <div><span style="font-size: 12px; color: {{secondary_color}};">Vencimiento:</span> <strong>{{due_date}}</strong></div>
-</div>`,
-    },
-    {
-      id: 'services_table',
-      label: 'Tabla de Servicios',
-      icon: Table2,
-      category: 'table',
-      html: `<table style="width: 100%; border-collapse: collapse; margin: 25px 0;">
-  <thead>
-    <tr style="background: {{primary_color}}; color: white;">
-      <th style="padding: 12px; text-align: left;">Descripción</th>
-      <th style="padding: 12px; text-align: center; width: 60px;">Cant.</th>
-      <th style="padding: 12px; text-align: right; width: 100px;">Precio</th>
-      <th style="padding: 12px; text-align: right; width: 100px;">Total</th>
-    </tr>
-  </thead>
-  <tbody>{{services_rows}}</tbody>
-</table>`,
-    },
-    {
-      id: 'invoice_totals',
-      label: 'Totales Factura',
-      icon: DollarSign,
-      category: 'totals',
-      html: `<div style="margin-left: auto; width: 250px;">
-  <div style="display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #e5e7eb;">
-    <span style="color: {{secondary_color}};">Subtotal:</span><span>{{subtotal}}</span>
-  </div>
-  <div style="display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #e5e7eb;">
-    <span style="color: {{secondary_color}};">IVA ({{iva_percent}}%):</span><span>{{iva_amount}}</span>
-  </div>
-  <div style="display: flex; justify-content: space-between; padding: 12px 0; font-size: 18px; font-weight: bold; color: {{primary_color}};">
-    <span>TOTAL:</span><span>{{total}}</span>
-  </div>
-</div>`,
-    },
-  ],
-  quote: [
-    {
-      id: 'quote_title',
-      label: 'Título Presupuesto',
-      icon: FileText,
-      category: 'header',
-      html: `<div style="text-align: center; margin: 30px 0;">
-  <h1 style="margin: 0; color: {{primary_color}}; font-size: 28px;">PRESUPUESTO</h1>
-  <p style="margin: 8px 0 0 0; font-size: 16px; color: {{secondary_color}};">Nº {{quote_number}}</p>
-</div>`,
-    },
-    {
-      id: 'quote_dates',
-      label: 'Fechas Presupuesto',
-      icon: Calendar,
-      category: 'content',
-      html: `<div style="display: flex; gap: 30px; margin: 20px 0; padding: 15px; background: #f0fdf4; border-radius: 8px;">
-  <div><span style="font-size: 12px; color: {{secondary_color}};">Fecha:</span> <strong>{{quote_date}}</strong></div>
-  <div><span style="font-size: 12px; color: {{secondary_color}};">Válido hasta:</span> <strong>{{valid_until}}</strong></div>
-</div>`,
-    },
-    {
-      id: 'quote_services_table',
-      label: 'Tabla de Servicios',
-      icon: Table2,
-      category: 'table',
-      html: `<table style="width: 100%; border-collapse: collapse; margin: 25px 0;">
-  <thead>
-    <tr style="background: {{primary_color}}; color: white;">
-      <th style="padding: 12px; text-align: left;">Servicio</th>
-      <th style="padding: 12px; text-align: center; width: 60px;">Cant.</th>
-      <th style="padding: 12px; text-align: right; width: 100px;">Precio</th>
-      <th style="padding: 12px; text-align: right; width: 100px;">Total</th>
-    </tr>
-  </thead>
-  <tbody>{{services_rows}}</tbody>
-</table>`,
-    },
-    {
-      id: 'quote_totals',
-      label: 'Totales Presupuesto',
-      icon: DollarSign,
-      category: 'totals',
-      html: `<div style="margin-left: auto; width: 250px;">
-  <div style="display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #e5e7eb;">
-    <span style="color: {{secondary_color}};">Subtotal:</span><span>{{subtotal}}</span>
-  </div>
-  <div style="display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #e5e7eb;">
-    <span style="color: {{secondary_color}};">IVA:</span><span>{{iva_total}}</span>
-  </div>
-  <div style="display: flex; justify-content: space-between; padding: 12px 0; font-size: 18px; font-weight: bold; color: {{primary_color}};">
-    <span>TOTAL:</span><span>{{total}}</span>
-  </div>
-</div>`,
-    },
-  ],
-  // NOTA: Los contratos usan ContractPdfPreview + contractPdf.ts (pdf-lib)
-  // Los bloques HTML no se usan para contratos - se usa PdfConfig
-  contract: [],
-};
-
-// Variables disponibles
-const VARIABLES = {
-  common: [
-    { key: 'company_name', label: 'Nombre empresa', icon: Building2 },
-    { key: 'company_cif', label: 'CIF empresa', icon: Hash },
-    { key: 'company_address', label: 'Dirección empresa', icon: MapPin },
-    { key: 'company_email', label: 'Email empresa', icon: Mail },
-    { key: 'company_phone', label: 'Teléfono empresa', icon: Phone },
-    { key: 'company_iban', label: 'IBAN empresa', icon: DollarSign },
-    { key: 'company_logo', label: 'Logo empresa', icon: Image },
-    { key: 'client_name', label: 'Nombre cliente', icon: User },
-    { key: 'client_cif', label: 'CIF cliente', icon: Hash },
-    { key: 'client_address', label: 'Dirección cliente', icon: MapPin },
-    { key: 'client_email', label: 'Email cliente', icon: Mail },
-    { key: 'primary_color', label: 'Color primario', icon: Palette },
-    { key: 'secondary_color', label: 'Color secundario', icon: Palette },
-  ],
-  invoice: [
-    { key: 'invoice_number', label: 'Nº Factura', icon: Hash },
-    { key: 'issue_date', label: 'Fecha emisión', icon: Calendar },
-    { key: 'due_date', label: 'Vencimiento', icon: Calendar },
-    { key: 'subtotal', label: 'Subtotal', icon: DollarSign },
-    { key: 'iva_percent', label: '% IVA', icon: DollarSign },
-    { key: 'iva_amount', label: 'IVA', icon: DollarSign },
-    { key: 'total', label: 'Total', icon: DollarSign },
-    { key: 'notes', label: 'Notas', icon: FileText },
-  ],
-  contract: [
-    { key: 'contract_number', label: 'Nº Contrato', icon: Hash },
-    { key: 'start_date', label: 'Fecha inicio', icon: Calendar },
-    { key: 'end_date', label: 'Fecha fin', icon: Calendar },
-    { key: 'billing_period', label: 'Periodicidad', icon: Calendar },
-    { key: 'subtotal', label: 'Subtotal', icon: DollarSign },
-    { key: 'iva_amount', label: 'IVA', icon: DollarSign },
-    { key: 'total', label: 'Total', icon: DollarSign },
-  ],
-  quote: [
-    { key: 'quote_number', label: 'Nº Presupuesto', icon: Hash },
-    { key: 'quote_date', label: 'Fecha', icon: Calendar },
-    { key: 'valid_until', label: 'Válido hasta', icon: Calendar },
-    { key: 'subtotal', label: 'Subtotal', icon: DollarSign },
-    { key: 'iva_total', label: 'IVA', icon: DollarSign },
-    { key: 'total', label: 'Total', icon: DollarSign },
-    { key: 'notes', label: 'Notas', icon: FileText },
-  ],
-};
-
-// Plantillas predeterminadas por tipo
-const getDefaultTemplate = (type: DocumentType, primaryColor: string, secondaryColor: string): string => {
-  const templates: Record<DocumentType, string> = {
-    invoice: `<div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 40px; color: #1f2937;">
-  <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 30px;">
-    <div>{{company_logo}}<h2 style="margin: 10px 0 0 0; color: #333;">{{company_name}}</h2></div>
-    <div style="text-align: right; font-size: 12px; color: ${secondaryColor};">
-      <p style="margin: 4px 0;">{{company_address}}</p>
-      <p style="margin: 4px 0;">CIF: {{company_cif}}</p>
-      <p style="margin: 4px 0;">{{company_email}}</p>
-    </div>
-  </div>
-  <div style="text-align: center; margin: 30px 0;">
-    <h1 style="margin: 0; color: ${primaryColor}; font-size: 28px;">FACTURA</h1>
-    <p style="margin: 8px 0 0 0; font-size: 16px; color: ${secondaryColor};">Nº {{invoice_number}}</p>
-  </div>
-  <div style="display: flex; gap: 30px; margin: 20px 0;">
-    <div><span style="font-size: 12px; color: ${secondaryColor};">Fecha emisión:</span> <strong>{{issue_date}}</strong></div>
-    <div><span style="font-size: 12px; color: ${secondaryColor};">Vencimiento:</span> <strong>{{due_date}}</strong></div>
-  </div>
-  <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0;">
-    <h3 style="margin: 0 0 10px 0; font-size: 12px; color: ${secondaryColor}; text-transform: uppercase;">Cliente</h3>
-    <p style="margin: 4px 0; font-weight: bold;">{{client_name}}</p>
-    <p style="margin: 4px 0; font-size: 13px;">{{client_address}}</p>
-    <p style="margin: 4px 0; font-size: 13px;">CIF: {{client_cif}}</p>
-  </div>
-  <table style="width: 100%; border-collapse: collapse; margin: 25px 0;">
-    <thead>
-      <tr style="background: ${primaryColor}; color: white;">
-        <th style="padding: 12px; text-align: left;">Descripción</th>
-        <th style="padding: 12px; text-align: center; width: 60px;">Cant.</th>
-        <th style="padding: 12px; text-align: right; width: 100px;">Precio</th>
-        <th style="padding: 12px; text-align: right; width: 100px;">Total</th>
-      </tr>
-    </thead>
-    <tbody>{{services_rows}}</tbody>
-  </table>
-  <div style="margin-left: auto; width: 250px;">
-    <div style="display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #e5e7eb;">
-      <span style="color: ${secondaryColor};">Subtotal:</span><span>{{subtotal}}</span>
-    </div>
-    <div style="display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #e5e7eb;">
-      <span style="color: ${secondaryColor};">IVA ({{iva_percent}}%):</span><span>{{iva_amount}}</span>
-    </div>
-    <div style="display: flex; justify-content: space-between; padding: 12px 0; font-size: 18px; font-weight: bold; color: ${primaryColor};">
-      <span>TOTAL:</span><span>{{total}}</span>
-    </div>
-  </div>
-  <div style="margin-top: 40px; padding-top: 20px; border-top: 1px solid #e5e7eb; text-align: center; font-size: 11px; color: #9ca3af;">
-    <p>{{company_name}} · {{company_address}}</p>
-    <p>IBAN: {{company_iban}}</p>
-  </div>
-</div>`,
-    quote: `<div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 40px; color: #1f2937;">
-  <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 30px;">
-    <div>{{company_logo}}<h2 style="margin: 10px 0 0 0; color: #333;">{{company_name}}</h2></div>
-    <div style="text-align: right; font-size: 12px; color: ${secondaryColor};">
-      <p style="margin: 4px 0;">{{company_address}}</p>
-      <p style="margin: 4px 0;">CIF: {{company_cif}}</p>
-    </div>
-  </div>
-  <div style="text-align: center; margin: 30px 0;">
-    <h1 style="margin: 0; color: ${primaryColor}; font-size: 28px;">PRESUPUESTO</h1>
-    <p style="margin: 8px 0 0 0; font-size: 16px; color: ${secondaryColor};">Nº {{quote_number}}</p>
-  </div>
-  <div style="display: flex; gap: 30px; margin: 20px 0; padding: 15px; background: #f0fdf4; border-radius: 8px;">
-    <div><span style="font-size: 12px; color: ${secondaryColor};">Fecha:</span> <strong>{{quote_date}}</strong></div>
-    <div><span style="font-size: 12px; color: ${secondaryColor};">Válido hasta:</span> <strong>{{valid_until}}</strong></div>
-  </div>
-  <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0;">
-    <h3 style="margin: 0 0 10px 0; font-size: 12px; color: ${secondaryColor}; text-transform: uppercase;">Cliente</h3>
-    <p style="margin: 4px 0; font-weight: bold;">{{client_name}}</p>
-    <p style="margin: 4px 0; font-size: 13px;">{{client_address}}</p>
-    <p style="margin: 4px 0; font-size: 13px;">CIF: {{client_cif}}</p>
-  </div>
-  <table style="width: 100%; border-collapse: collapse; margin: 25px 0;">
-    <thead>
-      <tr style="background: ${primaryColor}; color: white;">
-        <th style="padding: 12px; text-align: left;">Servicio</th>
-        <th style="padding: 12px; text-align: center; width: 60px;">Cant.</th>
-        <th style="padding: 12px; text-align: right; width: 100px;">Precio</th>
-        <th style="padding: 12px; text-align: right; width: 100px;">Total</th>
-      </tr>
-    </thead>
-    <tbody>{{services_rows}}</tbody>
-  </table>
-  <div style="margin-left: auto; width: 250px;">
-    <div style="display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #e5e7eb;">
-      <span style="color: ${secondaryColor};">Subtotal:</span><span>{{subtotal}}</span>
-    </div>
-    <div style="display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #e5e7eb;">
-      <span style="color: ${secondaryColor};">IVA:</span><span>{{iva_total}}</span>
-    </div>
-    <div style="display: flex; justify-content: space-between; padding: 12px 0; font-size: 18px; font-weight: bold; color: ${primaryColor};">
-      <span>TOTAL:</span><span>{{total}}</span>
-    </div>
-  </div>
-</div>`,
-    contract: `<div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 40px; color: #1f2937;">
-  <div style="text-align: center; margin: 30px 0; padding: 20px; background: ${primaryColor}; color: white; border-radius: 8px;">
-    <h1 style="margin: 0; font-size: 24px;">CONTRATO DE SERVICIOS</h1>
-    <p style="margin: 8px 0 0 0; opacity: 0.9;">Nº {{contract_number}}</p>
-  </div>
-  <div style="margin: 30px 0;">
-    <h2 style="font-size: 16px; border-bottom: 2px solid ${primaryColor}; padding-bottom: 8px;">PARTES CONTRATANTES</h2>
-    <p><strong>PRESTADOR:</strong> {{company_name}}, con CIF {{company_cif}}, domiciliada en {{company_address}}.</p>
-    <p><strong>CLIENTE:</strong> {{client_name}}, con CIF {{client_cif}}, domiciliada en {{client_address}}.</p>
-  </div>
-  <div style="margin: 30px 0;">
-    <h2 style="font-size: 16px; border-bottom: 2px solid ${primaryColor}; padding-bottom: 8px;">DURACIÓN Y VIGENCIA</h2>
-    <p>El presente contrato tendrá vigencia desde <strong>{{start_date}}</strong> hasta <strong>{{end_date}}</strong>.</p>
-    <p>Periodicidad de facturación: <strong>{{billing_period}}</strong></p>
-  </div>
-  <div style="margin: 30px 0; padding: 20px; background: #f9fafb; border-radius: 8px;">
-    <h2 style="font-size: 16px; margin: 0 0 15px 0;">CONDICIONES ECONÓMICAS</h2>
-    <p><span style="color: ${secondaryColor};">Subtotal:</span> <strong>{{subtotal}}</strong></p>
-    <p><span style="color: ${secondaryColor};">IVA:</span> <strong>{{iva_amount}}</strong></p>
-    <p style="font-size: 18px; color: ${primaryColor};"><strong>TOTAL: {{total}}</strong></p>
-  </div>
-  <div style="margin-top: 60px; display: flex; justify-content: space-around;">
-    <div style="text-align: center;">
-      <div style="width: 200px; border-bottom: 1px solid #000; height: 60px;"></div>
-      <p style="margin-top: 8px;">El Prestador</p>
-      <p style="font-size: 12px; color: ${secondaryColor};">{{company_name}}</p>
-    </div>
-    <div style="text-align: center;">
-      <div style="width: 200px; border-bottom: 1px solid #000; height: 60px;"></div>
-      <p style="margin-top: 8px;">El Cliente</p>
-      <p style="font-size: 12px; color: ${secondaryColor};">{{client_name}}</p>
-    </div>
-  </div>
-</div>`,
-  };
-  return templates[type];
+const defaultTitles: Record<DocumentType, string> = {
+  invoice: 'FACTURA',
+  quote: 'PRESUPUESTO',
+  contract: 'CONTRATO',
 };
 
 export function PdfSettingsManager() {
   const { data: companySettings } = useCompanySettings();
   const [selectedDocument, setSelectedDocument] = useState<DocumentType>('invoice');
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
-  const [editedContent, setEditedContent] = useState<string>('');
   const [editedName, setEditedName] = useState<string>('');
   const [primaryColor, setPrimaryColor] = useState('#3366cc');
   const [secondaryColor, setSecondaryColor] = useState('#666666');
@@ -464,7 +113,38 @@ export function PdfSettingsManager() {
 
   const selectedTemplate = templates.find(t => t.id === selectedTemplateId);
 
-  // Load extended config when template is selected
+  // Build the current PdfConfig from state
+  const currentConfig: PdfConfig = {
+    primary_color: primaryColor,
+    secondary_color: secondaryColor,
+    accent_color: primaryColor,
+    show_logo: true,
+    logo_position: 'left',
+    show_iban_footer: true,
+    show_notes: true,
+    show_discounts_column: false,
+    header_style: 'classic',
+    font_size_base: 10,
+    title_text: titleText,
+    title_size: titleSize,
+    client_box_color: clientBoxColor,
+    table_header_color: tableHeaderColor,
+    show_footer_legal: showFooterLegal,
+    footer_legal_lines: footerLegalText.split('\n').filter(line => line.trim()),
+    line_spacing: lineSpacing,
+    section_spacing: sectionSpacing,
+    row_height: rowHeight,
+    client_box_padding: clientBoxPadding,
+    margins: docMargins,
+    show_table_borders: showTableBorders,
+    table_border_color: tableBorderColor,
+    show_totals_lines: showTotalsLines,
+    totals_line_color: totalsLineColor,
+    sections: sections,
+    legal_clauses: selectedDocument === 'contract' ? legalClauses : undefined,
+  };
+
+  // Load config from template content
   const loadExtendedConfig = useCallback((content: string) => {
     const templateData = { content, id: '', name: '', entity_type: selectedDocument, variables: null, is_default: false, is_active: true, created_at: '', updated_at: '' };
     const config = extractPdfConfigFromTemplate(templateData as any);
@@ -478,29 +158,24 @@ export function PdfSettingsManager() {
     setShowFooterLegal(config.show_footer_legal ?? false);
     if (config.footer_legal_lines) setFooterLegalText(config.footer_legal_lines.join('\n'));
     
-    // Load spacing settings
     if (config.line_spacing) setLineSpacing(config.line_spacing);
     if (config.section_spacing) setSectionSpacing(config.section_spacing);
     if (config.row_height) setRowHeight(config.row_height);
     if (config.client_box_padding) setClientBoxPadding(config.client_box_padding);
     if (config.margins) setDocMargins(config.margins);
 
-    // Load table border settings
     setShowTableBorders(config.show_table_borders ?? true);
     if (config.table_border_color) setTableBorderColor(config.table_border_color);
 
-    // Load totals separator settings
     setShowTotalsLines(config.show_totals_lines ?? true);
     if (config.totals_line_color) setTotalsLineColor(config.totals_line_color);
 
-    // Load section-based configuration
     if (config.sections) {
       setSections({ ...getDefaultSections(), ...config.sections });
     } else {
       setSections(getDefaultSections());
     }
     
-    // Load legal clauses for contracts
     if (config.legal_clauses) {
       setLegalClauses(config.legal_clauses);
     } else {
@@ -508,72 +183,38 @@ export function PdfSettingsManager() {
     }
   }, [selectedDocument]);
 
-  // Seleccionar plantilla predeterminada al cargar
+  // Select default template on load
   useEffect(() => {
     if (templates.length > 0 && !selectedTemplateId) {
       const defaultTemplate = templates.find(t => t.is_default) || templates[0];
       setSelectedTemplateId(defaultTemplate.id);
-      setEditedContent(defaultTemplate.content);
       setEditedName(defaultTemplate.name);
       loadExtendedConfig(defaultTemplate.content);
     }
   }, [templates, selectedTemplateId, loadExtendedConfig]);
 
-  // Resetear selección cuando cambia el tipo de documento
+  // Reset when document type changes
   useEffect(() => {
     setSelectedTemplateId(null);
     setHasUnsavedChanges(false);
-    // Reset title based on document type
-    const defaultTitles: Record<DocumentType, string> = {
-      invoice: 'FACTURA',
-      quote: 'PRESUPUESTO',
-      contract: 'CONTRATO'
-    };
     setTitleText(defaultTitles[selectedDocument]);
   }, [selectedDocument]);
-
-  // Legacy function for backward compatibility
-  const extractColorsFromContent = (content: string) => {
-    loadExtendedConfig(content);
-  };
-
-  // Actualizar colores en el contenido
-  const updateColorsInContent = useCallback((content: string, primary: string, secondary: string): string => {
-    // Reemplazar colores primarios típicos
-    let updated = content.replace(/#4f46e5/gi, primary);
-    updated = updated.replace(/#3366cc/gi, primary);
-    updated = updated.replace(/#059669/gi, primary);
-    // Reemplazar colores secundarios
-    updated = updated.replace(/#6b7280/gi, secondary);
-    updated = updated.replace(/#666666/gi, secondary);
-    return updated;
-  }, []);
 
   const handleTemplateSelect = (templateId: string) => {
     const template = templates.find(t => t.id === templateId);
     if (template) {
       setSelectedTemplateId(templateId);
-      setEditedContent(template.content);
       setEditedName(template.name);
-      extractColorsFromContent(template.content);
+      loadExtendedConfig(template.content);
       setHasUnsavedChanges(false);
     }
-  };
-
-  const handleContentChange = (content: string) => {
-    setEditedContent(content);
-    setHasUnsavedChanges(true);
   };
 
   const handleColorChange = (type: 'primary' | 'secondary', color: string) => {
     if (type === 'primary') {
       setPrimaryColor(color);
-      const updated = updateColorsInContent(editedContent, color, secondaryColor);
-      setEditedContent(updated);
     } else {
       setSecondaryColor(color);
-      const updated = updateColorsInContent(editedContent, primaryColor, color);
-      setEditedContent(updated);
     }
     setHasUnsavedChanges(true);
   };
@@ -581,45 +222,8 @@ export function PdfSettingsManager() {
   const handleSave = async () => {
     if (!selectedTemplateId) return;
     try {
-      // Create PDF_CONFIG from current settings including extended parameters
-      const pdfConfig: PdfConfig = {
-        primary_color: primaryColor,
-        secondary_color: secondaryColor,
-        accent_color: primaryColor,
-        show_logo: true,
-        logo_position: 'left',
-        show_iban_footer: editedContent.includes('{{company_iban}}'),
-        show_notes: editedContent.includes('{{notes}}'),
-        show_discounts_column: editedContent.includes('{{discount'),
-        header_style: 'classic',
-        font_size_base: 10,
-        // Extended parameters
-        title_text: titleText,
-        title_size: titleSize,
-        client_box_color: clientBoxColor,
-        table_header_color: tableHeaderColor,
-        show_footer_legal: showFooterLegal,
-        footer_legal_lines: footerLegalText.split('\n').filter(line => line.trim()),
-        // Spacing parameters
-        line_spacing: lineSpacing,
-        section_spacing: sectionSpacing,
-        row_height: rowHeight,
-        client_box_padding: clientBoxPadding,
-        margins: docMargins,
-        // Table borders
-        show_table_borders: showTableBorders,
-        table_border_color: tableBorderColor,
-        // Totals
-        show_totals_lines: showTotalsLines,
-        totals_line_color: totalsLineColor,
-        // Section-based configuration
-        sections: sections,
-        // Contract-specific: legal clauses
-        legal_clauses: selectedDocument === 'contract' ? legalClauses : undefined,
-      };
-
-      // Embed PDF_CONFIG comment in the content for reliable extraction
-      const contentWithConfig = embedPdfConfigInTemplate(editedContent, pdfConfig);
+      // Create minimal content with embedded PDF_CONFIG
+      const contentWithConfig = embedPdfConfigInTemplate('', currentConfig);
 
       await updateTemplate.mutateAsync({
         id: selectedTemplateId,
@@ -629,13 +233,12 @@ export function PdfSettingsManager() {
         },
       });
       
-      // Update local content with the embedded config
-      setEditedContent(contentWithConfig);
       setHasUnsavedChanges(false);
-      console.log('[PdfSettingsManager] Saved template with PDF_CONFIG:', pdfConfig);
-      toast.success('Plantilla actualizada');
+      console.log('[PdfSettingsManager] Saved template with PDF_CONFIG:', currentConfig);
+      toast.success('Plantilla guardada correctamente');
     } catch (error) {
       console.error('Error saving template:', error);
+      toast.error('Error al guardar la plantilla');
     }
   };
 
@@ -645,7 +248,14 @@ export function PdfSettingsManager() {
       return;
     }
     try {
-      const defaultContent = getDefaultTemplate(selectedDocument, primaryColor, secondaryColor);
+      const defaultConfig: PdfConfig = {
+        primary_color: '#3366cc',
+        secondary_color: '#666666',
+        title_text: defaultTitles[selectedDocument],
+        sections: getDefaultSections(),
+      };
+      const defaultContent = embedPdfConfigInTemplate('', defaultConfig);
+      
       await createTemplate.mutateAsync({
         name: newTemplateName,
         entity_type: selectedDocument,
@@ -654,20 +264,24 @@ export function PdfSettingsManager() {
       });
       setNewTemplateName('');
       setShowNewDialog(false);
+      toast.success('Plantilla creada');
     } catch (error) {
       console.error('Error creating template:', error);
+      toast.error('Error al crear la plantilla');
     }
   };
 
   const handleDuplicate = async () => {
     if (!selectedTemplate) return;
     try {
+      const contentWithConfig = embedPdfConfigInTemplate('', currentConfig);
       await createTemplate.mutateAsync({
         name: `${selectedTemplate.name} (copia)`,
         entity_type: selectedDocument,
-        content: editedContent,
+        content: contentWithConfig,
         is_default: false,
       });
+      toast.success('Plantilla duplicada');
     } catch (error) {
       console.error('Error duplicating template:', error);
     }
@@ -679,6 +293,7 @@ export function PdfSettingsManager() {
       await deleteTemplate.mutateAsync(selectedTemplateId);
       setSelectedTemplateId(null);
       setShowDeleteDialog(false);
+      toast.success('Plantilla eliminada');
     } catch (error) {
       console.error('Error deleting template:', error);
     }
@@ -691,28 +306,11 @@ export function PdfSettingsManager() {
         id: selectedTemplateId,
         entityType: selectedDocument,
       });
+      toast.success('Plantilla establecida como predeterminada');
     } catch (error) {
       console.error('Error setting default:', error);
     }
   };
-
-  const handleInsertBlock = (html: string) => {
-    const colorizedHtml = html
-      .replace(/\{\{primary_color\}\}/g, primaryColor)
-      .replace(/\{\{secondary_color\}\}/g, secondaryColor);
-    setEditedContent(prev => prev + '\n\n' + colorizedHtml);
-    setHasUnsavedChanges(true);
-    toast.success('Bloque insertado');
-  };
-
-  const handleInsertVariable = (variable: string) => {
-    setEditedContent(prev => prev + `{{${variable}}}`);
-    setHasUnsavedChanges(true);
-  };
-
-  const hasLogo = !!companySettings?.logo_url;
-  const allBlocks = [...HTML_BLOCKS.common, ...(HTML_BLOCKS[selectedDocument] || [])];
-  const allVariables = [...VARIABLES.common, ...(VARIABLES[selectedDocument] || [])];
 
   if (isLoading) {
     return (
@@ -735,17 +333,24 @@ export function PdfSettingsManager() {
             Personaliza las plantillas para facturas, presupuestos y contratos
           </p>
         </div>
-        <Button 
-          onClick={handleSave} 
-          disabled={updateTemplate.isPending || !hasUnsavedChanges} 
-          className="gap-2"
-        >
-          {updateTemplate.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-          Guardar cambios
-        </Button>
+        <div className="flex items-center gap-2">
+          {hasUnsavedChanges && (
+            <Badge variant="outline" className="text-amber-600 border-amber-300 bg-amber-50">
+              Cambios sin guardar
+            </Badge>
+          )}
+          <Button 
+            onClick={handleSave} 
+            disabled={updateTemplate.isPending || !hasUnsavedChanges} 
+            className="gap-2"
+          >
+            {updateTemplate.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+            Guardar
+          </Button>
+        </div>
       </div>
 
-      {/* 1. Document Type Selector */}
+      {/* Document Type Selector */}
       <Card>
         <CardHeader className="pb-3">
           <CardTitle className="text-base flex items-center gap-2">
@@ -769,7 +374,7 @@ export function PdfSettingsManager() {
         </CardContent>
       </Card>
 
-      {/* 2. Template Selector */}
+      {/* Template Selector */}
       <Card>
         <CardHeader className="pb-3">
           <CardTitle className="text-base flex items-center gap-2">
@@ -824,25 +429,17 @@ export function PdfSettingsManager() {
                 <Star className="h-3 w-3 fill-current" /> Predeterminada
               </Badge>
             )}
-
-            {hasUnsavedChanges && (
-              <Badge variant="outline" className="text-amber-600 border-amber-300">
-                Cambios sin guardar
-              </Badge>
-            )}
           </div>
         </CardContent>
       </Card>
 
-      {/* 3. Editor Tabs + Preview */}
+      {/* Editor + Preview */}
       {selectedTemplate && (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Editor Panel */}
           <div className="lg:col-span-2">
-            {/* Para contratos: solo tabs relevantes (Secciones, Cláusulas, Colores, Diseño) */}
-            {/* Para facturas/presupuestos: todas las tabs */}
             <Tabs defaultValue="sections" className="w-full">
-              <TabsList className={`grid w-full ${selectedDocument === 'contract' ? 'grid-cols-4' : 'grid-cols-6'}`}>
+              <TabsList className={`grid w-full ${selectedDocument === 'contract' ? 'grid-cols-4' : 'grid-cols-3'}`}>
                 <TabsTrigger value="sections" className="gap-1">
                   <Layers className="h-4 w-4" />
                   <span className="hidden sm:inline">Secciones</span>
@@ -861,22 +458,9 @@ export function PdfSettingsManager() {
                   <Settings2 className="h-4 w-4" />
                   <span className="hidden sm:inline">Diseño</span>
                 </TabsTrigger>
-                {/* Variables y Bloques solo para facturas/presupuestos (usan HTML templates) */}
-                {selectedDocument !== 'contract' && (
-                  <>
-                    <TabsTrigger value="content" className="gap-1">
-                      <Layout className="h-4 w-4" />
-                      <span className="hidden sm:inline">Variables</span>
-                    </TabsTrigger>
-                    <TabsTrigger value="blocks" className="gap-1">
-                      <Table2 className="h-4 w-4" />
-                      <span className="hidden sm:inline">Bloques</span>
-                    </TabsTrigger>
-                  </>
-                )}
               </TabsList>
 
-              {/* Secciones - Nueva pestaña */}
+              {/* Sections Tab */}
               <TabsContent value="sections" className="mt-4">
                 <PdfSectionEditor 
                   sections={sections} 
@@ -888,7 +472,7 @@ export function PdfSettingsManager() {
                 />
               </TabsContent>
 
-              {/* Cláusulas Legales - Solo para contratos */}
+              {/* Clauses Tab - Contracts only */}
               {selectedDocument === 'contract' && (
                 <TabsContent value="clauses" className="mt-4">
                   <Card>
@@ -905,7 +489,7 @@ export function PdfSettingsManager() {
                 </TabsContent>
               )}
 
-              {/* Colores */}
+              {/* Colors Tab */}
               <TabsContent value="colors" className="mt-4">
                 <Card>
                   <CardContent className="pt-6 space-y-6">
@@ -976,11 +560,11 @@ export function PdfSettingsManager() {
                 </Card>
               </TabsContent>
 
-              {/* Diseño Avanzado */}
+              {/* Design Tab */}
               <TabsContent value="design" className="mt-4">
                 <Card>
                   <CardContent className="pt-6 space-y-6">
-                    {/* Título */}
+                    {/* Title */}
                     <div className="space-y-4">
                       <h4 className="font-medium text-sm flex items-center gap-2">
                         <Type className="h-4 w-4" />
@@ -1015,7 +599,7 @@ export function PdfSettingsManager() {
                       </div>
                     </div>
 
-                    {/* Colores de elementos */}
+                    {/* Element Colors */}
                     <div className="space-y-4">
                       <h4 className="font-medium text-sm flex items-center gap-2">
                         <Palette className="h-4 w-4" />
@@ -1093,18 +677,15 @@ export function PdfSettingsManager() {
                               setFooterLegalText(e.target.value);
                               setHasUnsavedChanges(true);
                             }}
-                            placeholder="Esta factura ha sido emitida conforme a la legislación vigente.&#10;Los datos fiscales son confidenciales.&#10;Para consultas contacte con info@empresa.com"
-                            rows={4}
+                            placeholder="Esta factura ha sido emitida conforme a la legislación vigente."
+                            rows={3}
                             className="text-sm"
                           />
-                          <p className="text-xs text-muted-foreground">
-                            Cada línea aparecerá centrada en el pie del PDF
-                          </p>
                         </div>
                       )}
                     </div>
 
-                    {/* Espaciado */}
+                    {/* Spacing */}
                     <div className="space-y-4">
                       <h4 className="font-medium text-sm flex items-center gap-2">
                         <Layout className="h-4 w-4" />
@@ -1183,7 +764,7 @@ export function PdfSettingsManager() {
                         </div>
                       </div>
                       
-                      {/* Bordes de tabla */}
+                      {/* Table Borders */}
                       <div className="mt-4 pt-4 border-t space-y-3">
                         <div className="flex items-center justify-between">
                           <Label>Mostrar líneas divisorias en tabla</Label>
@@ -1212,7 +793,7 @@ export function PdfSettingsManager() {
                         )}
                       </div>
 
-                      {/* Líneas en Totales */}
+                      {/* Totals Lines */}
                       <div className="mt-4 pt-4 border-t space-y-3">
                         <div className="flex items-center justify-between">
                           <Label>Mostrar líneas separadoras en Totales</Label>
@@ -1241,125 +822,9 @@ export function PdfSettingsManager() {
                         )}
                       </div>
                     </div>
-
-                    {/* Vista previa */}
-                    <div className="border rounded-lg p-4 bg-muted/30">
-                      <p className="text-sm font-medium mb-3">Vista previa de configuración</p>
-                      <div className="grid grid-cols-2 gap-x-6 gap-y-2 text-sm">
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">Título:</span>
-                          <span className="font-medium">{titleText} ({titleSize}px)</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">Espaciado líneas:</span>
-                          <span>{lineSpacing}px</span>
-                        </div>
-                        <div className="flex justify-between items-center">
-                          <span className="text-muted-foreground">Caja cliente:</span>
-                          <div className="w-12 h-4 rounded" style={{ backgroundColor: clientBoxColor }} />
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">Espacio secciones:</span>
-                          <span>{sectionSpacing}px</span>
-                        </div>
-                        <div className="flex justify-between items-center">
-                          <span className="text-muted-foreground">Cabecera tabla:</span>
-                          <div className="w-12 h-4 rounded" style={{ backgroundColor: tableHeaderColor }} />
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">Altura filas:</span>
-                          <span>{rowHeight}px</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">Pie legal:</span>
-                          <span>{showFooterLegal ? 'Sí' : 'No'}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">Márgenes:</span>
-                          <span>{docMargins}px</span>
-                        </div>
-                        <div className="flex justify-between items-center">
-                          <span className="text-muted-foreground">Bordes tabla:</span>
-                          <span>{showTableBorders ? 'Sí' : 'No'}</span>
-                        </div>
-                        <div className="flex justify-between items-center">
-                          <span className="text-muted-foreground">Líneas totales:</span>
-                          <span>{showTotalsLines ? 'Sí' : 'No'}</span>
-                        </div>
-                      </div>
-                    </div>
                   </CardContent>
                 </Card>
               </TabsContent>
-
-              {/* Contenido / Variables */}
-              <TabsContent value="content" className="mt-4">
-                <Card>
-                  <CardContent className="pt-6">
-                    <p className="text-sm text-muted-foreground mb-4">
-                      Variables disponibles para usar en las plantillas PDF
-                    </p>
-                    <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
-                      {allVariables.map((variable) => (
-                        <Button
-                          key={variable.key}
-                          variant="outline"
-                          size="sm"
-                          className="justify-start text-xs"
-                          onClick={() => handleInsertVariable(variable.key)}
-                        >
-                          <variable.icon className="h-3 w-3 mr-2" />
-                          {variable.label}
-                        </Button>
-                      ))}
-                    </div>
-                  </CardContent>
-                </Card>
-              </TabsContent>
-
-              {/* Bloques */}
-              <TabsContent value="blocks" className="mt-4">
-                <Card>
-                  <CardContent className="pt-6">
-                    <p className="text-sm text-muted-foreground mb-4">
-                      Haz clic en un bloque para añadirlo al final de la plantilla
-                    </p>
-                    <ScrollArea className="h-[400px]">
-                      <div className="space-y-4">
-                        {['header', 'content', 'table', 'totals', 'footer'].map(category => {
-                          const categoryBlocks = allBlocks.filter(b => b.category === category);
-                          if (categoryBlocks.length === 0) return null;
-                          return (
-                            <div key={category}>
-                              <h4 className="text-xs font-semibold text-muted-foreground uppercase mb-2">
-                                {category === 'header' ? 'Cabecera' :
-                                 category === 'content' ? 'Contenido' :
-                                 category === 'table' ? 'Tablas' :
-                                 category === 'totals' ? 'Totales' : 'Pie de página'}
-                              </h4>
-                              <div className="grid grid-cols-2 gap-2">
-                                {categoryBlocks.map(block => (
-                                  <Button
-                                    key={block.id}
-                                    variant="outline"
-                                    size="sm"
-                                    className="justify-start"
-                                    onClick={() => handleInsertBlock(block.html)}
-                                  >
-                                    <block.icon className="h-4 w-4 mr-2" />
-                                    {block.label}
-                                  </Button>
-                                ))}
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </ScrollArea>
-                  </CardContent>
-                </Card>
-              </TabsContent>
-
             </Tabs>
           </div>
 
@@ -1377,17 +842,12 @@ export function PdfSettingsManager() {
               </CardHeader>
               <CardContent>
                 <PdfPreview
-                  content={editedContent}
                   documentType={selectedDocument}
-                  config={{
-                    primary_color: primaryColor,
-                    secondary_color: secondaryColor,
-                    title_text: titleText,
-                    legal_clauses: selectedDocument === 'contract' ? legalClauses : undefined,
-                  }}
+                  config={currentConfig}
+                  scale={0.45}
                 />
                 <p className="text-xs text-muted-foreground text-center mt-3">
-                  Vista previa simplificada
+                  Vista previa del PDF generado
                 </p>
               </CardContent>
             </Card>
