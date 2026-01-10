@@ -153,11 +153,11 @@ export default function ProductAnalysis() {
   );
 
   const billingPeriodLabels: Record<string, string> = {
-    monthly: "Mensual",
-    quarterly: "Trimestral",
-    annual: "Anual",
-    one_time: "Único",
-    other: "Otro",
+    mensual: "Mensual",
+    trimestral: "Trimestral",
+    anual: "Anual",
+    unico: "Único",
+    otro: "Otro",
   };
 
   const invoiceColumns = [
@@ -177,8 +177,8 @@ export default function ProductAnalysis() {
       key: "invoice_status",
       label: "Estado",
       render: (p: InvoiceProduct) => (
-        <StatusBadge variant={invoiceStatusMap[p.invoice_status || "draft"]}>
-          {p.invoice_status === "paid" ? "Cobrada" : p.invoice_status === "issued" ? "Emitida" : p.invoice_status}
+        <StatusBadge variant={invoiceStatusMap[p.invoice_status || "borrador"]}>
+          {p.invoice_status === "pagada" ? "Cobrada" : p.invoice_status === "emitida" ? "Emitida" : p.invoice_status === "borrador" ? "Borrador" : p.invoice_status === "cancelada" ? "Cancelada" : p.invoice_status || "Borrador"}
         </StatusBadge>
       ),
     },
@@ -256,8 +256,8 @@ export default function ProductAnalysis() {
       key: "quote_status",
       label: "Estado",
       render: (p: QuoteProduct) => (
-        <StatusBadge variant={quoteStatusMap[p.quote_status || "draft"]}>
-          {p.quote_status === "approved" ? "Aprobado" : p.quote_status === "sent" ? "Enviado" : p.quote_status}
+        <StatusBadge variant={quoteStatusMap[p.quote_status || "borrador"]}>
+          {p.quote_status === "aceptado" ? "Aceptado" : p.quote_status === "enviado" ? "Enviado" : p.quote_status === "borrador" ? "Borrador" : p.quote_status === "rechazado" ? "Rechazado" : p.quote_status || "Borrador"}
         </StatusBadge>
       ),
     },
@@ -335,8 +335,8 @@ export default function ProductAnalysis() {
       key: "contract_status",
       label: "Estado",
       render: (p: ContractProduct) => (
-        <StatusBadge variant={contractStatusMap[p.contract_status || "pending_activation"]}>
-          {p.contract_status === "active" ? "Activo" : p.contract_status === "pending_activation" ? "Pendiente" : p.contract_status}
+        <StatusBadge variant={contractStatusMap[p.contract_status || "pendiente_activacion"]}>
+          {p.contract_status === "vigente" ? "Vigente" : p.contract_status === "pendiente_activacion" ? "Pendiente" : p.contract_status === "expirado" ? "Expirado" : p.contract_status === "cancelado" ? "Cancelado" : p.contract_status || "Pendiente"}
         </StatusBadge>
       ),
     },
