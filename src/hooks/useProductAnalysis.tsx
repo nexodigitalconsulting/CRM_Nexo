@@ -151,13 +151,13 @@ export function useProductStats() {
 
   const invoiceStats = invoiceProducts ? {
     totalInvoiced: invoiceProducts
-      .filter(p => p.invoice_status !== 'cancelled')
+      .filter(p => p.invoice_status !== 'cancelada')
       .reduce((sum, p) => sum + Number(p.subtotal), 0),
     totalPaid: invoiceProducts
-      .filter(p => p.invoice_status === 'paid')
+      .filter(p => p.invoice_status === 'pagada')
       .reduce((sum, p) => sum + Number(p.subtotal), 0),
     totalPending: invoiceProducts
-      .filter(p => p.invoice_status === 'issued')
+      .filter(p => p.invoice_status === 'emitida')
       .reduce((sum, p) => sum + Number(p.subtotal), 0),
     productCount: invoiceProducts.length,
     uniqueProducts: new Set(invoiceProducts.map(p => p.service_id)).size,
@@ -167,10 +167,10 @@ export function useProductStats() {
 
   const quoteStats = quoteProducts ? {
     totalQuoted: quoteProducts
-      .filter(p => p.quote_status !== 'rejected')
+      .filter(p => p.quote_status !== 'rechazado')
       .reduce((sum, p) => sum + Number(p.subtotal), 0),
     approvedTotal: quoteProducts
-      .filter(p => p.quote_status === 'approved')
+      .filter(p => p.quote_status === 'aceptado')
       .reduce((sum, p) => sum + Number(p.subtotal), 0),
     productCount: quoteProducts.length,
     uniqueProducts: new Set(quoteProducts.map(p => p.service_id)).size,
@@ -180,12 +180,12 @@ export function useProductStats() {
 
   const contractStats = contractProducts ? {
     totalContracted: contractProducts
-      .filter(p => p.contract_status === 'active')
+      .filter(p => p.contract_status === 'vigente')
       .reduce((sum, p) => sum + Number(p.subtotal), 0),
     totalAll: contractProducts.reduce((sum, p) => sum + Number(p.subtotal), 0),
     productCount: contractProducts.length,
     uniqueProducts: new Set(contractProducts.map(p => p.service_id)).size,
-    activeContracts: new Set(contractProducts.filter(p => p.contract_status === 'active').map(p => p.contract_id)).size,
+    activeContracts: new Set(contractProducts.filter(p => p.contract_status === 'vigente').map(p => p.contract_id)).size,
     topProducts: getTopContractProducts(contractProducts),
     byCategory: groupByCategory(contractProducts),
   } : null;
