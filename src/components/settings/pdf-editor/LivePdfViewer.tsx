@@ -166,30 +166,33 @@ export function LivePdfViewer({
   }, [sections.header, scale, primaryColor, secondaryColor, renderClickableSection]);
 
   const renderTitle = useCallback(() => {
+    const titleSize = sections.title.size || 28;
+    
     return renderClickableSection('title', sections.title.visible, (
       <div className="text-center" style={{ marginTop: sections.title.margin_top * scale }}>
+        {/* Title text - matches invoicePdf.ts lines 183-189 */}
         <div 
           className="font-bold"
           style={{ 
-            fontSize: (sections.title.size || 28) * scale * 0.6, 
-            color: primaryColor,
+            fontSize: titleSize * scale * 0.55, 
+            color: config.title_color || primaryColor,
           }}
         >
           {config.title_text || documentLabels[documentType].toUpperCase()}
         </div>
-        {/* Number below title (matches invoicePdf.ts lines 192-204) */}
+        {/* Number below title - matches invoicePdf.ts lines 192-204 */}
         <div 
           style={{ 
-            fontSize: 12 * scale, 
+            fontSize: 10 * scale, 
             color: secondaryColor,
-            marginTop: 4 * scale,
+            marginTop: sections.title.spacing * scale * 0.3,
           }}
         >
           Nº {documentType === 'invoice' ? 'FF-0042' : documentType === 'quote' ? 'PP-0015' : 'CT-0008'}
         </div>
       </div>
     ));
-  }, [sections.title, scale, config.title_text, documentType, primaryColor, secondaryColor, renderClickableSection]);
+  }, [sections.title, scale, config.title_text, config.title_color, documentType, primaryColor, secondaryColor, renderClickableSection]);
 
   const renderDates = useCallback(() => {
     return renderClickableSection('dates', sections.dates.visible, (
