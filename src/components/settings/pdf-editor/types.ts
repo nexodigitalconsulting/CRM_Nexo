@@ -1,17 +1,14 @@
-import { PdfSections, LegalClause } from '@/lib/pdf/pdfUtils';
+import { PdfSections, LegalClause, BlockType } from '@/lib/pdf/pdfUtils';
 
-// Block types for the visual editor
-export type BlockType = 
-  | 'header'
-  | 'title'
-  | 'dates'
-  | 'client'
-  | 'table'
-  | 'totals'
-  | 'notes'
-  | 'footer'
-  | 'legal'
-  | 'signatures';
+// Re-export BlockType from pdfUtils for convenience
+export type { BlockType };
+
+// Constraints for block movement
+export interface BlockConstraints {
+  mustBeFirst?: boolean;
+  mustBeLast?: boolean;
+  mustBeAfter?: BlockType[];
+}
 
 // A draggable block in the editor
 export interface PdfBlock {
@@ -21,6 +18,7 @@ export interface PdfBlock {
   visible: boolean;
   locked?: boolean; // Cannot be moved (e.g., footer always at end)
   order: number;
+  constraints?: BlockConstraints;
 }
 
 // Section configuration for property panel
@@ -37,12 +35,12 @@ export interface SectionProperty {
 // Get default blocks for a document type
 export function getDefaultBlocks(documentType: 'invoice' | 'quote' | 'contract'): PdfBlock[] {
   const baseBlocks: PdfBlock[] = [
-    { id: 'header', label: 'Cabecera', icon: 'Building2', visible: true, order: 0 },
+    { id: 'header', label: 'Cabecera', icon: 'Building2', visible: true, order: 0, locked: true, constraints: { mustBeFirst: true } },
     { id: 'title', label: 'Título', icon: 'FileText', visible: true, order: 1 },
     { id: 'dates', label: 'Fechas', icon: 'Calendar', visible: true, order: 2 },
     { id: 'client', label: 'Cliente', icon: 'User', visible: true, order: 3 },
     { id: 'table', label: 'Servicios', icon: 'Table2', visible: true, order: 4 },
-    { id: 'totals', label: 'Totales', icon: 'DollarSign', visible: true, order: 5 },
+    { id: 'totals', label: 'Totales', icon: 'DollarSign', visible: true, order: 5, constraints: { mustBeAfter: ['table'] } },
   ];
 
   if (documentType === 'contract') {
@@ -51,15 +49,38 @@ export function getDefaultBlocks(documentType: 'invoice' | 'quote' | 'contract')
       { id: 'notes', label: 'Notas', icon: 'StickyNote', visible: true, order: 6 },
       { id: 'legal', label: 'Cláusulas', icon: 'Scale', visible: true, order: 7 },
       { id: 'signatures', label: 'Firmas', icon: 'PenTool', visible: true, order: 8 },
-      { id: 'footer', label: 'Pie', icon: 'FileSignature', visible: true, locked: true, order: 9 },
+      { id: 'footer', label: 'Pie', icon: 'FileSignature', visible: true, locked: true, order: 9, constraints: { mustBeLast: true } },
     ];
   }
 
   return [
     ...baseBlocks,
     { id: 'notes', label: 'Notas', icon: 'StickyNote', visible: true, order: 6 },
-    { id: 'footer', label: 'Pie', icon: 'FileSignature', visible: true, locked: true, order: 7 },
+    { id: 'footer', label: 'Pie', icon: 'FileSignature', visible: true, locked: true, order: 7, constraints: { mustBeLast: true } },
   ];
+}
+
+// Get section order from blocks
+export function getOrderFromBlocks(blocks: PdfBlock[]): BlockType[] {
+  return [...blocks]
+    .sort((a, b) => a.order - b.order)
+    .map(b => b.id);
+}
+
+// Create blocks from section order
+export function getBlocksFromOrder(
+  sectionOrder: BlockType[], 
+  documentType: 'invoice' | 'quote' | 'contract'
+): PdfBlock[] {
+  const defaultBlocks = getDefaultBlocks(documentType);
+  const blockMap = new Map(defaultBlocks.map(b => [b.id, b]));
+  
+  return sectionOrder
+    .filter(id => blockMap.has(id))
+    .map((id, index) => ({
+      ...blockMap.get(id)!,
+      order: index,
+    }));
 }
 
 // Get section properties for the property panel
