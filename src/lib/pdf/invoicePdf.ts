@@ -11,16 +11,9 @@ import {
   formatCurrency,
   formatDate,
   drawLine,
-  drawTableHeader,
-  drawTableRow,
   pdfToBlob,
   blobToBase64,
   downloadBlob,
-  drawCompanyHeaderWithLogo,
-  drawClientSection,
-  drawDocumentTitle,
-  drawTotals,
-  drawFooter,
   embedLogo,
   drawLogo,
   CompanyData,
@@ -65,29 +58,19 @@ export type InvoiceTemplate = {
   content?: string;
 } | null;
 
-function isFact2Template(template?: InvoiceTemplate): boolean {
-  const name = template?.name?.toLowerCase() ?? '';
-  const content = template?.content?.toLowerCase() ?? '';
-
-  // We intentionally key off the template NAME first (most explicit),
-  // and then fall back to content markers.
-  return (
-    name.trim() === 'fact2' ||
-    name.includes('fact2') ||
-    content.includes('<!-- pdf_config:') ||
-    content.includes('{{services_rows}}')
-  );
-}
-
 function formatInvoiceNumber(invoiceNumber: number): string {
-  // Matches the UI prefix used across the app (FF-0001)
   return `FF-${String(invoiceNumber).padStart(4, '0')}`;
 }
 
-async function generateInvoicePdfFact2(
+/**
+ * Generate Invoice PDF using Visual config (sections + section_order)
+ * This is the ONLY layout - no more legacy/Fact2 detection
+ */
+export async function generateInvoicePdf(
   invoice: InvoiceData,
   company: CompanyData,
   config?: PdfConfig,
+  _template?: InvoiceTemplate // Kept for API compatibility but ignored
 ): Promise<Blob> {
   const pdfDoc = await createPdfDocument();
   const fonts = await embedFonts(pdfDoc);
@@ -110,7 +93,7 @@ async function generateInvoicePdfFact2(
       }
     : defaultSections;
 
-  console.log('[PDF] Using sections config:', sections);
+  console.log('[PDF Invoice] Using Visual config - sections:', Object.keys(sections).filter(k => (sections as any)[k]?.visible));
 
   const clientData: ClientData = invoice.client || { name: 'Cliente' };
 
@@ -374,7 +357,6 @@ async function generateInvoicePdfFact2(
     const services = invoice.services || [];
 
     services.forEach((svc, idx) => {
-      const rowTopY = y;
       const rowBottomY = y - rowHeight;
 
       // Alternate row background
@@ -512,6 +494,32 @@ async function generateInvoicePdfFact2(
     y = currentY;
   }
 
+  // ============ NOTES SECTION ============
+  const showNotes = config?.show_notes !== false;
+  if (showNotes && invoice.notes) {
+    y -= 20;
+    page.drawText('Observaciones:', {
+      x: left,
+      y,
+      size: fontSize - 1,
+      font: fonts.bold,
+      color: pdfColors.muted,
+    });
+    y -= 14;
+
+    const noteLines = invoice.notes.split('\n').slice(0, 3);
+    noteLines.forEach((line) => {
+      page.drawText(line.substring(0, 80), {
+        x: left,
+        y,
+        size: fontSize - 2,
+        font: fonts.regular,
+        color: pdfColors.secondary,
+      });
+      y -= 12;
+    });
+  }
+
   // ============ FOOTER SECTION ============
   if (sections.footer.visible) {
     const footerY = sections.footer.margin_top + 40; // Position from bottom
@@ -591,176 +599,6 @@ async function generateInvoicePdfFact2(
   return pdfToBlob(pdfDoc);
 }
 
-export async function generateInvoicePdf(
-  invoice: InvoiceData,
-  company: CompanyData,
-  config?: PdfConfig,
-  template?: InvoiceTemplate
-): Promise<Blob> {
-  const useFact2 = isFact2Template(template);
-  console.log('[PDF] Invoice layout:', useFact2 ? 'Fact2' : 'Legacy', 'template=', template?.name);
-
-  if (useFact2) {
-    return generateInvoicePdfFact2(invoice, company, config);
-  }
-
-  // Legacy layout
-  const pdfDoc = await createPdfDocument();
-  const fonts = await embedFonts(pdfDoc);
-  const page = addPage(pdfDoc);
-
-  const pdfColors = createColorsFromConfig(config);
-  const fontSize = config?.font_size_base || 10;
-  const showDiscounts = config?.show_discounts_column !== false;
-  const showNotes = config?.show_notes !== false;
-  const showIban = config?.show_iban_footer !== false;
-
-  const clientData: ClientData = invoice.client || { name: 'Cliente' };
-  let y = A4_HEIGHT - MARGIN;
-
-  // Company header with logo
-  y = await drawCompanyHeaderWithLogo(pdfDoc, page, company, fonts, y, config);
-
-  // Document title (right side)
-  drawDocumentTitle(page, 'FACTURA', invoice.invoice_number, fonts, A4_HEIGHT - MARGIN - 20, pdfColors);
-
-  // Separator line
-  y -= 10;
-  drawLine(page, MARGIN, y, A4_WIDTH - MARGIN, y, pdfColors.border, 1);
-  y -= 25;
-
-  // Invoice details (right side)
-  const detailsX = A4_WIDTH - MARGIN - 150;
-  let detailY = y + 10;
-
-  page.drawText('Fecha emisión:', {
-    x: detailsX,
-    y: detailY,
-    size: fontSize - 1,
-    font: fonts.regular,
-    color: pdfColors.muted,
-  });
-  page.drawText(formatDate(invoice.issue_date), {
-    x: detailsX + 80,
-    y: detailY,
-    size: fontSize - 1,
-    font: fonts.bold,
-    color: pdfColors.text,
-  });
-  detailY -= 14;
-
-  if (invoice.due_date) {
-    page.drawText('Vencimiento:', {
-      x: detailsX,
-      y: detailY,
-      size: fontSize - 1,
-      font: fonts.regular,
-      color: pdfColors.muted,
-    });
-    page.drawText(formatDate(invoice.due_date), {
-      x: detailsX + 80,
-      y: detailY,
-      size: fontSize - 1,
-      font: fonts.bold,
-      color: pdfColors.text,
-    });
-  }
-
-  // Client section
-  y = drawClientSection(page, clientData, fonts, y, pdfColors, fontSize);
-  y -= 20;
-
-  // Services table
-  const columns = showDiscounts
-    ? [
-        { label: 'Descripción', x: MARGIN + 5, width: 250 },
-        { label: 'Cant.', x: MARGIN + 260, width: 40 },
-        { label: 'Precio', x: MARGIN + 310, width: 70 },
-        { label: 'Dto.', x: MARGIN + 380, width: 50 },
-        { label: 'Total', x: MARGIN + 440, width: 70 },
-      ]
-    : [
-        { label: 'Descripción', x: MARGIN + 5, width: 280 },
-        { label: 'Cant.', x: MARGIN + 290, width: 50 },
-        { label: 'Precio', x: MARGIN + 350, width: 80 },
-        { label: 'Total', x: MARGIN + 440, width: 70 },
-      ];
-
-  y = drawTableHeader(page, y, columns, fonts, pdfColors, fontSize - 1);
-
-  // Service rows
-  const services = invoice.services || [];
-  services.forEach((svc, index) => {
-    const serviceName = svc.service?.name || 'Servicio';
-
-    const values = showDiscounts
-      ? [
-          { text: serviceName.substring(0, 40), x: columns[0].x },
-          { text: String(svc.quantity || 1), x: columns[1].x },
-          { text: formatCurrency(svc.unit_price), x: columns[2].x },
-          { text: svc.discount_percent ? `${svc.discount_percent}%` : '-', x: columns[3].x },
-          { text: formatCurrency(svc.total), x: columns[4].x },
-        ]
-      : [
-          { text: serviceName.substring(0, 50), x: columns[0].x },
-          { text: String(svc.quantity || 1), x: columns[1].x },
-          { text: formatCurrency(svc.unit_price), x: columns[2].x },
-          { text: formatCurrency(svc.total), x: columns[3].x },
-        ];
-
-    y = drawTableRow(page, y, values, fonts, index % 2 === 1, fontSize - 1);
-  });
-
-  // Bottom line of table
-  y -= 5;
-  drawLine(page, MARGIN, y, A4_WIDTH - MARGIN, y, pdfColors.border, 0.5);
-  y -= 30;
-
-  // Totals
-  y = drawTotals(
-    page,
-    invoice.subtotal || 0,
-    invoice.iva_amount || 0,
-    invoice.total || 0,
-    fonts,
-    y,
-    invoice.iva_percent || 21,
-    pdfColors,
-    fontSize
-  );
-
-  // Notes
-  if (showNotes && invoice.notes) {
-    y -= 20;
-    page.drawText('Observaciones:', {
-      x: MARGIN,
-      y,
-      size: fontSize - 1,
-      font: fonts.bold,
-      color: pdfColors.muted,
-    });
-    y -= 14;
-
-    const noteLines = invoice.notes.split('\n').slice(0, 3);
-    noteLines.forEach((line) => {
-      page.drawText(line.substring(0, 80), {
-        x: MARGIN,
-        y,
-        size: fontSize - 2,
-        font: fonts.regular,
-        color: pdfColors.secondary,
-      });
-      y -= 12;
-    });
-  }
-
-  // Footer
-  drawFooter(page, company, fonts, showIban, pdfColors);
-
-  return pdfToBlob(pdfDoc);
-}
-
-
 export async function generateInvoicePdfBase64(
   invoice: InvoiceData,
   company: CompanyData,
@@ -780,4 +618,3 @@ export async function downloadInvoicePdf(
   const blob = await generateInvoicePdf(invoice, company, config, template);
   downloadBlob(blob, `factura-${invoice.invoice_number}.pdf`);
 }
-
