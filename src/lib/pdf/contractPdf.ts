@@ -1,3 +1,4 @@
+import { rgb } from 'pdf-lib';
 import {
   createPdfDocument,
   embedFonts,
@@ -9,20 +10,16 @@ import {
   formatCurrency,
   formatDate,
   drawLine,
-  drawTableHeader,
-  drawTableRow,
   pdfToBlob,
   blobToBase64,
   downloadBlob,
-  drawCompanyHeaderWithLogo,
-  drawClientSection,
-  drawDocumentTitle,
-  drawTotals,
   drawFooter,
   drawLegalClauses,
   drawSignatureArea,
   replaceClauseVariables,
   hexToRgb,
+  embedLogo,
+  drawLogo,
   CompanyData,
   ClientData,
   PdfConfig,
@@ -30,8 +27,6 @@ import {
   getDefaultSections,
   LegalClause,
   DEFAULT_LEGAL_CLAUSES,
-  PdfFonts,
-  PdfColors,
 } from './pdfUtils';
 
 export interface ContractService {
@@ -73,6 +68,10 @@ function getBillingPeriodLabel(period: string | null | undefined): string {
     annual: 'Anual',
     one_time: 'Pago único',
     other: 'Otro',
+    mensual: 'Mensual',
+    trimestral: 'Trimestral',
+    anual: 'Anual',
+    unico: 'Pago único',
   };
   return labels[period || ''] || period || '-';
 }
@@ -83,10 +82,22 @@ function getStatusLabel(status: string | null | undefined): string {
     expired: 'Expirado',
     cancelled: 'Cancelado',
     pending_activation: 'Pendiente',
+    vigente: 'Vigente',
+    expirado: 'Expirado',
+    cancelado: 'Cancelado',
+    pendiente_activacion: 'Pendiente',
   };
   return labels[status || ''] || status || '-';
 }
 
+function formatContractNumber(num: number): string {
+  return `CT-${String(num).padStart(4, '0')}`;
+}
+
+/**
+ * Generate Contract PDF using Visual config (sections + section_order)
+ * Uses the same block-based approach as Invoice/Quote
+ */
 export async function generateContractPdf(
   contract: ContractData,
   company: CompanyData,
@@ -100,16 +111,12 @@ export async function generateContractPdf(
   
   // Use dynamic margin from config (fallback to default MARGIN constant)
   const margin = config?.margins || MARGIN;
-  const sectionSpacing = config?.section_spacing || 28;
-  const tableRowHeight = config?.row_height || 22;
-  const lineSpacing = config?.line_spacing || 14;
   
   // Get section configuration
   const defaultSections = getDefaultSections();
   const sections: PdfSections = config?.sections 
     ? { 
         ...defaultSections,
-        ...config.sections,
         header: { ...defaultSections.header, ...config.sections.header },
         title: { ...defaultSections.title, ...config.sections.title },
         dates: { ...defaultSections.dates, ...config.sections.dates },
@@ -122,12 +129,13 @@ export async function generateContractPdf(
       }
     : defaultSections;
 
+  console.log('[PDF Contract] Using Visual config - sections:', Object.keys(sections).filter(k => (sections as any)[k]?.visible));
+
   // Get legal clauses (use config or defaults)
   const rawClauses: LegalClause[] = config?.legal_clauses || DEFAULT_LEGAL_CLAUSES;
-  const showSignatures = config?.show_signatures !== false;
+  const showSignatures = config?.show_signatures !== false && sections.signatures?.visible !== false;
   const showLegalClauses = sections.legal?.visible !== false;
   
-  const showDiscounts = config?.show_discounts_column !== false;
   const showNotes = config?.show_notes !== false;
   const showIban = config?.show_iban_footer !== false;
   
@@ -165,210 +173,475 @@ export async function generateContractPdf(
   }));
   
   // =============================================
-  // PÁGINA 1: Información del contrato
+  // PÁGINA 1: Información del contrato (Visual layout)
   // =============================================
   const pages: ReturnType<typeof addPage>[] = [];
   let page1 = addPage(pdfDoc);
   
-  // Use content width based on dynamic margin
-  const contentWidth = A4_WIDTH - margin * 2;
+  const left = margin;
+  const right = A4_WIDTH - margin;
+  const contentWidth = right - left;
   pages.push(page1);
   let y = A4_HEIGHT - margin;
   
   // ============ HEADER SECTION ============
-  // Use logo_size from sections config
-  const logoMaxHeight = sections.header.logo_size || 60;
-  y = await drawCompanyHeaderWithLogo(pdfDoc, page1, company, fonts, y, {
-    ...config,
-    sections: {
-      ...sections,
-      header: { ...sections.header, logo_size: logoMaxHeight },
-    },
-  });
-  
-  // Document title (right side)
-  drawDocumentTitle(page1, 'CONTRATO', contract.contract_number, fonts, A4_HEIGHT - margin - 20, pdfColors);
-  
-  // Separator line
-  y -= 10;
-  drawLine(page1, margin, y, A4_WIDTH - margin, y, pdfColors.border, 1);
-  y -= sectionSpacing;
-  
-  // ============ CONTRACT DETAILS ============
-  const detailsX = A4_WIDTH - margin - 150;
-  let detailY = y + 10;
-  
-  page1.drawText('Fecha inicio:', {
-    x: detailsX,
-    y: detailY,
-    size: fontSize - 1,
-    font: fonts.regular,
-    color: pdfColors.muted,
-  });
-  page1.drawText(formatDate(contract.start_date), {
-    x: detailsX + 80,
-    y: detailY,
-    size: fontSize - 1,
-    font: fonts.bold,
-    color: pdfColors.text,
-  });
-  detailY -= lineSpacing;
-  
-  if (contract.end_date) {
-    page1.drawText('Fecha fin:', {
-      x: detailsX,
-      y: detailY,
+  if (sections.header.visible) {
+    y -= sections.header.margin_top;
+    
+    const showLogo = config?.show_logo !== false;
+    const logoPosition = config?.logo_position || 'left';
+    const logoSize = sections.header.logo_size || 60;
+
+    if (showLogo && company.logo_url) {
+      const logo = await embedLogo(pdfDoc, company.logo_url);
+      if (logo) {
+        const scale = logoSize / Math.max(logo.width, logo.height);
+        const scaledHeight = logo.height * scale;
+        drawLogo(page1, logo, logoPosition, y);
+        y -= scaledHeight + sections.header.spacing;
+      }
+    }
+
+    // Company name
+    page1.drawText(company.name || 'Mi Empresa', {
+      x: left,
+      y,
+      size: 16,
+      font: fonts.bold,
+      color: pdfColors.text,
+    });
+
+    // Company details on the right
+    const rightX = right - 220;
+    let rightY = y + 10;
+    const rightLines: string[] = [];
+    if (company.address) rightLines.push(company.address);
+    if (company.cif) rightLines.push(`CIF: ${company.cif}`);
+    if (company.email) rightLines.push(company.email);
+
+    rightLines.forEach((line) => {
+      page1.drawText(line.substring(0, 55), {
+        x: rightX,
+        y: rightY,
+        size: fontSize - 1,
+        font: fonts.regular,
+        color: pdfColors.secondary,
+      });
+      rightY -= sections.header.spacing;
+    });
+
+    y -= 20;
+  }
+
+  // ============ TITLE SECTION ============
+  if (sections.title.visible) {
+    y -= sections.title.margin_top;
+    
+    const titleText = sections.title.text || config?.title_text || 'CONTRATO';
+    const titleSize = sections.title.size || 28;
+    const titleWidth = fonts.bold.widthOfTextAtSize(titleText, titleSize);
+    const titleColor = config?.title_color ? hexToRgb(config.title_color) : null;
+    
+    page1.drawText(titleText, {
+      x: (A4_WIDTH - titleWidth) / 2,
+      y,
+      size: titleSize,
+      font: fonts.bold,
+      color: titleColor ? rgb(titleColor.r, titleColor.g, titleColor.b) : pdfColors.primary,
+    });
+
+    // Contract number below title
+    const numberText = `Nº ${formatContractNumber(contract.contract_number)}`;
+    const numberSize = 16;
+    const numberWidth = fonts.regular.widthOfTextAtSize(numberText, numberSize);
+    
+    y -= sections.title.spacing;
+    
+    page1.drawText(numberText, {
+      x: (A4_WIDTH - numberWidth) / 2,
+      y,
+      size: numberSize,
+      font: fonts.regular,
+      color: pdfColors.secondary,
+    });
+    
+    y -= 10;
+  }
+
+  // ============ DATES SECTION ============
+  if (sections.dates.visible) {
+    y -= sections.dates.margin_top;
+
+    page1.drawText('Fecha inicio:', {
+      x: left,
+      y,
       size: fontSize - 1,
       font: fonts.regular,
-      color: pdfColors.muted,
+      color: pdfColors.secondary,
     });
-    page1.drawText(formatDate(contract.end_date), {
-      x: detailsX + 80,
-      y: detailY,
+    page1.drawText(formatDate(contract.start_date), {
+      x: left + 80,
+      y,
       size: fontSize - 1,
       font: fonts.bold,
       color: pdfColors.text,
     });
-    detailY -= lineSpacing;
+
+    if (contract.end_date) {
+      page1.drawText('Fecha fin:', {
+        x: left + 200,
+        y,
+        size: fontSize - 1,
+        font: fonts.regular,
+        color: pdfColors.secondary,
+      });
+      page1.drawText(formatDate(contract.end_date), {
+        x: left + 270,
+        y,
+        size: fontSize - 1,
+        font: fonts.bold,
+        color: pdfColors.text,
+      });
+    }
+
+    y -= sections.dates.spacing / 2;
+
+    // Second row: billing period and status
+    page1.drawText('Facturación:', {
+      x: left,
+      y,
+      size: fontSize - 1,
+      font: fonts.regular,
+      color: pdfColors.secondary,
+    });
+    page1.drawText(getBillingPeriodLabel(contract.billing_period), {
+      x: left + 80,
+      y,
+      size: fontSize - 1,
+      font: fonts.bold,
+      color: pdfColors.text,
+    });
+
+    page1.drawText('Estado:', {
+      x: left + 200,
+      y,
+      size: fontSize - 1,
+      font: fonts.regular,
+      color: pdfColors.secondary,
+    });
+    page1.drawText(getStatusLabel(contract.status), {
+      x: left + 270,
+      y,
+      size: fontSize - 1,
+      font: fonts.bold,
+      color: pdfColors.text,
+    });
+
+    y -= sections.dates.spacing;
   }
-  
-  page1.drawText('Facturación:', {
-    x: detailsX,
-    y: detailY,
-    size: fontSize - 1,
-    font: fonts.regular,
-    color: pdfColors.muted,
-  });
-  page1.drawText(getBillingPeriodLabel(contract.billing_period), {
-    x: detailsX + 80,
-    y: detailY,
-    size: fontSize - 1,
-    font: fonts.bold,
-    color: pdfColors.text,
-  });
-  detailY -= lineSpacing;
-  
-  page1.drawText('Estado:', {
-    x: detailsX,
-    y: detailY,
-    size: fontSize - 1,
-    font: fonts.regular,
-    color: pdfColors.muted,
-  });
-  page1.drawText(getStatusLabel(contract.status), {
-    x: detailsX + 80,
-    y: detailY,
-    size: fontSize - 1,
-    font: fonts.bold,
-    color: pdfColors.text,
-  });
-  
+
   // ============ CLIENT SECTION ============
-  y = drawClientSection(page1, clientData, fonts, y, pdfColors, fontSize);
+  if (sections.client.visible) {
+    y -= sections.client.margin_top;
+    
+    const boxPadding = sections.client.padding;
+    const clientLineSpacing = sections.client.spacing;
+    const clientBoxColor = sections.client.background_color || '#f8f9fa';
+    
+    // Calculate box height based on content
+    const clientLineCount = 2 + (clientData.address ? 1 : 0) + (clientData.cif ? 1 : 0);
+    const boxHeight = Math.max(78, boxPadding * 2 + 18 + clientLineCount * clientLineSpacing);
+    const clientBoxRgb = hexToRgb(clientBoxColor);
+
+    // Draw client box background
+    page1.drawRectangle({
+      x: left,
+      y: y - boxHeight,
+      width: contentWidth,
+      height: boxHeight,
+      color: rgb(clientBoxRgb.r, clientBoxRgb.g, clientBoxRgb.b),
+    });
+
+    // Draw border if configured
+    if (sections.client.show_border) {
+      const borderColor = sections.client.border_color || '#e5e7eb';
+      const borderRgb = hexToRgb(borderColor);
+      page1.drawRectangle({
+        x: left,
+        y: y - boxHeight,
+        width: contentWidth,
+        height: boxHeight,
+        borderColor: rgb(borderRgb.r, borderRgb.g, borderRgb.b),
+        borderWidth: 1,
+      });
+    }
+
+    let boxY = y - boxPadding - 10;
+    page1.drawText('CLIENTE', {
+      x: left + boxPadding,
+      y: boxY,
+      size: fontSize - 2,
+      font: fonts.bold,
+      color: pdfColors.secondary,
+    });
+    boxY -= clientLineSpacing;
+
+    page1.drawText(clientData.name || '', {
+      x: left + boxPadding,
+      y: boxY,
+      size: fontSize + 1,
+      font: fonts.bold,
+      color: pdfColors.text,
+    });
+    boxY -= clientLineSpacing;
+
+    if (clientData.address) {
+      page1.drawText(clientData.address.substring(0, 70), {
+        x: left + boxPadding,
+        y: boxY,
+        size: fontSize - 1,
+        font: fonts.regular,
+        color: pdfColors.text,
+      });
+      boxY -= clientLineSpacing;
+    }
+
+    if (clientData.cif) {
+      page1.drawText(`CIF: ${clientData.cif}`, {
+        x: left + boxPadding,
+        y: boxY,
+        size: fontSize - 1,
+        font: fonts.regular,
+        color: pdfColors.text,
+      });
+    }
+
+    y = y - boxHeight;
+  }
   
   // Contract name if exists
   if (contract.name) {
-    y -= 10;
+    y -= 15;
     page1.drawText(contract.name, {
-      x: margin,
+      x: left,
       y,
       size: fontSize + 1,
       font: fonts.bold,
       color: pdfColors.text,
     });
-    y -= 20;
+    y -= 10;
   }
   
-  y -= 10;
-  
-  // ============ SERVICES TABLE ============
-  const columns = showDiscounts ? [
-    { label: 'Servicio', x: margin + 5, width: 250 },
-    { label: 'Cant.', x: margin + 260, width: 40 },
-    { label: 'Precio', x: margin + 310, width: 70 },
-    { label: 'Dto.', x: margin + 380, width: 50 },
-    { label: 'Total', x: margin + 440, width: 70 },
-  ] : [
-    { label: 'Servicio', x: margin + 5, width: 280 },
-    { label: 'Cant.', x: margin + 290, width: 50 },
-    { label: 'Precio', x: margin + 350, width: 80 },
-    { label: 'Total', x: margin + 440, width: 70 },
-  ];
-  
-  // Use headerHeight from sections config
-  const tableHeaderHeight = sections.table.header_height || 25;
-  const tableHeaderColorHex = config?.table_header_color;
-  const tableHeaderBg = tableHeaderColorHex ? hexToRgb(tableHeaderColorHex) : undefined;
-  
-  y = drawTableHeader(page1, y, columns, fonts, pdfColors, fontSize - 1, tableHeaderHeight, tableHeaderBg);
-  
-  // Service rows (only active services)
-  const services = (contract.services || []).filter(s => s.is_active !== false);
-  services.forEach((svc, index) => {
-    const serviceName = svc.service?.name || 'Servicio';
+  // ============ TABLE SECTION ============
+  if (sections.table.visible) {
+    y -= sections.table.margin_top;
     
-    const values = showDiscounts ? [
-      { text: serviceName.substring(0, 40), x: columns[0].x },
-      { text: String(svc.quantity || 1), x: columns[1].x },
-      { text: formatCurrency(svc.unit_price), x: columns[2].x },
-      { text: svc.discount_percent ? `${svc.discount_percent}%` : '-', x: columns[3].x },
-      { text: formatCurrency(svc.total), x: columns[4].x },
-    ] : [
-      { text: serviceName.substring(0, 50), x: columns[0].x },
-      { text: String(svc.quantity || 1), x: columns[1].x },
-      { text: formatCurrency(svc.unit_price), x: columns[2].x },
-      { text: formatCurrency(svc.total), x: columns[3].x },
+    const headerHeight = sections.table.header_height;
+    const rowHeight = sections.table.row_height;
+    const showTableBorders = sections.table.show_borders;
+    const tableBorderColor = sections.table.border_color || '#e5e7eb';
+    const tableBorderRgb = hexToRgb(tableBorderColor);
+    const tableHeaderColor = config?.table_header_color || config?.primary_color || '#3b82f6';
+    const tableHeaderRgb = hexToRgb(tableHeaderColor);
+
+    // Table header background
+    page1.drawRectangle({
+      x: left,
+      y: y - headerHeight,
+      width: contentWidth,
+      height: headerHeight,
+      color: rgb(tableHeaderRgb.r, tableHeaderRgb.g, tableHeaderRgb.b),
+    });
+
+    // Column layout
+    const colDescX = left + 12;
+    const colQtyX = left + contentWidth * 0.70;
+    const colUnitX = left + contentWidth * 0.84;
+    const colTotX = right - 12;
+
+    const cols = [
+      { label: 'Servicio', x: colDescX, align: 'left' as const },
+      { label: 'Cant.', x: colQtyX, align: 'right' as const },
+      { label: 'Precio', x: colUnitX, align: 'right' as const },
+      { label: 'Total', x: colTotX, align: 'right' as const },
     ];
+
+    cols.forEach((c) => {
+      const textWidth = fonts.bold.widthOfTextAtSize(c.label, fontSize - 1);
+      const x = c.align === 'right' ? c.x - textWidth : c.x;
+      page1.drawText(c.label, {
+        x,
+        y: y - headerHeight + (headerHeight - (fontSize - 1)) / 2 - 1,
+        size: fontSize - 1,
+        font: fonts.bold,
+        color: pdfColors.white,
+      });
+    });
+
+    y -= headerHeight;
+
+    // Service rows (only active services)
+    const services = (contract.services || []).filter(s => s.is_active !== false);
+
+    services.forEach((svc, idx) => {
+      const rowBottomY = y - rowHeight;
+
+      // Alternate row background
+      if (idx % 2 === 1) {
+        page1.drawRectangle({
+          x: left,
+          y: rowBottomY,
+          width: contentWidth,
+          height: rowHeight,
+          color: rgb(0.98, 0.98, 0.98),
+        });
+      }
+
+      const desc = (svc.service?.name || 'Servicio').substring(0, 60);
+      const qty = String(svc.quantity || 1);
+      const unit = formatCurrency(svc.unit_price);
+      const tot = formatCurrency(svc.total);
+
+      const textY = rowBottomY + (rowHeight - (fontSize - 1)) / 2 - 1;
+
+      page1.drawText(desc, {
+        x: colDescX,
+        y: textY,
+        size: fontSize - 1,
+        font: fonts.regular,
+        color: pdfColors.text,
+      });
+
+      const qtyW = fonts.regular.widthOfTextAtSize(qty, fontSize - 1);
+      page1.drawText(qty, {
+        x: colQtyX - qtyW,
+        y: textY,
+        size: fontSize - 1,
+        font: fonts.regular,
+        color: pdfColors.text,
+      });
+
+      const unitW = fonts.regular.widthOfTextAtSize(unit, fontSize - 1);
+      page1.drawText(unit, {
+        x: colUnitX - unitW,
+        y: textY,
+        size: fontSize - 1,
+        font: fonts.regular,
+        color: pdfColors.text,
+      });
+
+      const totW = fonts.regular.widthOfTextAtSize(tot, fontSize - 1);
+      page1.drawText(tot, {
+        x: colTotX - totW,
+        y: textY,
+        size: fontSize - 1,
+        font: fonts.regular,
+        color: pdfColors.text,
+      });
+
+      // Divider line at bottom of row
+      if (showTableBorders) {
+        drawLine(
+          page1,
+          left,
+          rowBottomY,
+          right,
+          rowBottomY,
+          rgb(tableBorderRgb.r, tableBorderRgb.g, tableBorderRgb.b),
+          0.6,
+        );
+      }
+
+      y = rowBottomY;
+    });
+  }
+  
+  // ============ TOTALS SECTION ============
+  if (sections.totals.visible) {
+    y -= sections.totals.margin_top;
     
-    // Use tableRowHeight from config
-    y = drawTableRow(page1, y, values, fonts, index % 2 === 1, fontSize - 1, tableRowHeight);
-  });
+    const totalsLineSpacing = sections.totals.line_spacing;
+    const showTotalsLines = sections.totals.show_lines;
+    const totalsLineColor = sections.totals.line_color || '#e5e7eb';
+    const totalsLineRgb = hexToRgb(totalsLineColor);
+
+    const totalsWidth = 250;
+    const totalsX = right - totalsWidth;
+
+    const rows = [
+      { label: 'Subtotal:', value: formatCurrency(contract.subtotal || 0), bold: false },
+      { label: 'IVA (21%):', value: formatCurrency(contract.iva_total || 0), bold: false },
+      { label: 'TOTAL:', value: formatCurrency(contract.total || 0), bold: true },
+    ];
+
+    let currentY = y;
+    rows.forEach((r, i) => {
+      const isTotal = r.bold;
+      const size = isTotal ? 18 : fontSize;
+      const font = isTotal ? fonts.bold : fonts.regular;
+      const color = isTotal ? pdfColors.primary : pdfColors.secondary;
+
+      page1.drawText(r.label, {
+        x: totalsX,
+        y: currentY,
+        size,
+        font,
+        color,
+      });
+
+      const vW = font.widthOfTextAtSize(r.value, size);
+      page1.drawText(r.value, {
+        x: right - vW,
+        y: currentY,
+        size,
+        font,
+        color,
+      });
+
+      if (showTotalsLines && i < rows.length - 1) {
+        const lineY = currentY - 3;
+        drawLine(
+          page1,
+          totalsX,
+          lineY,
+          right,
+          lineY,
+          rgb(totalsLineRgb.r, totalsLineRgb.g, totalsLineRgb.b),
+          0.5,
+        );
+      }
+
+      currentY -= totalsLineSpacing;
+    });
+
+    y = currentY;
+
+    // Billing period note
+    page1.drawText(`Importe por período: ${getBillingPeriodLabel(contract.billing_period)}`, {
+      x: left,
+      y: y + 10,
+      size: fontSize - 2,
+      font: fonts.regular,
+      color: pdfColors.muted,
+    });
+  }
   
-  // Bottom line of table
-  y -= 5;
-  drawLine(page1, margin, y, A4_WIDTH - margin, y, pdfColors.border, 0.5);
-  y -= sectionSpacing;
-  
-  // ============ TOTALS ============
-  y = drawTotals(
-    page1,
-    contract.subtotal || 0,
-    contract.iva_total || 0,
-    contract.total || 0,
-    fonts,
-    y,
-    21,
-    pdfColors,
-    fontSize
-  );
-  
-  // Billing period note
-  y -= 10;
-  const periodNote = `Importe por período de facturación: ${getBillingPeriodLabel(contract.billing_period)}`;
-  page1.drawText(periodNote, {
-    x: margin,
-    y,
-    size: fontSize - 1,
-    font: fonts.regular,
-    color: pdfColors.muted,
-  });
-  
-  // ============ NOTES ============
+  // ============ NOTES SECTION ============
   if (showNotes && contract.notes) {
-    y -= sectionSpacing;
+    y -= 25;
     page1.drawText('Observaciones:', {
-      x: margin,
+      x: left,
       y,
       size: fontSize - 1,
       font: fonts.bold,
       color: pdfColors.muted,
     });
-    y -= lineSpacing;
+    y -= 14;
     
     const noteLines = contract.notes.split('\n').slice(0, 3);
     noteLines.forEach((line) => {
       page1.drawText(line.substring(0, 80), {
-        x: margin,
+        x: left,
         y,
         size: fontSize - 2,
         font: fonts.regular,
@@ -379,7 +652,7 @@ export async function generateContractPdf(
   }
   
   // ============ SIGNATURE ON PAGE 1 ============
-  if (showSignatures && sections.signatures?.visible !== false) {
+  if (showSignatures) {
     // Position signature at the bottom of page 1
     y = Math.min(y - 40, margin + 120);
     
@@ -420,7 +693,7 @@ export async function generateContractPdf(
       
       y2 -= 15;
       drawLine(page2, margin, y2, A4_WIDTH - margin, y2, pdfColors.border, 1);
-      y2 -= sectionSpacing;
+      y2 -= 28;
       
       // ============ LEGAL CLAUSES ============
       y2 = drawLegalClauses(page2, legalClauses, fonts, y2, pdfColors, {
@@ -430,7 +703,7 @@ export async function generateContractPdf(
       });
       
       // ============ FINAL SIGNATURE ============
-      if (showSignatures && sections.signatures?.visible !== false) {
+      if (showSignatures) {
         // Position signature at bottom of page 2
         y2 = Math.min(y2 - 30, margin + 100);
         

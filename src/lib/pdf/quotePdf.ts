@@ -11,16 +11,9 @@ import {
   formatCurrency,
   formatDate,
   drawLine,
-  drawTableHeader,
-  drawTableRow,
   pdfToBlob,
   blobToBase64,
   downloadBlob,
-  drawCompanyHeaderWithLogo,
-  drawClientSection,
-  drawDocumentTitle,
-  drawTotals,
-  drawFooter,
   embedLogo,
   drawLogo,
   CompanyData,
@@ -66,27 +59,19 @@ export type QuoteTemplate = {
   content?: string;
 } | null;
 
-function isQuote2Template(template?: QuoteTemplate): boolean {
-  const name = template?.name?.toLowerCase() ?? '';
-  const content = template?.content?.toLowerCase() ?? '';
-
-  return (
-    name.trim() === 'quote2' ||
-    name.includes('quote2') ||
-    name.includes('presupuesto2') ||
-    content.includes('<!-- pdf_config:') ||
-    content.includes('{{services_rows}}')
-  );
-}
-
 function formatQuoteNumber(quoteNumber: number): string {
   return `P-${String(quoteNumber).padStart(4, '0')}`;
 }
 
-async function generateQuotePdfAdvanced(
+/**
+ * Generate Quote PDF using Visual config (sections + section_order)
+ * This is the ONLY layout - no more legacy/Quote2 detection
+ */
+export async function generateQuotePdf(
   quote: QuoteData,
   company: CompanyData,
   config?: PdfConfig,
+  _template?: QuoteTemplate // Kept for API compatibility but ignored
 ): Promise<Blob> {
   const pdfDoc = await createPdfDocument();
   const fonts = await embedFonts(pdfDoc);
@@ -109,7 +94,7 @@ async function generateQuotePdfAdvanced(
       }
     : defaultSections;
 
-  console.log('[PDF Quote] Using sections config:', sections);
+  console.log('[PDF Quote] Using Visual config - sections:', Object.keys(sections).filter(k => (sections as any)[k]?.visible));
 
   const clientData: ClientData | null = quote.client || null;
 
@@ -334,6 +319,20 @@ async function generateQuotePdfAdvanced(
         color: rgb(contactBoxRgb.r, contactBoxRgb.g, contactBoxRgb.b),
       });
 
+      // Draw border if configured
+      if (sections.client.show_border) {
+        const borderColor = sections.client.border_color || '#e5e7eb';
+        const borderRgb = hexToRgb(borderColor);
+        page.drawRectangle({
+          x: left,
+          y: y - contactBoxHeight,
+          width: contentWidth,
+          height: contactBoxHeight,
+          borderColor: rgb(borderRgb.r, borderRgb.g, borderRgb.b),
+          borderWidth: 1,
+        });
+      }
+
       let boxY = y - boxPadding - 10;
       page.drawText('CONTACTO', {
         x: left + boxPadding,
@@ -432,7 +431,6 @@ async function generateQuotePdfAdvanced(
     const services = quote.services || [];
 
     services.forEach((svc, idx) => {
-      const rowTopY = y;
       const rowBottomY = y - rowHeight;
 
       // Alternate row background
@@ -673,224 +671,6 @@ async function generateQuotePdfAdvanced(
   }
 
   return pdfToBlob(pdfDoc);
-}
-
-// Legacy quote PDF generator
-async function generateQuotePdfLegacy(
-  quote: QuoteData,
-  company: CompanyData,
-  config?: PdfConfig
-): Promise<Blob> {
-  const pdfDoc = await createPdfDocument();
-  const fonts = await embedFonts(pdfDoc);
-  const page = addPage(pdfDoc);
-  
-  const pdfColors = createColorsFromConfig(config);
-  const fontSize = config?.font_size_base || 10;
-  const showDiscounts = config?.show_discounts_column !== false;
-  const showNotes = config?.show_notes !== false;
-  const showIban = config?.show_iban_footer !== false;
-  
-  let y = A4_HEIGHT - MARGIN;
-  
-  // Company header with logo
-  y = await drawCompanyHeaderWithLogo(pdfDoc, page, company, fonts, y, config);
-  
-  // Document title (right side)
-  drawDocumentTitle(page, 'PRESUPUESTO', quote.quote_number, fonts, A4_HEIGHT - MARGIN - 20, pdfColors);
-  
-  // Separator line
-  y -= 10;
-  drawLine(page, MARGIN, y, A4_WIDTH - MARGIN, y, pdfColors.border, 1);
-  y -= 25;
-  
-  // Quote details (right side)
-  const detailsX = A4_WIDTH - MARGIN - 150;
-  let detailY = y + 10;
-  
-  page.drawText('Fecha:', {
-    x: detailsX,
-    y: detailY,
-    size: fontSize - 1,
-    font: fonts.regular,
-    color: pdfColors.muted,
-  });
-  page.drawText(formatDate(quote.created_at), {
-    x: detailsX + 80,
-    y: detailY,
-    size: fontSize - 1,
-    font: fonts.bold,
-    color: pdfColors.text,
-  });
-  detailY -= 14;
-  
-  if (quote.valid_until) {
-    page.drawText('Válido hasta:', {
-      x: detailsX,
-      y: detailY,
-      size: fontSize - 1,
-      font: fonts.regular,
-      color: pdfColors.muted,
-    });
-    page.drawText(formatDate(quote.valid_until), {
-      x: detailsX + 80,
-      y: detailY,
-      size: fontSize - 1,
-      font: fonts.bold,
-      color: pdfColors.text,
-    });
-  }
-  
-  // Client/Contact section
-  if (quote.client) {
-    y = drawClientSection(page, quote.client, fonts, y, pdfColors, fontSize);
-  } else if (quote.contact) {
-    page.drawText('CONTACTO', {
-      x: MARGIN,
-      y,
-      size: fontSize,
-      font: fonts.bold,
-      color: pdfColors.muted,
-    });
-    y -= 16;
-    
-    page.drawText(quote.contact.name || '', {
-      x: MARGIN,
-      y,
-      size: fontSize + 1,
-      font: fonts.bold,
-      color: pdfColors.text,
-    });
-    y -= 14;
-    
-    if (quote.contact.email) {
-      page.drawText(quote.contact.email, {
-        x: MARGIN,
-        y,
-        size: fontSize - 1,
-        font: fonts.regular,
-        color: pdfColors.secondary,
-      });
-      y -= 12;
-    }
-    y -= 10;
-  }
-  
-  // Quote name if exists
-  if (quote.name) {
-    y -= 10;
-    page.drawText(quote.name, {
-      x: MARGIN,
-      y,
-      size: fontSize + 1,
-      font: fonts.bold,
-      color: pdfColors.text,
-    });
-    y -= 20;
-  }
-  
-  y -= 10;
-  
-  // Services table
-  const columns = showDiscounts ? [
-    { label: 'Descripción', x: MARGIN + 5, width: 250 },
-    { label: 'Cant.', x: MARGIN + 260, width: 40 },
-    { label: 'Precio', x: MARGIN + 310, width: 70 },
-    { label: 'Dto.', x: MARGIN + 380, width: 50 },
-    { label: 'Total', x: MARGIN + 440, width: 70 },
-  ] : [
-    { label: 'Descripción', x: MARGIN + 5, width: 280 },
-    { label: 'Cant.', x: MARGIN + 290, width: 50 },
-    { label: 'Precio', x: MARGIN + 350, width: 80 },
-    { label: 'Total', x: MARGIN + 440, width: 70 },
-  ];
-  
-  y = drawTableHeader(page, y, columns, fonts, pdfColors, fontSize - 1);
-  
-  // Service rows
-  const services = quote.services || [];
-  services.forEach((svc, index) => {
-    const serviceName = svc.service?.name || 'Servicio';
-    
-    const values = showDiscounts ? [
-      { text: serviceName.substring(0, 40), x: columns[0].x },
-      { text: String(svc.quantity || 1), x: columns[1].x },
-      { text: formatCurrency(svc.unit_price), x: columns[2].x },
-      { text: svc.discount_percent ? `${svc.discount_percent}%` : '-', x: columns[3].x },
-      { text: formatCurrency(svc.total), x: columns[4].x },
-    ] : [
-      { text: serviceName.substring(0, 50), x: columns[0].x },
-      { text: String(svc.quantity || 1), x: columns[1].x },
-      { text: formatCurrency(svc.unit_price), x: columns[2].x },
-      { text: formatCurrency(svc.total), x: columns[3].x },
-    ];
-    
-    y = drawTableRow(page, y, values, fonts, index % 2 === 1, fontSize - 1);
-  });
-  
-  // Bottom line of table
-  y -= 5;
-  drawLine(page, MARGIN, y, A4_WIDTH - MARGIN, y, pdfColors.border, 0.5);
-  y -= 30;
-  
-  // Totals
-  y = drawTotals(
-    page,
-    quote.subtotal || 0,
-    quote.iva_total || 0,
-    quote.total || 0,
-    fonts,
-    y,
-    21,
-    pdfColors,
-    fontSize
-  );
-  
-  // Notes
-  if (showNotes && quote.notes) {
-    y -= 20;
-    page.drawText('Observaciones:', {
-      x: MARGIN,
-      y,
-      size: fontSize - 1,
-      font: fonts.bold,
-      color: pdfColors.muted,
-    });
-    y -= 14;
-    
-    const noteLines = quote.notes.split('\n').slice(0, 3);
-    noteLines.forEach((line) => {
-      page.drawText(line.substring(0, 80), {
-        x: MARGIN,
-        y,
-        size: fontSize - 2,
-        font: fonts.regular,
-        color: pdfColors.secondary,
-      });
-      y -= 12;
-    });
-  }
-  
-  // Footer
-  drawFooter(page, company, fonts, showIban, pdfColors);
-  
-  return pdfToBlob(pdfDoc);
-}
-
-export async function generateQuotePdf(
-  quote: QuoteData,
-  company: CompanyData,
-  config?: PdfConfig,
-  template?: QuoteTemplate
-): Promise<Blob> {
-  const useAdvanced = isQuote2Template(template);
-  console.log('[PDF] Quote layout:', useAdvanced ? 'Advanced' : 'Legacy', 'template=', template?.name);
-
-  if (useAdvanced) {
-    return generateQuotePdfAdvanced(quote, company, config);
-  }
-
-  return generateQuotePdfLegacy(quote, company, config);
 }
 
 export async function generateQuotePdfBase64(
