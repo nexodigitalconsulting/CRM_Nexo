@@ -51,7 +51,7 @@ import { PdfSectionEditor } from "./PdfSectionEditor";
 import { ContractClausesEditor } from "./ContractClausesEditor";
 import { VisualPdfDesigner } from "./pdf-editor";
 import { embedPdfConfigInTemplate, extractPdfConfigFromTemplate } from "@/hooks/useDefaultTemplate";
-import { PdfConfig, PdfSections, getDefaultSections, LegalClause, DEFAULT_LEGAL_CLAUSES } from "@/lib/pdf/pdfUtils";
+import { PdfConfig, PdfSections, getDefaultSections, LegalClause, DEFAULT_LEGAL_CLAUSES, BlockType, DEFAULT_SECTION_ORDER, DEFAULT_CONTRACT_SECTION_ORDER } from "@/lib/pdf/pdfUtils";
 
 type DocumentType = 'invoice' | 'quote' | 'contract';
 
@@ -107,6 +107,9 @@ export function PdfSettingsManager() {
   // Legal clauses for contracts
   const [legalClauses, setLegalClauses] = useState<LegalClause[]>(DEFAULT_LEGAL_CLAUSES);
 
+  // Section order for visual editor
+  const [sectionOrder, setSectionOrder] = useState<BlockType[]>(DEFAULT_SECTION_ORDER);
+
   const { data: templates = [], isLoading } = usePdfTemplates(selectedDocument);
   const createTemplate = useCreatePdfTemplate();
   const updateTemplate = useUpdatePdfTemplate();
@@ -143,6 +146,7 @@ export function PdfSettingsManager() {
     show_totals_lines: showTotalsLines,
     totals_line_color: totalsLineColor,
     sections: sections,
+    section_order: sectionOrder,
     legal_clauses: selectedDocument === 'contract' ? legalClauses : undefined,
   };
 
@@ -178,6 +182,13 @@ export function PdfSettingsManager() {
       setSections(getDefaultSections());
     }
     
+    // Load section_order
+    if (config.section_order && config.section_order.length > 0) {
+      setSectionOrder(config.section_order);
+    } else {
+      setSectionOrder(selectedDocument === 'contract' ? DEFAULT_CONTRACT_SECTION_ORDER : DEFAULT_SECTION_ORDER);
+    }
+    
     if (config.legal_clauses) {
       setLegalClauses(config.legal_clauses);
     } else {
@@ -200,6 +211,8 @@ export function PdfSettingsManager() {
     setSelectedTemplateId(null);
     setHasUnsavedChanges(false);
     setTitleText(defaultTitles[selectedDocument]);
+    // Reset section order for document type
+    setSectionOrder(selectedDocument === 'contract' ? DEFAULT_CONTRACT_SECTION_ORDER : DEFAULT_SECTION_ORDER);
   }, [selectedDocument]);
 
   const handleTemplateSelect = (templateId: string) => {
@@ -474,6 +487,7 @@ export function PdfSettingsManager() {
             if (config.client_box_color) setClientBoxColor(config.client_box_color);
             if (config.table_header_color) setTableHeaderColor(config.table_header_color);
             if (config.sections) setSections(config.sections);
+            if (config.section_order) setSectionOrder(config.section_order);
             if (config.legal_clauses) setLegalClauses(config.legal_clauses);
             setHasUnsavedChanges(true);
           }}
