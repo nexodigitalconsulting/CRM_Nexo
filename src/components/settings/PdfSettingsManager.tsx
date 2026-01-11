@@ -2,10 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import {
   Select,
@@ -41,14 +38,11 @@ import {
   useSetDefaultTemplate,
 } from "@/hooks/usePdfTemplates";
 import { 
-  Loader2, FileText, Palette, Eye, Save, Layout, Type, 
+  Loader2, FileText, Layout,
   Plus, Trash2, Copy, Star,
-  FileSignature, Settings2, Layers, Scale, Wand2, Settings
+  FileSignature, Wand2
 } from "lucide-react";
 import { toast } from "sonner";
-import { PdfPreview } from "./PdfPreview";
-import { PdfSectionEditor } from "./PdfSectionEditor";
-import { ContractClausesEditor } from "./ContractClausesEditor";
 import { VisualPdfDesigner } from "./pdf-editor";
 import { embedPdfConfigInTemplate, extractPdfConfigFromTemplate } from "@/hooks/useDefaultTemplate";
 import { PdfConfig, PdfSections, getDefaultSections, LegalClause, DEFAULT_LEGAL_CLAUSES, BlockType, DEFAULT_SECTION_ORDER, DEFAULT_CONTRACT_SECTION_ORDER } from "@/lib/pdf/pdfUtils";
@@ -69,7 +63,7 @@ const defaultTitles: Record<DocumentType, string> = {
 
 export function PdfSettingsManager() {
   const { data: companySettings } = useCompanySettings();
-  const [editorMode, setEditorMode] = useState<'visual' | 'classic'>('visual');
+  // Visual-only mode - Classic editor removed
   const [selectedDocument, setSelectedDocument] = useState<DocumentType>('invoice');
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
   const [editedName, setEditedName] = useState<string>('');
@@ -200,11 +194,11 @@ export function PdfSettingsManager() {
 
   const currentConfig = normalizeConfigForPdf(currentConfigBase);
 
-  // Keep configDraft aligned with Classic field states.
-  // (Visual editor writes configDraft directly to avoid saving stale state.)
-  useEffect(() => {
-    setConfigDraft(currentConfig);
-  }, [currentConfig]);
+  // REMOVED: The useEffect that synchronized configDraft from currentConfig
+  // was causing state overwrites when using Visual editor.
+  // Now configDraft is ONLY updated by:
+  // 1. loadExtendedConfig (when loading a template)
+  // 2. VisualPdfDesigner's onConfigChange
 
   // Load config from template content
   const loadExtendedConfig = useCallback((content: string) => {
@@ -449,46 +443,11 @@ export function PdfSettingsManager() {
             Personaliza las plantillas para facturas, presupuestos y contratos
           </p>
         </div>
-        <div className="flex items-center gap-4">
-          {/* Editor Mode Toggle */}
-          <div className="flex items-center gap-2 border rounded-lg p-1">
-            <Button
-              variant={editorMode === 'visual' ? 'default' : 'ghost'}
-              size="sm"
-              onClick={() => setEditorMode('visual')}
-              className="gap-1"
-            >
-              <Wand2 className="h-4 w-4" />
-              Visual
-            </Button>
-            <Button
-              variant={editorMode === 'classic' ? 'default' : 'ghost'}
-              size="sm"
-              onClick={() => setEditorMode('classic')}
-              className="gap-1"
-            >
-              <Settings className="h-4 w-4" />
-              Clásico
-            </Button>
-          </div>
-          {editorMode === 'classic' && (
-            <>
-              {hasUnsavedChanges && (
-                <Badge variant="outline" className="text-amber-600 border-amber-300 bg-amber-50">
-                  Cambios sin guardar
-                </Badge>
-              )}
-              <Button 
-                onClick={handleSave} 
-                disabled={updateTemplate.isPending || !hasUnsavedChanges} 
-                className="gap-2"
-              >
-                {updateTemplate.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-                Guardar
-              </Button>
-            </>
-          )}
-        </div>
+        {/* Visual editor badge - removed Classic mode toggle */}
+        <Badge variant="secondary" className="gap-1">
+          <Wand2 className="h-4 w-4" />
+          Editor Visual
+        </Badge>
       </div>
 
       {/* Document Type Selector */}
@@ -574,11 +533,11 @@ export function PdfSettingsManager() {
         </CardContent>
       </Card>
 
-      {/* Visual Editor Mode */}
-      {selectedTemplate && editorMode === 'visual' && (
+      {/* Visual Editor - Now the only mode */}
+      {selectedTemplate && (
         <VisualPdfDesigner
           documentType={selectedDocument}
-          initialConfig={configDraft ?? currentConfig}
+          initialConfig={configDraft}
           templateName={editedName}
           onConfigChange={(config) => {
             // Normalize to what the real pdf-lib generator uses (sections.*)
@@ -586,30 +545,6 @@ export function PdfSettingsManager() {
 
             // IMPORTANT: store the full normalized config immediately so Save never persists stale state
             setConfigDraft(normalized);
-
-            // Sync all fields to keep Classic UI consistent too
-            if (normalized.primary_color !== undefined) setPrimaryColor(normalized.primary_color);
-            if (normalized.secondary_color !== undefined) setSecondaryColor(normalized.secondary_color);
-            if (normalized.title_text !== undefined) setTitleText(normalized.title_text);
-            if (normalized.title_size !== undefined) setTitleSize(normalized.title_size);
-            if (normalized.client_box_color !== undefined) setClientBoxColor(normalized.client_box_color);
-            if (normalized.table_header_color !== undefined) setTableHeaderColor(normalized.table_header_color);
-            if (normalized.sections !== undefined) setSections(normalized.sections);
-            if (normalized.section_order !== undefined) setSectionOrder(normalized.section_order);
-            if (normalized.legal_clauses !== undefined) setLegalClauses(normalized.legal_clauses);
-            if (normalized.show_footer_legal !== undefined) setShowFooterLegal(normalized.show_footer_legal);
-            if (normalized.footer_legal_lines !== undefined)
-              setFooterLegalText(normalized.footer_legal_lines.join('\n'));
-            if (normalized.line_spacing !== undefined) setLineSpacing(normalized.line_spacing);
-            if (normalized.section_spacing !== undefined) setSectionSpacing(normalized.section_spacing);
-            if (normalized.row_height !== undefined) setRowHeight(normalized.row_height);
-            if (normalized.client_box_padding !== undefined) setClientBoxPadding(normalized.client_box_padding);
-            if (normalized.margins !== undefined) setDocMargins(normalized.margins);
-            if (normalized.show_table_borders !== undefined) setShowTableBorders(normalized.show_table_borders);
-            if (normalized.table_border_color !== undefined) setTableBorderColor(normalized.table_border_color);
-            if (normalized.show_totals_lines !== undefined) setShowTotalsLines(normalized.show_totals_lines);
-            if (normalized.totals_line_color !== undefined) setTotalsLineColor(normalized.totals_line_color);
-
             setHasUnsavedChanges(true);
           }}
           onNameChange={(name) => {
@@ -622,427 +557,7 @@ export function PdfSettingsManager() {
         />
       )}
 
-      {/* Classic Editor + Preview */}
-      {selectedTemplate && editorMode === 'classic' && (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Editor Panel */}
-          <div className="lg:col-span-2">
-            <Tabs defaultValue="sections" className="w-full">
-              <TabsList className={`grid w-full ${selectedDocument === 'contract' ? 'grid-cols-4' : 'grid-cols-3'}`}>
-                <TabsTrigger value="sections" className="gap-1">
-                  <Layers className="h-4 w-4" />
-                  <span className="hidden sm:inline">Secciones</span>
-                </TabsTrigger>
-                {selectedDocument === 'contract' && (
-                  <TabsTrigger value="clauses" className="gap-1">
-                    <Scale className="h-4 w-4" />
-                    <span className="hidden sm:inline">Cláusulas</span>
-                  </TabsTrigger>
-                )}
-                <TabsTrigger value="colors" className="gap-1">
-                  <Palette className="h-4 w-4" />
-                  <span className="hidden sm:inline">Colores</span>
-                </TabsTrigger>
-                <TabsTrigger value="design" className="gap-1">
-                  <Settings2 className="h-4 w-4" />
-                  <span className="hidden sm:inline">Diseño</span>
-                </TabsTrigger>
-              </TabsList>
-
-              {/* Sections Tab */}
-              <TabsContent value="sections" className="mt-4">
-                <PdfSectionEditor 
-                  sections={sections} 
-                  onChange={(newSections) => {
-                    setSections(newSections);
-                    setHasUnsavedChanges(true);
-                  }}
-                  documentType={selectedDocument}
-                />
-              </TabsContent>
-
-              {/* Clauses Tab - Contracts only */}
-              {selectedDocument === 'contract' && (
-                <TabsContent value="clauses" className="mt-4">
-                  <Card>
-                    <CardContent className="pt-6">
-                      <ContractClausesEditor 
-                        clauses={legalClauses}
-                        onChange={(newClauses) => {
-                          setLegalClauses(newClauses);
-                          setHasUnsavedChanges(true);
-                        }}
-                      />
-                    </CardContent>
-                  </Card>
-                </TabsContent>
-              )}
-
-              {/* Colors Tab */}
-              <TabsContent value="colors" className="mt-4">
-                <Card>
-                  <CardContent className="pt-6 space-y-6">
-                    <div className="space-y-2">
-                      <Label>Nombre de la plantilla</Label>
-                      <Input
-                        value={editedName}
-                        onChange={(e) => {
-                          setEditedName(e.target.value);
-                          setHasUnsavedChanges(true);
-                        }}
-                        placeholder="Nombre de la plantilla"
-                      />
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-6">
-                      <div className="space-y-2">
-                        <Label>Color primario</Label>
-                        <div className="flex gap-2">
-                          <Input
-                            type="color"
-                            value={primaryColor}
-                            onChange={(e) => handleColorChange('primary', e.target.value)}
-                            className="w-12 h-10 p-1 cursor-pointer"
-                          />
-                          <Input
-                            value={primaryColor}
-                            onChange={(e) => handleColorChange('primary', e.target.value)}
-                            className="flex-1 font-mono text-sm"
-                          />
-                        </div>
-                        <p className="text-xs text-muted-foreground">Títulos, cabeceras y totales</p>
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label>Color secundario</Label>
-                        <div className="flex gap-2">
-                          <Input
-                            type="color"
-                            value={secondaryColor}
-                            onChange={(e) => handleColorChange('secondary', e.target.value)}
-                            className="w-12 h-10 p-1 cursor-pointer"
-                          />
-                          <Input
-                            value={secondaryColor}
-                            onChange={(e) => handleColorChange('secondary', e.target.value)}
-                            className="flex-1 font-mono text-sm"
-                          />
-                        </div>
-                        <p className="text-xs text-muted-foreground">Texto secundario y etiquetas</p>
-                      </div>
-                    </div>
-
-                    <div className="border rounded-lg p-4 bg-muted/30">
-                      <p className="text-sm font-medium mb-3">Vista previa de colores</p>
-                      <div className="flex gap-6">
-                        <div className="flex items-center gap-2">
-                          <div className="w-6 h-6 rounded border" style={{ backgroundColor: primaryColor }} />
-                          <span className="text-sm" style={{ color: primaryColor }}>Título Principal</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <div className="w-6 h-6 rounded border" style={{ backgroundColor: secondaryColor }} />
-                          <span className="text-sm" style={{ color: secondaryColor }}>Texto secundario</span>
-                        </div>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              </TabsContent>
-
-              {/* Design Tab */}
-              <TabsContent value="design" className="mt-4">
-                <Card>
-                  <CardContent className="pt-6 space-y-6">
-                    {/* Title */}
-                    <div className="space-y-4">
-                      <h4 className="font-medium text-sm flex items-center gap-2">
-                        <Type className="h-4 w-4" />
-                        Título del documento
-                      </h4>
-                      <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                          <Label>Texto del título</Label>
-                          <Input
-                            value={titleText}
-                            onChange={(e) => {
-                              setTitleText(e.target.value);
-                              setHasUnsavedChanges(true);
-                            }}
-                            placeholder="FACTURA"
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <Label>Tamaño (px): {titleSize}</Label>
-                          <Input
-                            type="range"
-                            min="20"
-                            max="40"
-                            value={titleSize}
-                            onChange={(e) => {
-                              setTitleSize(Number(e.target.value));
-                              setHasUnsavedChanges(true);
-                            }}
-                            className="w-full"
-                          />
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Element Colors */}
-                    <div className="space-y-4">
-                      <h4 className="font-medium text-sm flex items-center gap-2">
-                        <Palette className="h-4 w-4" />
-                        Colores de elementos
-                      </h4>
-                      <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                          <Label>Fondo caja cliente</Label>
-                          <div className="flex gap-2">
-                            <Input
-                              type="color"
-                              value={clientBoxColor}
-                              onChange={(e) => {
-                                setClientBoxColor(e.target.value);
-                                setHasUnsavedChanges(true);
-                              }}
-                              className="w-12 h-10 p-1 cursor-pointer"
-                            />
-                            <Input
-                              value={clientBoxColor}
-                              onChange={(e) => {
-                                setClientBoxColor(e.target.value);
-                                setHasUnsavedChanges(true);
-                              }}
-                              className="flex-1 font-mono text-sm"
-                            />
-                          </div>
-                        </div>
-                        <div className="space-y-2">
-                          <Label>Cabecera de tabla</Label>
-                          <div className="flex gap-2">
-                            <Input
-                              type="color"
-                              value={tableHeaderColor}
-                              onChange={(e) => {
-                                setTableHeaderColor(e.target.value);
-                                setHasUnsavedChanges(true);
-                              }}
-                              className="w-12 h-10 p-1 cursor-pointer"
-                            />
-                            <Input
-                              value={tableHeaderColor}
-                              onChange={(e) => {
-                                setTableHeaderColor(e.target.value);
-                                setHasUnsavedChanges(true);
-                              }}
-                              className="flex-1 font-mono text-sm"
-                            />
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Footer Legal */}
-                    <div className="space-y-4">
-                      <div className="flex items-center justify-between">
-                        <h4 className="font-medium text-sm flex items-center gap-2">
-                          <FileSignature className="h-4 w-4" />
-                          Pie legal
-                        </h4>
-                        <Switch
-                          checked={showFooterLegal}
-                          onCheckedChange={(checked) => {
-                            setShowFooterLegal(checked);
-                            setHasUnsavedChanges(true);
-                          }}
-                        />
-                      </div>
-                      {showFooterLegal && (
-                        <div className="space-y-2">
-                          <Label>Texto legal (una línea por fila)</Label>
-                          <Textarea
-                            value={footerLegalText}
-                            onChange={(e) => {
-                              setFooterLegalText(e.target.value);
-                              setHasUnsavedChanges(true);
-                            }}
-                            placeholder="Esta factura ha sido emitida conforme a la legislación vigente."
-                            rows={3}
-                            className="text-sm"
-                          />
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Spacing */}
-                    <div className="space-y-4">
-                      <h4 className="font-medium text-sm flex items-center gap-2">
-                        <Layout className="h-4 w-4" />
-                        Espaciado
-                      </h4>
-                      <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                          <Label>Espaciado entre líneas: {lineSpacing}px</Label>
-                          <Input
-                            type="range"
-                            min="10"
-                            max="22"
-                            value={lineSpacing}
-                            onChange={(e) => {
-                              setLineSpacing(Number(e.target.value));
-                              setHasUnsavedChanges(true);
-                            }}
-                            className="w-full"
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <Label>Espacio entre secciones: {sectionSpacing}px</Label>
-                          <Input
-                            type="range"
-                            min="16"
-                            max="50"
-                            value={sectionSpacing}
-                            onChange={(e) => {
-                              setSectionSpacing(Number(e.target.value));
-                              setHasUnsavedChanges(true);
-                            }}
-                            className="w-full"
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <Label>Altura de filas tabla: {rowHeight}px</Label>
-                          <Input
-                            type="range"
-                            min="18"
-                            max="36"
-                            value={rowHeight}
-                            onChange={(e) => {
-                              setRowHeight(Number(e.target.value));
-                              setHasUnsavedChanges(true);
-                            }}
-                            className="w-full"
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <Label>Padding caja cliente: {clientBoxPadding}px</Label>
-                          <Input
-                            type="range"
-                            min="8"
-                            max="28"
-                            value={clientBoxPadding}
-                            onChange={(e) => {
-                              setClientBoxPadding(Number(e.target.value));
-                              setHasUnsavedChanges(true);
-                            }}
-                            className="w-full"
-                          />
-                        </div>
-                        <div className="space-y-2 col-span-2">
-                          <Label>Márgenes del documento: {docMargins}px</Label>
-                          <Input
-                            type="range"
-                            min="30"
-                            max="80"
-                            value={docMargins}
-                            onChange={(e) => {
-                              setDocMargins(Number(e.target.value));
-                              setHasUnsavedChanges(true);
-                            }}
-                            className="w-full"
-                          />
-                        </div>
-                      </div>
-                      
-                      {/* Table Borders */}
-                      <div className="mt-4 pt-4 border-t space-y-3">
-                        <div className="flex items-center justify-between">
-                          <Label>Mostrar líneas divisorias en tabla</Label>
-                          <Switch
-                            checked={showTableBorders}
-                            onCheckedChange={(checked) => {
-                              setShowTableBorders(checked);
-                              setHasUnsavedChanges(true);
-                            }}
-                          />
-                        </div>
-                        {showTableBorders && (
-                          <div className="flex items-center gap-3">
-                            <Label className="w-32">Color de líneas:</Label>
-                            <Input
-                              type="color"
-                              value={tableBorderColor}
-                              onChange={(e) => {
-                                setTableBorderColor(e.target.value);
-                                setHasUnsavedChanges(true);
-                              }}
-                              className="w-12 h-8 p-0"
-                            />
-                            <span className="text-xs text-muted-foreground">{tableBorderColor}</span>
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Totals Lines */}
-                      <div className="mt-4 pt-4 border-t space-y-3">
-                        <div className="flex items-center justify-between">
-                          <Label>Mostrar líneas separadoras en Totales</Label>
-                          <Switch
-                            checked={showTotalsLines}
-                            onCheckedChange={(checked) => {
-                              setShowTotalsLines(checked);
-                              setHasUnsavedChanges(true);
-                            }}
-                          />
-                        </div>
-                        {showTotalsLines && (
-                          <div className="flex items-center gap-3">
-                            <Label className="w-32">Color de líneas:</Label>
-                            <Input
-                              type="color"
-                              value={totalsLineColor}
-                              onChange={(e) => {
-                                setTotalsLineColor(e.target.value);
-                                setHasUnsavedChanges(true);
-                              }}
-                              className="w-12 h-8 p-0"
-                            />
-                            <span className="text-xs text-muted-foreground">{totalsLineColor}</span>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              </TabsContent>
-            </Tabs>
-          </div>
-
-          {/* Preview Panel */}
-          <div className="lg:col-span-1">
-            <Card className="sticky top-4">
-              <CardHeader className="pb-3">
-                <CardTitle className="text-base flex items-center justify-between">
-                  <span className="flex items-center gap-2">
-                    <Eye className="h-4 w-4" />
-                    Vista previa
-                  </span>
-                  <Badge variant="secondary">{documentLabels[selectedDocument]}</Badge>
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <PdfPreview
-                  documentType={selectedDocument}
-                  config={configDraft ?? currentConfig}
-                  scale={0.45}
-                />
-                <p className="text-xs text-muted-foreground text-center mt-3">
-                  Vista previa del PDF generado
-                </p>
-              </CardContent>
-            </Card>
-          </div>
-        </div>
-      )}
+      {/* Classic Editor removed - Visual-only mode */}
 
       {/* Empty state */}
       {!selectedTemplate && templates.length === 0 && (
