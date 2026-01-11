@@ -43,12 +43,13 @@ import {
 import { 
   Loader2, FileText, Palette, Eye, Save, Layout, Type, 
   Plus, Trash2, Copy, Star,
-  FileSignature, Settings2, Layers, Scale
+  FileSignature, Settings2, Layers, Scale, Wand2, Settings
 } from "lucide-react";
 import { toast } from "sonner";
 import { PdfPreview } from "./PdfPreview";
 import { PdfSectionEditor } from "./PdfSectionEditor";
 import { ContractClausesEditor } from "./ContractClausesEditor";
+import { VisualPdfDesigner } from "./pdf-editor";
 import { embedPdfConfigInTemplate, extractPdfConfigFromTemplate } from "@/hooks/useDefaultTemplate";
 import { PdfConfig, PdfSections, getDefaultSections, LegalClause, DEFAULT_LEGAL_CLAUSES } from "@/lib/pdf/pdfUtils";
 
@@ -68,6 +69,7 @@ const defaultTitles: Record<DocumentType, string> = {
 
 export function PdfSettingsManager() {
   const { data: companySettings } = useCompanySettings();
+  const [editorMode, setEditorMode] = useState<'visual' | 'classic'>('visual');
   const [selectedDocument, setSelectedDocument] = useState<DocumentType>('invoice');
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
   const [editedName, setEditedName] = useState<string>('');
@@ -333,20 +335,45 @@ export function PdfSettingsManager() {
             Personaliza las plantillas para facturas, presupuestos y contratos
           </p>
         </div>
-        <div className="flex items-center gap-2">
-          {hasUnsavedChanges && (
-            <Badge variant="outline" className="text-amber-600 border-amber-300 bg-amber-50">
-              Cambios sin guardar
-            </Badge>
+        <div className="flex items-center gap-4">
+          {/* Editor Mode Toggle */}
+          <div className="flex items-center gap-2 border rounded-lg p-1">
+            <Button
+              variant={editorMode === 'visual' ? 'default' : 'ghost'}
+              size="sm"
+              onClick={() => setEditorMode('visual')}
+              className="gap-1"
+            >
+              <Wand2 className="h-4 w-4" />
+              Visual
+            </Button>
+            <Button
+              variant={editorMode === 'classic' ? 'default' : 'ghost'}
+              size="sm"
+              onClick={() => setEditorMode('classic')}
+              className="gap-1"
+            >
+              <Settings className="h-4 w-4" />
+              Clásico
+            </Button>
+          </div>
+          {editorMode === 'classic' && (
+            <>
+              {hasUnsavedChanges && (
+                <Badge variant="outline" className="text-amber-600 border-amber-300 bg-amber-50">
+                  Cambios sin guardar
+                </Badge>
+              )}
+              <Button 
+                onClick={handleSave} 
+                disabled={updateTemplate.isPending || !hasUnsavedChanges} 
+                className="gap-2"
+              >
+                {updateTemplate.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                Guardar
+              </Button>
+            </>
           )}
-          <Button 
-            onClick={handleSave} 
-            disabled={updateTemplate.isPending || !hasUnsavedChanges} 
-            className="gap-2"
-          >
-            {updateTemplate.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-            Guardar
-          </Button>
         </div>
       </div>
 
@@ -433,8 +460,35 @@ export function PdfSettingsManager() {
         </CardContent>
       </Card>
 
-      {/* Editor + Preview */}
-      {selectedTemplate && (
+      {/* Visual Editor Mode */}
+      {selectedTemplate && editorMode === 'visual' && (
+        <VisualPdfDesigner
+          documentType={selectedDocument}
+          initialConfig={currentConfig}
+          templateName={editedName}
+          onConfigChange={(config) => {
+            if (config.primary_color) setPrimaryColor(config.primary_color);
+            if (config.secondary_color) setSecondaryColor(config.secondary_color);
+            if (config.title_text) setTitleText(config.title_text);
+            if (config.title_size) setTitleSize(config.title_size);
+            if (config.client_box_color) setClientBoxColor(config.client_box_color);
+            if (config.table_header_color) setTableHeaderColor(config.table_header_color);
+            if (config.sections) setSections(config.sections);
+            if (config.legal_clauses) setLegalClauses(config.legal_clauses);
+            setHasUnsavedChanges(true);
+          }}
+          onNameChange={(name) => {
+            setEditedName(name);
+            setHasUnsavedChanges(true);
+          }}
+          onSave={handleSave}
+          isSaving={updateTemplate.isPending}
+          hasUnsavedChanges={hasUnsavedChanges}
+        />
+      )}
+
+      {/* Classic Editor + Preview */}
+      {selectedTemplate && editorMode === 'classic' && (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Editor Panel */}
           <div className="lg:col-span-2">
