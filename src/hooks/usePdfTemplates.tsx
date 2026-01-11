@@ -90,7 +90,9 @@ export function useCreatePdfTemplate() {
       return data;
     },
     onSuccess: () => {
+      // Invalidate both pdf-templates and default-template caches
       queryClient.invalidateQueries({ queryKey: ['pdf-templates'] });
+      queryClient.invalidateQueries({ queryKey: ['default-template'] });
       toast.success('Plantilla creada correctamente');
     },
     onError: (error) => {
@@ -124,7 +126,9 @@ export function useUpdatePdfTemplate() {
       return data;
     },
     onSuccess: () => {
+      // Invalidate both pdf-templates and default-template caches
       queryClient.invalidateQueries({ queryKey: ['pdf-templates'] });
+      queryClient.invalidateQueries({ queryKey: ['default-template'] });
       toast.success('Plantilla actualizada');
     },
     onError: (error) => {
@@ -147,7 +151,9 @@ export function useDeletePdfTemplate() {
       if (error) throw error;
     },
     onSuccess: () => {
+      // Invalidate both pdf-templates and default-template caches
       queryClient.invalidateQueries({ queryKey: ['pdf-templates'] });
+      queryClient.invalidateQueries({ queryKey: ['default-template'] });
       toast.success('Plantilla eliminada');
     },
     onError: (error) => {
@@ -180,7 +186,9 @@ export function useSetDefaultTemplate() {
       return data;
     },
     onSuccess: () => {
+      // Invalidate both pdf-templates and default-template caches
       queryClient.invalidateQueries({ queryKey: ['pdf-templates'] });
+      queryClient.invalidateQueries({ queryKey: ['default-template'] });
       toast.success('Plantilla establecida como predeterminada');
     },
     onError: (error) => {
