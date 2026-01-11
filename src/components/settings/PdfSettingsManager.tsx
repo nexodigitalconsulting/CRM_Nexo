@@ -79,7 +79,17 @@ export function PdfSettingsManager() {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [newTemplateName, setNewTemplateName] = useState('');
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
-  
+
+  // Single source of truth for saving + cross-mode consistency.
+  // Classic UI still edits the per-field states below, but we always keep configDraft in sync.
+  const [configDraft, setConfigDraft] = useState<PdfConfig>({
+    primary_color: '#3366cc',
+    secondary_color: '#666666',
+    title_text: defaultTitles.invoice,
+    sections: getDefaultSections(),
+    section_order: DEFAULT_SECTION_ORDER,
+  });
+
   // Extended design settings
   const [titleText, setTitleText] = useState('FACTURA');
   const [titleSize, setTitleSize] = useState(28);
@@ -87,7 +97,7 @@ export function PdfSettingsManager() {
   const [tableHeaderColor, setTableHeaderColor] = useState('#3b82f6');
   const [showFooterLegal, setShowFooterLegal] = useState(false);
   const [footerLegalText, setFooterLegalText] = useState('');
-  
+
   // Spacing settings
   const [lineSpacing, setLineSpacing] = useState(14);
   const [sectionSpacing, setSectionSpacing] = useState(28);
@@ -103,7 +113,7 @@ export function PdfSettingsManager() {
 
   // Section-based configuration
   const [sections, setSections] = useState<PdfSections>(getDefaultSections());
-  
+
   // Legal clauses for contracts
   const [legalClauses, setLegalClauses] = useState<LegalClause[]>(DEFAULT_LEGAL_CLAUSES);
 
@@ -118,7 +128,7 @@ export function PdfSettingsManager() {
 
   const selectedTemplate = templates.find(t => t.id === selectedTemplateId);
 
-  // Build the current PdfConfig from state
+  // Build the current PdfConfig from state (used by Classic UI)
   const currentConfig: PdfConfig = {
     primary_color: primaryColor,
     secondary_color: secondaryColor,
@@ -135,7 +145,7 @@ export function PdfSettingsManager() {
     client_box_color: clientBoxColor,
     table_header_color: tableHeaderColor,
     show_footer_legal: showFooterLegal,
-    footer_legal_lines: footerLegalText.split('\n').filter(line => line.trim()),
+    footer_legal_lines: footerLegalText.split('\n').filter((line) => line.trim()),
     line_spacing: lineSpacing,
     section_spacing: sectionSpacing,
     row_height: rowHeight,
@@ -150,50 +160,120 @@ export function PdfSettingsManager() {
     legal_clauses: selectedDocument === 'contract' ? legalClauses : undefined,
   };
 
+  // Keep configDraft aligned with Classic field states.
+  // (Visual editor writes configDraft directly to avoid saving stale state.)
+  useEffect(() => {
+    setConfigDraft(currentConfig);
+  }, [
+    selectedDocument,
+    primaryColor,
+    secondaryColor,
+    titleText,
+    titleSize,
+    clientBoxColor,
+    tableHeaderColor,
+    showFooterLegal,
+    footerLegalText,
+    lineSpacing,
+    sectionSpacing,
+    rowHeight,
+    clientBoxPadding,
+    docMargins,
+    showTableBorders,
+    tableBorderColor,
+    showTotalsLines,
+    totalsLineColor,
+    sections,
+    sectionOrder,
+    legalClauses,
+  ]);
+
   // Load config from template content
   const loadExtendedConfig = useCallback((content: string) => {
-    const templateData = { content, id: '', name: '', entity_type: selectedDocument, variables: null, is_default: false, is_active: true, created_at: '', updated_at: '' };
-    const config = extractPdfConfigFromTemplate(templateData as any);
-    
-    if (config.primary_color) setPrimaryColor(config.primary_color);
-    if (config.secondary_color) setSecondaryColor(config.secondary_color);
-    if (config.title_text) setTitleText(config.title_text);
-    if (config.title_size) setTitleSize(config.title_size);
-    if (config.client_box_color) setClientBoxColor(config.client_box_color);
-    if (config.table_header_color) setTableHeaderColor(config.table_header_color);
-    setShowFooterLegal(config.show_footer_legal ?? false);
-    if (config.footer_legal_lines) setFooterLegalText(config.footer_legal_lines.join('\n'));
-    
-    if (config.line_spacing) setLineSpacing(config.line_spacing);
-    if (config.section_spacing) setSectionSpacing(config.section_spacing);
-    if (config.row_height) setRowHeight(config.row_height);
-    if (config.client_box_padding) setClientBoxPadding(config.client_box_padding);
-    if (config.margins) setDocMargins(config.margins);
+    const templateData = {
+      content,
+      id: '',
+      name: '',
+      entity_type: selectedDocument,
+      variables: null,
+      is_default: false,
+      is_active: true,
+      created_at: '',
+      updated_at: '',
+    };
 
-    setShowTableBorders(config.show_table_borders ?? true);
-    if (config.table_border_color) setTableBorderColor(config.table_border_color);
+    const parsed = extractPdfConfigFromTemplate(templateData as any);
 
-    setShowTotalsLines(config.show_totals_lines ?? true);
-    if (config.totals_line_color) setTotalsLineColor(config.totals_line_color);
+    // Normalize/merge with defaults so both editors see the same complete config.
+    const defaultSections = getDefaultSections();
+    const normalized: PdfConfig = {
+      primary_color: parsed.primary_color ?? '#3366cc',
+      secondary_color: parsed.secondary_color ?? '#666666',
+      accent_color: parsed.accent_color ?? (parsed.primary_color ?? '#3366cc'),
+      show_logo: parsed.show_logo ?? true,
+      logo_position: parsed.logo_position ?? 'left',
+      show_iban_footer: parsed.show_iban_footer ?? true,
+      show_notes: parsed.show_notes ?? true,
+      show_discounts_column: parsed.show_discounts_column ?? false,
+      header_style: parsed.header_style ?? 'classic',
+      font_size_base: parsed.font_size_base ?? 10,
+      title_text: parsed.title_text ?? defaultTitles[selectedDocument],
+      title_size: parsed.title_size ?? 28,
+      client_box_color: parsed.client_box_color ?? '#f1f5f9',
+      table_header_color: parsed.table_header_color ?? '#3b82f6',
+      show_footer_legal: parsed.show_footer_legal ?? false,
+      footer_legal_lines: parsed.footer_legal_lines ?? [],
+      line_spacing: parsed.line_spacing ?? 14,
+      section_spacing: parsed.section_spacing ?? 28,
+      row_height: parsed.row_height ?? 22,
+      client_box_padding: parsed.client_box_padding ?? 14,
+      margins: parsed.margins ?? 50,
+      show_table_borders: parsed.show_table_borders ?? true,
+      table_border_color: parsed.table_border_color ?? '#e5e7eb',
+      show_totals_lines: parsed.show_totals_lines ?? true,
+      totals_line_color: parsed.totals_line_color ?? '#e5e7eb',
+      sections: parsed.sections ? { ...defaultSections, ...parsed.sections } : defaultSections,
+      section_order:
+        parsed.section_order && parsed.section_order.length > 0
+          ? parsed.section_order
+          : selectedDocument === 'contract'
+            ? DEFAULT_CONTRACT_SECTION_ORDER
+            : DEFAULT_SECTION_ORDER,
+      legal_clauses: parsed.legal_clauses ?? DEFAULT_LEGAL_CLAUSES,
+    };
 
-    if (config.sections) {
-      setSections({ ...getDefaultSections(), ...config.sections });
-    } else {
-      setSections(getDefaultSections());
-    }
-    
-    // Load section_order
-    if (config.section_order && config.section_order.length > 0) {
-      setSectionOrder(config.section_order);
-    } else {
-      setSectionOrder(selectedDocument === 'contract' ? DEFAULT_CONTRACT_SECTION_ORDER : DEFAULT_SECTION_ORDER);
-    }
-    
-    if (config.legal_clauses) {
-      setLegalClauses(config.legal_clauses);
-    } else {
-      setLegalClauses(DEFAULT_LEGAL_CLAUSES);
-    }
+    // Update both the per-field state (Classic UI) and the draft (used for Visual/save).
+    setConfigDraft(normalized);
+
+    setPrimaryColor(normalized.primary_color ?? '#3366cc');
+    setSecondaryColor(normalized.secondary_color ?? '#666666');
+    setTitleText(normalized.title_text ?? defaultTitles[selectedDocument]);
+    setTitleSize(normalized.title_size ?? 28);
+    setClientBoxColor(normalized.client_box_color ?? '#f1f5f9');
+    setTableHeaderColor(normalized.table_header_color ?? '#3b82f6');
+    setShowFooterLegal(normalized.show_footer_legal ?? false);
+    setFooterLegalText((normalized.footer_legal_lines ?? []).join('\n'));
+
+    setLineSpacing(normalized.line_spacing ?? 14);
+    setSectionSpacing(normalized.section_spacing ?? 28);
+    setRowHeight(normalized.row_height ?? 22);
+    setClientBoxPadding(normalized.client_box_padding ?? 14);
+    setDocMargins(normalized.margins ?? 50);
+
+    setShowTableBorders(normalized.show_table_borders ?? true);
+    setTableBorderColor(normalized.table_border_color ?? '#e5e7eb');
+
+    setShowTotalsLines(normalized.show_totals_lines ?? true);
+    setTotalsLineColor(normalized.totals_line_color ?? '#e5e7eb');
+
+    setSections((normalized.sections ?? defaultSections) as PdfSections);
+
+    setSectionOrder(
+      (normalized.section_order ??
+        (selectedDocument === 'contract' ? DEFAULT_CONTRACT_SECTION_ORDER : DEFAULT_SECTION_ORDER)) as BlockType[],
+    );
+
+    setLegalClauses(normalized.legal_clauses ?? DEFAULT_LEGAL_CLAUSES);
   }, [selectedDocument]);
 
   // Select default template on load
@@ -237,8 +317,10 @@ export function PdfSettingsManager() {
   const handleSave = async () => {
     if (!selectedTemplateId) return;
     try {
-      // Create minimal content with embedded PDF_CONFIG
-      const contentWithConfig = embedPdfConfigInTemplate('', currentConfig);
+      // Save EXACTLY what the Visual editor produced (configDraft),
+      // to avoid saving stale per-field state.
+      const configToSave = configDraft ?? currentConfig;
+      const contentWithConfig = embedPdfConfigInTemplate('', configToSave);
 
       await updateTemplate.mutateAsync({
         id: selectedTemplateId,
@@ -247,9 +329,9 @@ export function PdfSettingsManager() {
           content: contentWithConfig,
         },
       });
-      
+
       setHasUnsavedChanges(false);
-      console.log('[PdfSettingsManager] Saved template with PDF_CONFIG:', currentConfig);
+      console.log('[PdfSettingsManager] Saved template with PDF_CONFIG:', configToSave);
       toast.success('Plantilla guardada correctamente');
     } catch (error) {
       console.error('Error saving template:', error);
@@ -477,10 +559,13 @@ export function PdfSettingsManager() {
       {selectedTemplate && editorMode === 'visual' && (
         <VisualPdfDesigner
           documentType={selectedDocument}
-          initialConfig={currentConfig}
+          initialConfig={configDraft ?? currentConfig}
           templateName={editedName}
           onConfigChange={(config) => {
-            // Sync ALL fields from Visual Editor to maintain consistency
+            // IMPORTANT: store the full config immediately so Save never persists stale state
+            setConfigDraft(config);
+
+            // Sync ALL fields from Visual Editor to keep Classic UI consistent too
             if (config.primary_color !== undefined) setPrimaryColor(config.primary_color);
             if (config.secondary_color !== undefined) setSecondaryColor(config.secondary_color);
             if (config.title_text !== undefined) setTitleText(config.title_text);
@@ -490,9 +575,9 @@ export function PdfSettingsManager() {
             if (config.sections !== undefined) setSections(config.sections);
             if (config.section_order !== undefined) setSectionOrder(config.section_order);
             if (config.legal_clauses !== undefined) setLegalClauses(config.legal_clauses);
-            // Sync additional fields that were missing
             if (config.show_footer_legal !== undefined) setShowFooterLegal(config.show_footer_legal);
-            if (config.footer_legal_lines !== undefined) setFooterLegalText(config.footer_legal_lines.join('\n'));
+            if (config.footer_legal_lines !== undefined)
+              setFooterLegalText(config.footer_legal_lines.join('\n'));
             if (config.line_spacing !== undefined) setLineSpacing(config.line_spacing);
             if (config.section_spacing !== undefined) setSectionSpacing(config.section_spacing);
             if (config.row_height !== undefined) setRowHeight(config.row_height);
@@ -502,6 +587,7 @@ export function PdfSettingsManager() {
             if (config.table_border_color !== undefined) setTableBorderColor(config.table_border_color);
             if (config.show_totals_lines !== undefined) setShowTotalsLines(config.show_totals_lines);
             if (config.totals_line_color !== undefined) setTotalsLineColor(config.totals_line_color);
+
             setHasUnsavedChanges(true);
           }}
           onNameChange={(name) => {
@@ -924,7 +1010,7 @@ export function PdfSettingsManager() {
               <CardContent>
                 <PdfPreview
                   documentType={selectedDocument}
-                  config={currentConfig}
+                  config={configDraft ?? currentConfig}
                   scale={0.45}
                 />
                 <p className="text-xs text-muted-foreground text-center mt-3">
