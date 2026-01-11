@@ -480,15 +480,28 @@ export function PdfSettingsManager() {
           initialConfig={currentConfig}
           templateName={editedName}
           onConfigChange={(config) => {
-            if (config.primary_color) setPrimaryColor(config.primary_color);
-            if (config.secondary_color) setSecondaryColor(config.secondary_color);
-            if (config.title_text) setTitleText(config.title_text);
-            if (config.title_size) setTitleSize(config.title_size);
-            if (config.client_box_color) setClientBoxColor(config.client_box_color);
-            if (config.table_header_color) setTableHeaderColor(config.table_header_color);
-            if (config.sections) setSections(config.sections);
-            if (config.section_order) setSectionOrder(config.section_order);
-            if (config.legal_clauses) setLegalClauses(config.legal_clauses);
+            // Sync ALL fields from Visual Editor to maintain consistency
+            if (config.primary_color !== undefined) setPrimaryColor(config.primary_color);
+            if (config.secondary_color !== undefined) setSecondaryColor(config.secondary_color);
+            if (config.title_text !== undefined) setTitleText(config.title_text);
+            if (config.title_size !== undefined) setTitleSize(config.title_size);
+            if (config.client_box_color !== undefined) setClientBoxColor(config.client_box_color);
+            if (config.table_header_color !== undefined) setTableHeaderColor(config.table_header_color);
+            if (config.sections !== undefined) setSections(config.sections);
+            if (config.section_order !== undefined) setSectionOrder(config.section_order);
+            if (config.legal_clauses !== undefined) setLegalClauses(config.legal_clauses);
+            // Sync additional fields that were missing
+            if (config.show_footer_legal !== undefined) setShowFooterLegal(config.show_footer_legal);
+            if (config.footer_legal_lines !== undefined) setFooterLegalText(config.footer_legal_lines.join('\n'));
+            if (config.line_spacing !== undefined) setLineSpacing(config.line_spacing);
+            if (config.section_spacing !== undefined) setSectionSpacing(config.section_spacing);
+            if (config.row_height !== undefined) setRowHeight(config.row_height);
+            if (config.client_box_padding !== undefined) setClientBoxPadding(config.client_box_padding);
+            if (config.margins !== undefined) setDocMargins(config.margins);
+            if (config.show_table_borders !== undefined) setShowTableBorders(config.show_table_borders);
+            if (config.table_border_color !== undefined) setTableBorderColor(config.table_border_color);
+            if (config.show_totals_lines !== undefined) setShowTotalsLines(config.show_totals_lines);
+            if (config.totals_line_color !== undefined) setTotalsLineColor(config.totals_line_color);
             setHasUnsavedChanges(true);
           }}
           onNameChange={(name) => {
