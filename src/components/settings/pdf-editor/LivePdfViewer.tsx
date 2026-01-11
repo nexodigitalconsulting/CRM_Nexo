@@ -124,28 +124,42 @@ export function LivePdfViewer({
 
   // Section render functions that match the real PDF layout
   const renderHeader = useCallback(() => {
+    const companyNameSize = sections.header.company_name_size || 16;
+    
     return renderClickableSection('header', sections.header.visible, (
       <div className="flex justify-between items-start" style={{ marginBottom: sections.header.spacing * scale }}>
-        {/* Logo on LEFT (matches invoicePdf.ts) */}
-        <div className="flex items-center gap-3">
+        {/* Logo on LEFT */}
+        <div 
+          className="bg-gray-200 flex items-center justify-center rounded flex-shrink-0"
+          style={{ 
+            width: (sections.header.logo_size || 60) * scale, 
+            height: (sections.header.logo_size || 60) * 0.7 * scale, 
+            fontSize: 7 * scale 
+          }}
+        >
+          LOGO
+        </div>
+        
+        {/* Company info on RIGHT - Name on top, details below */}
+        <div className="text-right flex flex-col" style={{ maxWidth: '60%' }}>
+          {/* Company name - larger, on top */}
           <div 
-            className="bg-gray-200 flex items-center justify-center rounded"
-            style={{ width: 50 * scale, height: 35 * scale, fontSize: 7 * scale }}
-          >
-            LOGO
-          </div>
-          <div 
-            className="font-bold" 
-            style={{ fontSize: 14 * scale, color: primaryColor }}
+            className="font-bold leading-tight" 
+            style={{ 
+              fontSize: companyNameSize * scale * 0.7, 
+              color: primaryColor,
+              marginBottom: 4 * scale,
+            }}
           >
             {SAMPLE_COMPANY.name}
           </div>
-        </div>
-        {/* Company details on RIGHT (matches invoicePdf.ts lines 153-169) */}
-        <div className="text-right" style={{ fontSize: 8 * scale, color: secondaryColor }}>
-          <div>{SAMPLE_COMPANY.address}</div>
-          <div>CIF: {SAMPLE_COMPANY.cif}</div>
-          <div>{SAMPLE_COMPANY.email}</div>
+          {/* Company details - smaller, below */}
+          <div style={{ fontSize: 7 * scale, color: secondaryColor, lineHeight: 1.4 }}>
+            <div>{SAMPLE_COMPANY.address}</div>
+            <div>{SAMPLE_COMPANY.postal_code} {SAMPLE_COMPANY.city}</div>
+            <div>CIF: {SAMPLE_COMPANY.cif}</div>
+            <div>{SAMPLE_COMPANY.email}</div>
+          </div>
         </div>
       </div>
     ));

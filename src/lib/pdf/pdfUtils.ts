@@ -13,7 +13,8 @@ export interface PdfSectionConfig {
 }
 
 export interface PdfHeaderSection extends PdfSectionConfig {
-  logo_size?: number;      // Logo max height (40-80)
+  logo_size?: number;           // Logo max height (40-80)
+  company_name_size?: number;   // Company name font size (12-24)
 }
 
 export interface PdfTitleSection extends PdfSectionConfig {
@@ -153,7 +154,7 @@ export interface PdfSections {
 // Default section values
 export function getDefaultSections(): PdfSections {
   return {
-    header: { margin_top: 0, spacing: 8, visible: true, logo_size: 60 },
+    header: { margin_top: 0, spacing: 8, visible: true, logo_size: 60, company_name_size: 16 },
     title: { margin_top: 20, spacing: 16, visible: true, size: 28 },
     dates: { margin_top: 22, spacing: 10, visible: true },
     client: { margin_top: 20, spacing: 14, visible: true, padding: 14, background_color: '#f8f9fa' },

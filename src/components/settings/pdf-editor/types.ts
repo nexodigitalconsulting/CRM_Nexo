@@ -90,6 +90,7 @@ export function getSectionProperties(blockId: BlockType): SectionProperty[] {
       return [
         { key: 'spacing', label: 'Espaciado interno', type: 'slider', min: 4, max: 20, unit: 'px' },
         { key: 'logo_size', label: 'Tamaño máximo logo', type: 'slider', min: 30, max: 100, unit: 'px' },
+        { key: 'company_name_size', label: 'Tamaño nombre empresa', type: 'slider', min: 12, max: 24, unit: 'px' },
       ];
     case 'title':
       return [
