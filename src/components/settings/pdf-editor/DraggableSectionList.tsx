@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import { PdfBlock, BlockType } from './types';
 import { cn } from '@/lib/utils';
+import { toast } from 'sonner';
 
 interface DraggableSectionListProps {
   blocks: PdfBlock[];
@@ -30,6 +31,41 @@ const iconMap: Record<string, React.ReactNode> = {
   PenTool: <PenTool className="h-4 w-4" />,
   StickyNote: <StickyNote className="h-4 w-4" />,
 };
+
+// Validate if a move respects constraints
+function validateMove(blocks: PdfBlock[], draggedId: BlockType, targetOrder: number): { valid: boolean; message?: string } {
+  const draggedBlock = blocks.find(b => b.id === draggedId);
+  if (!draggedBlock) return { valid: false, message: 'Bloque no encontrado' };
+
+  // Check mustBeAfter constraints for the dragged block
+  if (draggedBlock.constraints?.mustBeAfter) {
+    for (const requiredBefore of draggedBlock.constraints.mustBeAfter) {
+      const requiredBlock = blocks.find(b => b.id === requiredBefore);
+      if (requiredBlock && requiredBlock.order >= targetOrder) {
+        return { 
+          valid: false, 
+          message: `"${draggedBlock.label}" debe ir después de "${requiredBlock.label}"`
+        };
+      }
+    }
+  }
+
+  // Check if any other block has mustBeAfter pointing to the dragged block
+  for (const block of blocks) {
+    if (block.id === draggedId) continue;
+    if (block.constraints?.mustBeAfter?.includes(draggedId)) {
+      // The dependent block must still be after the dragged block's new position
+      if (block.order <= targetOrder) {
+        return {
+          valid: false,
+          message: `"${block.label}" debe ir después de "${draggedBlock.label}"`
+        };
+      }
+    }
+  }
+
+  return { valid: true };
+}
 
 export function DraggableSectionList({
   blocks,
@@ -89,6 +125,15 @@ export function DraggableSectionList({
     const draggedBlockId = draggedRef.current;
     const draggedBlock = blocks.find(b => b.id === draggedBlockId);
     if (!draggedBlock) return;
+
+    // Validate the move
+    const validation = validateMove(blocks, draggedBlockId, targetBlock.order);
+    if (!validation.valid) {
+      toast.error(validation.message || 'Movimiento no permitido');
+      setDragOverId(null);
+      setDraggedId(null);
+      return;
+    }
 
     // Calculate new order
     const newBlocks = blocks.map(block => {

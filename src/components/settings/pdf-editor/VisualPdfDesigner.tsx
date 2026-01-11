@@ -15,8 +15,8 @@ import {
 import { DraggableSectionList } from './DraggableSectionList';
 import { SectionPropertyPanel } from './SectionPropertyPanel';
 import { LivePdfViewer } from './LivePdfViewer';
-import { BlockType, PdfBlock, getDefaultBlocks } from './types';
-import { PdfConfig, PdfSections, getDefaultSections, LegalClause, DEFAULT_LEGAL_CLAUSES } from '@/lib/pdf/pdfUtils';
+import { BlockType, PdfBlock, getDefaultBlocks, getOrderFromBlocks, getBlocksFromOrder } from './types';
+import { PdfConfig, PdfSections, getDefaultSections, LegalClause, DEFAULT_LEGAL_CLAUSES, DEFAULT_SECTION_ORDER, DEFAULT_CONTRACT_SECTION_ORDER } from '@/lib/pdf/pdfUtils';
 import { ContractClausesEditor } from '../ContractClausesEditor';
 
 interface VisualPdfDesignerProps {
@@ -47,7 +47,15 @@ export function VisualPdfDesigner({
   hasUnsavedChanges,
 }: VisualPdfDesignerProps) {
   const [selectedBlockId, setSelectedBlockId] = useState<BlockType | null>(null);
-  const [blocks, setBlocks] = useState<PdfBlock[]>(() => getDefaultBlocks(documentType));
+  
+  // Initialize blocks from config section_order or defaults
+  const [blocks, setBlocks] = useState<PdfBlock[]>(() => {
+    if (initialConfig.section_order && initialConfig.section_order.length > 0) {
+      return getBlocksFromOrder(initialConfig.section_order, documentType);
+    }
+    return getDefaultBlocks(documentType);
+  });
+  
   const [sections, setSections] = useState<PdfSections>(() => initialConfig.sections || getDefaultSections());
   const [legalClauses, setLegalClauses] = useState<LegalClause[]>(() => initialConfig.legal_clauses || DEFAULT_LEGAL_CLAUSES);
   
@@ -63,12 +71,19 @@ export function VisualPdfDesigner({
 
   // Reset blocks when document type changes
   useEffect(() => {
-    setBlocks(getDefaultBlocks(documentType));
+    const defaultOrder = documentType === 'contract' ? DEFAULT_CONTRACT_SECTION_ORDER : DEFAULT_SECTION_ORDER;
+    if (initialConfig.section_order && initialConfig.section_order.length > 0) {
+      setBlocks(getBlocksFromOrder(initialConfig.section_order, documentType));
+    } else {
+      setBlocks(getDefaultBlocks(documentType));
+    }
     setSelectedBlockId(null);
   }, [documentType]);
 
   // Sync config when any value changes
   useEffect(() => {
+    const sectionOrder = getOrderFromBlocks(blocks);
+    
     const newConfig: PdfConfig = {
       ...initialConfig,
       primary_color: primaryColor,
@@ -80,6 +95,7 @@ export function VisualPdfDesigner({
       table_header_color: tableHeaderColor,
       show_footer_legal: showFooterLegal,
       footer_legal_lines: footerLegalText.split('\n').filter(l => l.trim()),
+      section_order: sectionOrder,
       sections,
       legal_clauses: documentType === 'contract' ? legalClauses : undefined,
     };
@@ -87,7 +103,7 @@ export function VisualPdfDesigner({
   }, [
     primaryColor, secondaryColor, titleText, titleSize,
     clientBoxColor, tableHeaderColor, showFooterLegal, footerLegalText,
-    sections, legalClauses, documentType
+    sections, legalClauses, documentType, blocks
   ]);
 
   const handleBlocksChange = (newBlocks: PdfBlock[]) => {
@@ -122,6 +138,7 @@ export function VisualPdfDesigner({
     title_size: titleSize,
     client_box_color: clientBoxColor,
     table_header_color: tableHeaderColor,
+    section_order: getOrderFromBlocks(blocks),
     sections,
     legal_clauses: legalClauses,
   };
@@ -384,6 +401,7 @@ export function VisualPdfDesigner({
             selectedSection={selectedBlockId}
             onSectionClick={setSelectedBlockId}
             scale={0.45}
+            blocks={blocks}
           />
         </div>
       </div>

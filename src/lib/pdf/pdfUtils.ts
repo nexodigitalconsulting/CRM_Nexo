@@ -166,6 +166,28 @@ export function getDefaultSections(): PdfSections {
   };
 }
 
+// Block types for section ordering
+export type BlockType = 
+  | 'header'
+  | 'title'
+  | 'dates'
+  | 'client'
+  | 'table'
+  | 'totals'
+  | 'notes'
+  | 'footer'
+  | 'legal'
+  | 'signatures';
+
+// Default section order
+export const DEFAULT_SECTION_ORDER: BlockType[] = [
+  'header', 'title', 'dates', 'client', 'table', 'totals', 'notes', 'footer'
+];
+
+export const DEFAULT_CONTRACT_SECTION_ORDER: BlockType[] = [
+  'header', 'title', 'dates', 'client', 'table', 'totals', 'notes', 'legal', 'signatures', 'footer'
+];
+
 // PDF Configuration interface matching pdf_settings table
 export interface PdfConfig {
   primary_color?: string;
@@ -200,6 +222,9 @@ export interface PdfConfig {
   // Totals section
   show_totals_lines?: boolean;      // Show separator lines in totals block (default: true)
   totals_line_color?: string;       // Totals separator color (default: border)
+
+  // Section ordering (NEW) - allows custom section order
+  section_order?: BlockType[];      // Custom order of sections
 
   // Section-based configuration (NEW)
   sections?: PdfSections;
