@@ -48,66 +48,38 @@ export function VisualPdfDesigner({
 }: VisualPdfDesignerProps) {
   const [selectedBlockId, setSelectedBlockId] = useState<BlockType | null>(null);
   
-  // Initialize blocks from config section_order or defaults
-  const [blocks, setBlocks] = useState<PdfBlock[]>(() => {
-    if (initialConfig.section_order && initialConfig.section_order.length > 0) {
-      return getBlocksFromOrder(initialConfig.section_order, documentType);
-    }
-    return getDefaultBlocks(documentType);
-  });
+  // Derive all values directly from initialConfig - single source of truth
+  const sections = initialConfig.sections || getDefaultSections();
+  const legalClauses = initialConfig.legal_clauses || DEFAULT_LEGAL_CLAUSES;
+  const primaryColor = initialConfig.primary_color || '#3366cc';
+  const secondaryColor = initialConfig.secondary_color || '#666666';
+  const titleText = initialConfig.title_text || documentLabels[documentType].toUpperCase();
+  const titleSize = initialConfig.title_size || 28;
+  const clientBoxColor = initialConfig.client_box_color || '#f1f5f9';
+  const tableHeaderColor = initialConfig.table_header_color || '#3b82f6';
+  const showFooterLegal = initialConfig.show_footer_legal || false;
+  const footerLegalText = (initialConfig.footer_legal_lines || []).join('\n');
   
-  const [sections, setSections] = useState<PdfSections>(() => initialConfig.sections || getDefaultSections());
-  const [legalClauses, setLegalClauses] = useState<LegalClause[]>(() => initialConfig.legal_clauses || DEFAULT_LEGAL_CLAUSES);
-  
-  // Design state
-  const [primaryColor, setPrimaryColor] = useState(initialConfig.primary_color || '#3366cc');
-  const [secondaryColor, setSecondaryColor] = useState(initialConfig.secondary_color || '#666666');
-  const [titleText, setTitleText] = useState(initialConfig.title_text || documentLabels[documentType].toUpperCase());
-  const [titleSize, setTitleSize] = useState(initialConfig.title_size || 28);
-  const [clientBoxColor, setClientBoxColor] = useState(initialConfig.client_box_color || '#f1f5f9');
-  const [tableHeaderColor, setTableHeaderColor] = useState(initialConfig.table_header_color || '#3b82f6');
-  const [showFooterLegal, setShowFooterLegal] = useState(initialConfig.show_footer_legal || false);
-  const [footerLegalText, setFooterLegalText] = useState((initialConfig.footer_legal_lines || []).join('\n'));
+  // Derive blocks from section_order
+  const blocks = (initialConfig.section_order && initialConfig.section_order.length > 0)
+    ? getBlocksFromOrder(initialConfig.section_order, documentType)
+    : getDefaultBlocks(documentType);
 
-  // Reset blocks when document type changes
+  // Reset selection when document type changes
   useEffect(() => {
-    const defaultOrder = documentType === 'contract' ? DEFAULT_CONTRACT_SECTION_ORDER : DEFAULT_SECTION_ORDER;
-    if (initialConfig.section_order && initialConfig.section_order.length > 0) {
-      setBlocks(getBlocksFromOrder(initialConfig.section_order, documentType));
-    } else {
-      setBlocks(getDefaultBlocks(documentType));
-    }
     setSelectedBlockId(null);
   }, [documentType]);
 
-  // Sync config when any value changes
-  useEffect(() => {
-    const sectionOrder = getOrderFromBlocks(blocks);
-    
-    const newConfig: PdfConfig = {
+  // Helper to update config - all changes go through parent
+  const updateConfig = useCallback((updates: Partial<PdfConfig>) => {
+    onConfigChange({
       ...initialConfig,
-      primary_color: primaryColor,
-      secondary_color: secondaryColor,
-      accent_color: primaryColor,
-      title_text: titleText,
-      title_size: titleSize,
-      client_box_color: clientBoxColor,
-      table_header_color: tableHeaderColor,
-      show_footer_legal: showFooterLegal,
-      footer_legal_lines: footerLegalText.split('\n').filter(l => l.trim()),
-      section_order: sectionOrder,
-      sections,
-      legal_clauses: documentType === 'contract' ? legalClauses : undefined,
-    };
-    onConfigChange(newConfig);
-  }, [
-    primaryColor, secondaryColor, titleText, titleSize,
-    clientBoxColor, tableHeaderColor, showFooterLegal, footerLegalText,
-    sections, legalClauses, documentType, blocks
-  ]);
+      ...updates,
+    });
+  }, [initialConfig, onConfigChange]);
 
   const handleBlocksChange = (newBlocks: PdfBlock[]) => {
-    setBlocks(newBlocks);
+    const newSectionOrder = getOrderFromBlocks(newBlocks);
     // Update section visibility based on blocks
     const newSections = { ...sections };
     newBlocks.forEach(block => {
@@ -118,18 +90,25 @@ export function VisualPdfDesigner({
         };
       }
     });
-    setSections(newSections);
+    updateConfig({ 
+      section_order: newSectionOrder,
+      sections: newSections,
+    });
   };
 
   const handleSectionsChange = (newSections: PdfSections) => {
-    setSections(newSections);
-    // Sync visibility back to blocks
-    setBlocks(blocks.map(block => ({
+    // Sync visibility back to section_order by rebuilding blocks
+    const updatedBlocks = blocks.map(block => ({
       ...block,
       visible: (newSections as any)[block.id]?.visible ?? block.visible,
-    })));
+    }));
+    updateConfig({
+      sections: newSections,
+      section_order: getOrderFromBlocks(updatedBlocks),
+    });
   };
 
+  // Current config for preview (derived from initialConfig)
   const currentConfig: PdfConfig = {
     ...initialConfig,
     primary_color: primaryColor,
@@ -234,12 +213,12 @@ export function VisualPdfDesigner({
                         <Input
                           type="color"
                           value={primaryColor}
-                          onChange={(e) => setPrimaryColor(e.target.value)}
+                          onChange={(e) => updateConfig({ primary_color: e.target.value })}
                           className="w-12 h-10 p-1 cursor-pointer"
                         />
                         <Input
                           value={primaryColor}
-                          onChange={(e) => setPrimaryColor(e.target.value)}
+                          onChange={(e) => updateConfig({ primary_color: e.target.value })}
                           className="flex-1 font-mono text-sm"
                         />
                       </div>
@@ -251,12 +230,12 @@ export function VisualPdfDesigner({
                         <Input
                           type="color"
                           value={secondaryColor}
-                          onChange={(e) => setSecondaryColor(e.target.value)}
+                          onChange={(e) => updateConfig({ secondary_color: e.target.value })}
                           className="w-12 h-10 p-1 cursor-pointer"
                         />
                         <Input
                           value={secondaryColor}
-                          onChange={(e) => setSecondaryColor(e.target.value)}
+                          onChange={(e) => updateConfig({ secondary_color: e.target.value })}
                           className="flex-1 font-mono text-sm"
                         />
                       </div>
@@ -270,12 +249,12 @@ export function VisualPdfDesigner({
                         <Input
                           type="color"
                           value={clientBoxColor}
-                          onChange={(e) => setClientBoxColor(e.target.value)}
+                          onChange={(e) => updateConfig({ client_box_color: e.target.value })}
                           className="w-12 h-10 p-1 cursor-pointer"
                         />
                         <Input
                           value={clientBoxColor}
-                          onChange={(e) => setClientBoxColor(e.target.value)}
+                          onChange={(e) => updateConfig({ client_box_color: e.target.value })}
                           className="flex-1 font-mono text-sm"
                         />
                       </div>
@@ -287,12 +266,12 @@ export function VisualPdfDesigner({
                         <Input
                           type="color"
                           value={tableHeaderColor}
-                          onChange={(e) => setTableHeaderColor(e.target.value)}
+                          onChange={(e) => updateConfig({ table_header_color: e.target.value })}
                           className="w-12 h-10 p-1 cursor-pointer"
                         />
                         <Input
                           value={tableHeaderColor}
-                          onChange={(e) => setTableHeaderColor(e.target.value)}
+                          onChange={(e) => updateConfig({ table_header_color: e.target.value })}
                           className="flex-1 font-mono text-sm"
                         />
                       </div>
@@ -334,7 +313,7 @@ export function VisualPdfDesigner({
                         <Label>Texto</Label>
                         <Input
                           value={titleText}
-                          onChange={(e) => setTitleText(e.target.value)}
+                          onChange={(e) => updateConfig({ title_text: e.target.value })}
                           placeholder="FACTURA"
                         />
                       </div>
@@ -345,7 +324,7 @@ export function VisualPdfDesigner({
                           min="20"
                           max="40"
                           value={titleSize}
-                          onChange={(e) => setTitleSize(Number(e.target.value))}
+                          onChange={(e) => updateConfig({ title_size: Number(e.target.value) })}
                           className="w-full"
                         />
                       </div>
@@ -360,13 +339,15 @@ export function VisualPdfDesigner({
                       </h4>
                       <Switch
                         checked={showFooterLegal}
-                        onCheckedChange={setShowFooterLegal}
+                        onCheckedChange={(checked) => updateConfig({ show_footer_legal: checked })}
                       />
                     </div>
                     {showFooterLegal && (
                       <Textarea
                         value={footerLegalText}
-                        onChange={(e) => setFooterLegalText(e.target.value)}
+                        onChange={(e) => updateConfig({ 
+                          footer_legal_lines: e.target.value.split('\n').filter(l => l.trim()) 
+                        })}
                         placeholder="Texto legal..."
                         rows={3}
                         className="text-sm"
@@ -384,7 +365,7 @@ export function VisualPdfDesigner({
                   <CardContent className="pt-6">
                     <ContractClausesEditor
                       clauses={legalClauses}
-                      onChange={setLegalClauses}
+                      onChange={(newClauses) => updateConfig({ legal_clauses: newClauses })}
                     />
                   </CardContent>
                 </Card>
