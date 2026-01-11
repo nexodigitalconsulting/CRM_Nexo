@@ -351,8 +351,15 @@ export function generatePdfConfigComment(config: PdfConfig): string {
     show_totals_lines: config.show_totals_lines,
     totals_line_color: config.totals_line_color,
 
+    // Section ordering - CRITICAL for Visual Editor sync
+    section_order: config.section_order,
+
     // Section-based configuration
     sections: config.sections,
+
+    // Contract-specific
+    legal_clauses: config.legal_clauses,
+    show_signatures: config.show_signatures,
   };
 
   // Remove undefined values
