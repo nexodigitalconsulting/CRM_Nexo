@@ -128,8 +128,46 @@ export function PdfSettingsManager() {
 
   const selectedTemplate = templates.find(t => t.id === selectedTemplateId);
 
-  // Build the current PdfConfig from state (used by Classic UI)
-  const currentConfig: PdfConfig = {
+  // Normalize config so the PDF generator (which relies heavily on sections.*)
+  // always receives the same values edited in the UI (Visual + Classic).
+  const normalizeConfigForPdf = useCallback(
+    (cfg: PdfConfig): PdfConfig => {
+      const defaultSections = getDefaultSections();
+      const mergedSections: PdfSections = cfg.sections
+        ? {
+            ...defaultSections,
+            ...cfg.sections,
+            header: { ...defaultSections.header, ...cfg.sections.header },
+            title: { ...defaultSections.title, ...cfg.sections.title },
+            dates: { ...defaultSections.dates, ...cfg.sections.dates },
+            client: { ...defaultSections.client, ...cfg.sections.client },
+            table: { ...defaultSections.table, ...cfg.sections.table },
+            totals: { ...defaultSections.totals, ...cfg.sections.totals },
+            footer: { ...defaultSections.footer, ...cfg.sections.footer },
+            legal: { ...defaultSections.legal, ...cfg.sections.legal },
+            signatures: { ...defaultSections.signatures, ...cfg.sections.signatures },
+          }
+        : defaultSections;
+
+      // Bridge legacy/top-level fields into sections, because Fact2 generator reads sections.*
+      if (cfg.client_box_color) mergedSections.client.background_color = cfg.client_box_color;
+      if (typeof cfg.client_box_padding === 'number') mergedSections.client.padding = cfg.client_box_padding;
+      if (typeof cfg.row_height === 'number') mergedSections.table.row_height = cfg.row_height;
+      if (typeof cfg.show_table_borders === 'boolean') mergedSections.table.show_borders = cfg.show_table_borders;
+      if (cfg.table_border_color) mergedSections.table.border_color = cfg.table_border_color;
+      if (typeof cfg.show_totals_lines === 'boolean') mergedSections.totals.show_lines = cfg.show_totals_lines;
+      if (cfg.totals_line_color) mergedSections.totals.line_color = cfg.totals_line_color;
+
+      return {
+        ...cfg,
+        sections: mergedSections,
+      };
+    },
+    [],
+  );
+
+  // Build the current PdfConfig from Classic UI state
+  const currentConfigBase: PdfConfig = {
     primary_color: primaryColor,
     secondary_color: secondaryColor,
     accent_color: primaryColor,
@@ -160,33 +198,13 @@ export function PdfSettingsManager() {
     legal_clauses: selectedDocument === 'contract' ? legalClauses : undefined,
   };
 
+  const currentConfig = normalizeConfigForPdf(currentConfigBase);
+
   // Keep configDraft aligned with Classic field states.
   // (Visual editor writes configDraft directly to avoid saving stale state.)
   useEffect(() => {
     setConfigDraft(currentConfig);
-  }, [
-    selectedDocument,
-    primaryColor,
-    secondaryColor,
-    titleText,
-    titleSize,
-    clientBoxColor,
-    tableHeaderColor,
-    showFooterLegal,
-    footerLegalText,
-    lineSpacing,
-    sectionSpacing,
-    rowHeight,
-    clientBoxPadding,
-    docMargins,
-    showTableBorders,
-    tableBorderColor,
-    showTotalsLines,
-    totalsLineColor,
-    sections,
-    sectionOrder,
-    legalClauses,
-  ]);
+  }, [currentConfig]);
 
   // Load config from template content
   const loadExtendedConfig = useCallback((content: string) => {
@@ -317,9 +335,10 @@ export function PdfSettingsManager() {
   const handleSave = async () => {
     if (!selectedTemplateId) return;
     try {
-      // Save EXACTLY what the Visual editor produced (configDraft),
-      // to avoid saving stale per-field state.
-      const configToSave = configDraft ?? currentConfig;
+      // Save EXACTLY what the Visual editor produced (configDraft), normalized to what
+      // the pdf-lib generator actually consumes.
+      const rawToSave = configDraft ?? currentConfig;
+      const configToSave = normalizeConfigForPdf(rawToSave);
       const contentWithConfig = embedPdfConfigInTemplate('', configToSave);
 
       await updateTemplate.mutateAsync({
@@ -562,31 +581,34 @@ export function PdfSettingsManager() {
           initialConfig={configDraft ?? currentConfig}
           templateName={editedName}
           onConfigChange={(config) => {
-            // IMPORTANT: store the full config immediately so Save never persists stale state
-            setConfigDraft(config);
+            // Normalize to what the real pdf-lib generator uses (sections.*)
+            const normalized = normalizeConfigForPdf(config);
 
-            // Sync ALL fields from Visual Editor to keep Classic UI consistent too
-            if (config.primary_color !== undefined) setPrimaryColor(config.primary_color);
-            if (config.secondary_color !== undefined) setSecondaryColor(config.secondary_color);
-            if (config.title_text !== undefined) setTitleText(config.title_text);
-            if (config.title_size !== undefined) setTitleSize(config.title_size);
-            if (config.client_box_color !== undefined) setClientBoxColor(config.client_box_color);
-            if (config.table_header_color !== undefined) setTableHeaderColor(config.table_header_color);
-            if (config.sections !== undefined) setSections(config.sections);
-            if (config.section_order !== undefined) setSectionOrder(config.section_order);
-            if (config.legal_clauses !== undefined) setLegalClauses(config.legal_clauses);
-            if (config.show_footer_legal !== undefined) setShowFooterLegal(config.show_footer_legal);
-            if (config.footer_legal_lines !== undefined)
-              setFooterLegalText(config.footer_legal_lines.join('\n'));
-            if (config.line_spacing !== undefined) setLineSpacing(config.line_spacing);
-            if (config.section_spacing !== undefined) setSectionSpacing(config.section_spacing);
-            if (config.row_height !== undefined) setRowHeight(config.row_height);
-            if (config.client_box_padding !== undefined) setClientBoxPadding(config.client_box_padding);
-            if (config.margins !== undefined) setDocMargins(config.margins);
-            if (config.show_table_borders !== undefined) setShowTableBorders(config.show_table_borders);
-            if (config.table_border_color !== undefined) setTableBorderColor(config.table_border_color);
-            if (config.show_totals_lines !== undefined) setShowTotalsLines(config.show_totals_lines);
-            if (config.totals_line_color !== undefined) setTotalsLineColor(config.totals_line_color);
+            // IMPORTANT: store the full normalized config immediately so Save never persists stale state
+            setConfigDraft(normalized);
+
+            // Sync all fields to keep Classic UI consistent too
+            if (normalized.primary_color !== undefined) setPrimaryColor(normalized.primary_color);
+            if (normalized.secondary_color !== undefined) setSecondaryColor(normalized.secondary_color);
+            if (normalized.title_text !== undefined) setTitleText(normalized.title_text);
+            if (normalized.title_size !== undefined) setTitleSize(normalized.title_size);
+            if (normalized.client_box_color !== undefined) setClientBoxColor(normalized.client_box_color);
+            if (normalized.table_header_color !== undefined) setTableHeaderColor(normalized.table_header_color);
+            if (normalized.sections !== undefined) setSections(normalized.sections);
+            if (normalized.section_order !== undefined) setSectionOrder(normalized.section_order);
+            if (normalized.legal_clauses !== undefined) setLegalClauses(normalized.legal_clauses);
+            if (normalized.show_footer_legal !== undefined) setShowFooterLegal(normalized.show_footer_legal);
+            if (normalized.footer_legal_lines !== undefined)
+              setFooterLegalText(normalized.footer_legal_lines.join('\n'));
+            if (normalized.line_spacing !== undefined) setLineSpacing(normalized.line_spacing);
+            if (normalized.section_spacing !== undefined) setSectionSpacing(normalized.section_spacing);
+            if (normalized.row_height !== undefined) setRowHeight(normalized.row_height);
+            if (normalized.client_box_padding !== undefined) setClientBoxPadding(normalized.client_box_padding);
+            if (normalized.margins !== undefined) setDocMargins(normalized.margins);
+            if (normalized.show_table_borders !== undefined) setShowTableBorders(normalized.show_table_borders);
+            if (normalized.table_border_color !== undefined) setTableBorderColor(normalized.table_border_color);
+            if (normalized.show_totals_lines !== undefined) setShowTotalsLines(normalized.show_totals_lines);
+            if (normalized.totals_line_color !== undefined) setTotalsLineColor(normalized.totals_line_color);
 
             setHasUnsavedChanges(true);
           }}
