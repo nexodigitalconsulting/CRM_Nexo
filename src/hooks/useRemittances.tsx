@@ -46,7 +46,7 @@ export function useRemittance(id: string | undefined) {
           )
         `)
         .eq("id", id)
-        .single();
+        .maybeSingle();
 
       if (error) throw error;
       return data as RemittanceWithInvoices;

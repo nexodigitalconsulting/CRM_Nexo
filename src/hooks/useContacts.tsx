@@ -31,7 +31,7 @@ export function useContact(id: string | undefined) {
         .from("contacts")
         .select("*")
         .eq("id", id)
-        .single();
+        .maybeSingle();
       
       if (error) throw error;
       return data;
