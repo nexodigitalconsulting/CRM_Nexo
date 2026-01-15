@@ -32,6 +32,8 @@ export interface InvoiceWithDetails {
   subtotal: number | null;
   iva_percent: number | null;
   iva_amount: number | null;
+  irpf_percent?: number | null;
+  irpf_amount?: number | null;
   total: number | null;
   notes: string | null;
   document_url: string | null;
@@ -62,6 +64,8 @@ export interface InvoiceInsert {
   subtotal?: number;
   iva_percent?: number;
   iva_amount?: number;
+  irpf_percent?: number;
+  irpf_amount?: number;
   total?: number;
   notes?: string | null;
   services: InvoiceService[];
@@ -76,6 +80,8 @@ export interface InvoiceUpdate {
   subtotal?: number;
   iva_percent?: number;
   iva_amount?: number;
+  irpf_percent?: number;
+  irpf_amount?: number;
   total?: number;
   notes?: string | null;
   services?: InvoiceService[];

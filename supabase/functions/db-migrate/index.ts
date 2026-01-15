@@ -7,7 +7,7 @@ const corsHeaders = {
 };
 
 // Current schema version - UPDATE THIS when adding new migrations
-const CURRENT_VERSION = "v1.7.0";
+const CURRENT_VERSION = "v1.9.0";
 
 // Migration definitions
 const MIGRATIONS = [
@@ -18,7 +18,8 @@ const MIGRATIONS = [
   { version: "v1.4.0", description: "Columnas is_sent y sent_at en invoices, quotes, contracts" },
   { version: "v1.5.0", description: "Email logs, Gmail OAuth config, columna provider" },
   { version: "v1.6.0", description: "Expenses: expense_number text unique, id_factura" },
-  { version: "v1.7.0", description: "Migración de enums a español" }
+  { version: "v1.7.0", description: "Migración de enums a español" },
+  { version: "v1.9.0", description: "Invoice IRPF fields (irpf_percent, irpf_amount)" }
 ];
 
 // Version comparison helper

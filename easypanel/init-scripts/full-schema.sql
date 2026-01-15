@@ -394,6 +394,8 @@ CREATE TABLE IF NOT EXISTS public.invoices (
   subtotal numeric DEFAULT 0,
   iva_percent numeric DEFAULT 21.00,
   iva_amount numeric DEFAULT 0,
+  irpf_percent numeric(5,2) DEFAULT 0,
+  irpf_amount numeric(12,2) DEFAULT 0,
   total numeric DEFAULT 0,
   notes text,
   document_url text,

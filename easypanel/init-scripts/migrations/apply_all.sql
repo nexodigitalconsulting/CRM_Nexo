@@ -565,7 +565,33 @@ BEGIN
 END $$;
 
 -- ============================================
--- VERIFICACIÓN FINAL DE COMPONENTES v1.7.0
+-- MIGRACIÓN v1.9.0 - Invoice IRPF Fields
+-- ============================================
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM schema_versions WHERE version = 'v1.9.0') THEN
+    RAISE NOTICE '[%] v1.9.0 ya aplicada - omitiendo', clock_timestamp();
+    RETURN;
+  END IF;
+
+  RAISE NOTICE '[%] Aplicando v1.9.0 - Invoice IRPF Fields...', clock_timestamp();
+
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'invoices' AND column_name = 'irpf_percent') THEN
+    ALTER TABLE public.invoices ADD COLUMN irpf_percent NUMERIC(5,2) DEFAULT 0;
+  END IF;
+
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'invoices' AND column_name = 'irpf_amount') THEN
+    ALTER TABLE public.invoices ADD COLUMN irpf_amount NUMERIC(12,2) DEFAULT 0;
+  END IF;
+
+  INSERT INTO schema_versions (version, description, applied_at)
+  VALUES ('v1.9.0', 'Invoice IRPF fields', now());
+  
+  RAISE NOTICE '[%] ✓ v1.9.0 aplicada correctamente', clock_timestamp();
+END $$;
+
+-- ============================================
+-- VERIFICACIÓN FINAL DE COMPONENTES v1.9.0
 -- ============================================
 DO $$
 DECLARE
