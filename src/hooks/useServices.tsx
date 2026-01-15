@@ -47,7 +47,7 @@ export function useService(id: string | undefined) {
         .from("services")
         .select("*")
         .eq("id", id)
-        .single();
+        .maybeSingle();
       
       if (error) throw error;
       return data;

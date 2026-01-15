@@ -41,7 +41,7 @@ export function useDashboardConfig() {
         .from("profiles")
         .select("*")
         .eq("user_id", user.user.id)
-        .single();
+        .maybeSingle();
 
       // For now, return default widgets - we'll store config in profile later
       return { widgets: DEFAULT_WIDGETS };

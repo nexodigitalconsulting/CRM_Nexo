@@ -30,7 +30,7 @@ export function useExpense(id: string) {
         .from("expenses")
         .select("*")
         .eq("id", id)
-        .single();
+        .maybeSingle();
 
       if (error) throw error;
       return data as Expense;
