@@ -54,6 +54,7 @@ const formSchema = z.object({
   due_date: z.string().optional(),
   status: z.enum(["borrador", "emitida", "pagada", "cancelada"]),
   notes: z.string().optional(),
+  irpf_percent: z.coerce.number().min(0).max(100).default(0),
   services: z.array(serviceLineSchema).min(1, "Añade al menos un servicio"),
 });
 
@@ -73,7 +74,7 @@ export function InvoiceFormDialog({ open, onOpenChange, invoice }: Props) {
   const { data: fullInvoice } = useInvoice(invoice?.id);
   const createInvoice = useCreateInvoice();
   const updateInvoice = useUpdateInvoice();
-  const [totals, setTotals] = useState({ subtotal: 0, iva: 0, total: 0 });
+  const [totals, setTotals] = useState({ subtotal: 0, iva: 0, irpf: 0, total: 0 });
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -84,6 +85,7 @@ export function InvoiceFormDialog({ open, onOpenChange, invoice }: Props) {
       due_date: "",
       status: "borrador",
       notes: "",
+      irpf_percent: 0,
       services: [],
     },
   });
@@ -113,6 +115,7 @@ export function InvoiceFormDialog({ open, onOpenChange, invoice }: Props) {
         due_date: invoiceData.due_date || "",
         status: invoiceData.status,
         notes: invoiceData.notes || "",
+        irpf_percent: invoiceData.irpf_percent || 0,
         services: invoiceData.services?.map((s) => ({
           service_id: s.service_id,
           quantity: s.quantity,
@@ -130,10 +133,13 @@ export function InvoiceFormDialog({ open, onOpenChange, invoice }: Props) {
         due_date: "",
         status: "borrador",
         notes: "",
+        irpf_percent: 0,
         services: [],
       });
     }
   }, [invoiceData, form]);
+
+  const watchIrpfPercent = form.watch("irpf_percent");
 
   useEffect(() => {
     let subtotal = 0;
@@ -149,12 +155,17 @@ export function InvoiceFormDialog({ open, onOpenChange, invoice }: Props) {
       iva += lineIva;
     });
 
+    // Calculate IRPF
+    const irpfPercent = watchIrpfPercent || 0;
+    const irpf = subtotal * (irpfPercent / 100);
+
     setTotals({
       subtotal,
       iva,
-      total: subtotal + iva,
+      irpf,
+      total: subtotal + iva - irpf,
     });
-  }, [watchServices]);
+  }, [watchServices, watchIrpfPercent]);
 
   const handleServiceSelect = (index: number, serviceId: string) => {
     const selectedService = services.find((s) => s.id === serviceId);
@@ -196,6 +207,8 @@ export function InvoiceFormDialog({ open, onOpenChange, invoice }: Props) {
       notes: values.notes || null,
       subtotal: totals.subtotal,
       iva_amount: totals.iva,
+      irpf_percent: values.irpf_percent || 0,
+      irpf_amount: totals.irpf,
       total: totals.total,
       services: servicesData,
     };
@@ -346,6 +359,20 @@ export function InvoiceFormDialog({ open, onOpenChange, invoice }: Props) {
                         ))}
                       </SelectContent>
                     </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="irpf_percent"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>IRPF %</FormLabel>
+                    <FormControl>
+                      <Input type="number" step="0.01" min="0" max="100" {...field} />
+                    </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -520,6 +547,17 @@ export function InvoiceFormDialog({ open, onOpenChange, invoice }: Props) {
                     })}
                   </span>
                 </div>
+                {(watchIrpfPercent || 0) > 0 && (
+                  <div className="flex justify-between text-sm text-destructive">
+                    <span>IRPF ({watchIrpfPercent}%):</span>
+                    <span>
+                      -{totals.irpf.toLocaleString("es-ES", {
+                        style: "currency",
+                        currency: "EUR",
+                      })}
+                    </span>
+                  </div>
+                )}
                 <Separator />
                 <div className="flex justify-between font-semibold">
                   <span>Total:</span>

@@ -46,6 +46,8 @@ export interface InvoiceData {
   subtotal?: number | null;
   iva_amount?: number | null;
   iva_percent?: number | null;
+  irpf_percent?: number | null;
+  irpf_amount?: number | null;
   total?: number | null;
   notes?: string | null;
   status?: string | null;
@@ -441,11 +443,22 @@ export async function generateInvoicePdf(
     const totalsWidth = 250;
     const totalsX = right - totalsWidth;
 
-    const rows = [
+    const rows: { label: string; value: string; bold: boolean; isNegative?: boolean }[] = [
       { label: 'Subtotal:', value: formatCurrency(invoice.subtotal || 0), bold: false },
       { label: `IVA (${invoice.iva_percent || 21}%):`, value: formatCurrency(invoice.iva_amount || 0), bold: false },
-      { label: 'TOTAL:', value: formatCurrency(invoice.total || 0), bold: true },
     ];
+
+    // Add IRPF row only if irpf_percent > 0
+    if (invoice.irpf_percent && invoice.irpf_percent > 0) {
+      rows.push({
+        label: `IRPF (${invoice.irpf_percent}%):`,
+        value: `-${formatCurrency(invoice.irpf_amount || 0)}`,
+        bold: false,
+        isNegative: true,
+      });
+    }
+
+    rows.push({ label: 'TOTAL:', value: formatCurrency(invoice.total || 0), bold: true });
 
     let currentY = y;
     rows.forEach((r, i) => {

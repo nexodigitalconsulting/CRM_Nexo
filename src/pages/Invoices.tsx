@@ -72,6 +72,7 @@ const columnConfigs: ColumnConfig[] = [
   { key: "due_date", label: "Vencimiento", defaultVisible: true },
   { key: "subtotal", label: "Base Imponible", defaultVisible: true },
   { key: "iva_amount", label: "IVA", defaultVisible: false },
+  { key: "irpf_amount", label: "IRPF", defaultVisible: false },
   { key: "total", label: "Total", defaultVisible: true },
   { key: "status", label: "Estado", defaultVisible: true },
   { key: "contract", label: "Contrato", defaultVisible: false },
@@ -222,6 +223,17 @@ export default function Invoices() {
       ),
     },
     {
+      key: "irpf_amount",
+      label: "IRPF",
+      render: (invoice: InvoiceWithDetails) => (
+        <span className="text-sm text-destructive">
+          {invoice.irpf_amount && invoice.irpf_amount > 0 
+            ? `-${formatCurrency(invoice.irpf_amount)}` 
+            : "-"}
+        </span>
+      ),
+    },
+    {
       key: "total",
       label: "Total",
       render: (invoice: InvoiceWithDetails) => (
@@ -301,6 +313,8 @@ export default function Invoices() {
                   subtotal: fullInvoice.subtotal,
                   iva_amount: fullInvoice.iva_amount,
                   iva_percent: fullInvoice.iva_percent,
+                  irpf_percent: (fullInvoice as any).irpf_percent || 0,
+                  irpf_amount: (fullInvoice as any).irpf_amount || 0,
                   total: fullInvoice.total,
                   notes: fullInvoice.notes,
                   client: fullInvoice.client,

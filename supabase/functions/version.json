@@ -1,6 +1,6 @@
 {
-  "version": "1.7.0",
-  "schemaVersion": "v1.7.0",
+  "version": "1.9.0",
+  "schemaVersion": "v1.9.0",
   "buildDate": "2025-01-15",
   "functions": [
     "bootstrap-admin",
@@ -18,6 +18,7 @@
     "setup-database"
   ],
   "changelog": {
+    "1.9.0": "Invoice IRPF fields (irpf_percent, irpf_amount)",
     "1.7.0": "Enums en español, sincronización de versiones",
     "1.6.0": "Expenses: expense_number text unique, id_factura",
     "1.5.0": "Email logs, Gmail OAuth config, provider selector",
