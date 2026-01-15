@@ -534,7 +534,38 @@ BEGIN
 END $$;
 
 -- ============================================
--- VERIFICACIÓN FINAL DE COMPONENTES v1.6.0
+-- MIGRACIÓN v1.7.0 - Enums a Español
+-- ============================================
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM schema_versions WHERE version = 'v1.7.0') THEN
+    RAISE NOTICE '[%] v1.7.0 ya aplicada - omitiendo', clock_timestamp();
+    RETURN;
+  END IF;
+
+  RAISE NOTICE '[%] Aplicando v1.7.0 - Enums a español...', clock_timestamp();
+  
+  -- NOTA: Esta migración solo registra la versión si los enums ya están en español.
+  -- Si los enums están en inglés, deben migrarse manualmente con el archivo:
+  -- easypanel/init-scripts/migrations/v1.7.0_2025-01-15_spanish_enums.sql
+  
+  -- Verificar si ya están en español (verificamos un enum representativo)
+  IF EXISTS (
+    SELECT 1 FROM pg_enum e
+    JOIN pg_type t ON e.enumtypid = t.oid
+    WHERE t.typname = 'client_status' AND e.enumlabel = 'activo'
+  ) THEN
+    -- Ya están en español, solo registrar
+    INSERT INTO schema_versions (version, description, applied_at)
+    VALUES ('v1.7.0', 'Enums en español (ya aplicado)', now());
+    RAISE NOTICE '[%] ✓ v1.7.0 registrada - enums ya en español', clock_timestamp();
+  ELSE
+    RAISE NOTICE '[%] ⚠️ Enums aún en inglés - ejecutar v1.7.0_2025-01-15_spanish_enums.sql manualmente', clock_timestamp();
+  END IF;
+END $$;
+
+-- ============================================
+-- VERIFICACIÓN FINAL DE COMPONENTES v1.7.0
 -- ============================================
 DO $$
 DECLARE
@@ -549,6 +580,7 @@ DECLARE
   v_expense_number_text boolean;
   v_id_factura boolean;
   v_expense_unique boolean;
+  v_enums_spanish boolean;
   v_all_ok boolean;
 BEGIN
   SELECT get_current_schema_version() INTO v_current;
@@ -569,7 +601,14 @@ BEGIN
   SELECT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'expenses' AND column_name = 'id_factura') INTO v_id_factura;
   SELECT EXISTS (SELECT 1 FROM pg_constraint WHERE conname IN ('expenses_expense_number_unique', 'expenses_expense_number_key')) INTO v_expense_unique;
   
-  v_all_ok := v_email_logs AND v_gmail_config AND v_provider_col AND v_invoices_is_sent AND v_quotes_is_sent AND v_contracts_is_sent AND v_expense_number_text AND v_id_factura AND v_expense_unique;
+  -- Verificar v1.7.0: enums en español
+  SELECT EXISTS (
+    SELECT 1 FROM pg_enum e
+    JOIN pg_type t ON e.enumtypid = t.oid
+    WHERE t.typname = 'client_status' AND e.enumlabel = 'activo'
+  ) INTO v_enums_spanish;
+  
+  v_all_ok := v_email_logs AND v_gmail_config AND v_provider_col AND v_invoices_is_sent AND v_quotes_is_sent AND v_contracts_is_sent AND v_expense_number_text AND v_id_factura AND v_expense_unique AND v_enums_spanish;
   
   RAISE NOTICE '';
   RAISE NOTICE '[%] ═══════════════════════════════════════════════════════', clock_timestamp();
@@ -593,6 +632,8 @@ BEGIN
   RAISE NOTICE '[%]   expenses.expense_number text: %', clock_timestamp(), CASE WHEN v_expense_number_text THEN '✓' ELSE '✗' END;
   RAISE NOTICE '[%]   expenses.id_factura:   %', clock_timestamp(), CASE WHEN v_id_factura THEN '✓' ELSE '✗' END;
   RAISE NOTICE '[%]   expenses UNIQUE constraint: %', clock_timestamp(), CASE WHEN v_expense_unique THEN '✓' ELSE '✗' END;
+  RAISE NOTICE '[%] v1.7.0:', clock_timestamp();
+  RAISE NOTICE '[%]   Enums en español:     %', clock_timestamp(), CASE WHEN v_enums_spanish THEN '✓' ELSE '✗' END;
   RAISE NOTICE '[%] ═══════════════════════════════════════════════════════', clock_timestamp();
   RAISE NOTICE '[%] ESTADO FINAL: %', clock_timestamp(), CASE WHEN v_all_ok THEN '✅ TODOS LOS COMPONENTES OK' ELSE '⚠️ FALTAN COMPONENTES' END;
   RAISE NOTICE '[%] ═══════════════════════════════════════════════════════', clock_timestamp();

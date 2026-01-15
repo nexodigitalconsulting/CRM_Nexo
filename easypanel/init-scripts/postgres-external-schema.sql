@@ -28,47 +28,47 @@ DO $$ BEGIN
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 DO $$ BEGIN
-  CREATE TYPE client_status AS ENUM ('active', 'inactive');
+  CREATE TYPE client_status AS ENUM ('activo', 'inactivo');
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 DO $$ BEGIN
-  CREATE TYPE client_segment AS ENUM ('corporate', 'pyme', 'entrepreneur', 'individual');
+  CREATE TYPE client_segment AS ENUM ('corporativo', 'pyme', 'autonomo', 'particular');
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 DO $$ BEGIN
-  CREATE TYPE contact_status AS ENUM ('new', 'contacted', 'follow_up', 'discarded', 'converted');
+  CREATE TYPE contact_status AS ENUM ('nuevo', 'contactado', 'seguimiento', 'descartado', 'convertido');
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 DO $$ BEGIN
-  CREATE TYPE contract_status AS ENUM ('active', 'expired', 'cancelled', 'pending_activation');
+  CREATE TYPE contract_status AS ENUM ('vigente', 'expirado', 'cancelado', 'pendiente_activacion');
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 DO $$ BEGIN
-  CREATE TYPE billing_period AS ENUM ('monthly', 'quarterly', 'annual', 'one_time', 'other');
+  CREATE TYPE billing_period AS ENUM ('mensual', 'trimestral', 'anual', 'unico', 'otro');
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 DO $$ BEGIN
-  CREATE TYPE payment_status AS ENUM ('paid', 'pending', 'partial', 'claimed');
+  CREATE TYPE payment_status AS ENUM ('pagado', 'pendiente', 'parcial', 'reclamado');
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 DO $$ BEGIN
-  CREATE TYPE quote_status AS ENUM ('draft', 'sent', 'approved', 'rejected');
+  CREATE TYPE quote_status AS ENUM ('borrador', 'enviado', 'aceptado', 'rechazado');
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 DO $$ BEGIN
-  CREATE TYPE invoice_status AS ENUM ('draft', 'issued', 'paid', 'cancelled');
+  CREATE TYPE invoice_status AS ENUM ('borrador', 'emitida', 'pagada', 'cancelada');
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 DO $$ BEGIN
-  CREATE TYPE remittance_status AS ENUM ('pending', 'paid', 'partial', 'overdue');
+  CREATE TYPE remittance_status AS ENUM ('pendiente', 'cobrada', 'parcial', 'vencida');
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 DO $$ BEGIN
-  CREATE TYPE service_status AS ENUM ('active', 'inactive', 'development');
+  CREATE TYPE service_status AS ENUM ('activo', 'inactivo', 'desarrollo');
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 DO $$ BEGIN
-  CREATE TYPE event_importance AS ENUM ('high', 'medium', 'low');
+  CREATE TYPE event_importance AS ENUM ('alta', 'media', 'baja');
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 -- ============================================
@@ -809,7 +809,8 @@ VALUES
   ('v1.3.0', 'RLS schema_versions', now()),
   ('v1.4.0', 'is_sent/sent_at columns', now()),
   ('v1.5.0', 'Email logs, Gmail OAuth config', now()),
-  ('v1.6.0', 'Expenses: expense_number text unique, id_factura', now())
+  ('v1.6.0', 'Expenses: expense_number text unique, id_factura', now()),
+  ('v1.7.0', 'Enums en español', now())
 ON CONFLICT (version) DO NOTHING;
 
 -- ============================================
