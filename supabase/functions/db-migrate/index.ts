@@ -7,7 +7,7 @@ const corsHeaders = {
 };
 
 // Current schema version - UPDATE THIS when adding new migrations
-const CURRENT_VERSION = "v1.4.0";
+const CURRENT_VERSION = "v1.7.0";
 
 // Migration definitions
 const MIGRATIONS = [
@@ -15,7 +15,10 @@ const MIGRATIONS = [
   { version: "v1.1.0", description: "Tabla pdf_settings para personalización de documentos" },
   { version: "v1.2.0", description: "Columna signature_html, tablas de productos y triggers" },
   { version: "v1.3.0", description: "RLS para schema_versions" },
-  { version: "v1.4.0", description: "Columnas is_sent y sent_at en invoices, quotes, contracts" }
+  { version: "v1.4.0", description: "Columnas is_sent y sent_at en invoices, quotes, contracts" },
+  { version: "v1.5.0", description: "Email logs, Gmail OAuth config, columna provider" },
+  { version: "v1.6.0", description: "Expenses: expense_number text unique, id_factura" },
+  { version: "v1.7.0", description: "Migración de enums a español" }
 ];
 
 // Version comparison helper
@@ -251,6 +254,45 @@ serve(async (req) => {
       log("⚠️ Falta: contracts.is_sent/sent_at (v1.4.0)");
     } else if (!contractSentError) {
       log("✓ contracts.is_sent/sent_at existe");
+    }
+
+    // Check email_logs table (v1.5.0)
+    const { error: emailLogsError } = await supabaseAdmin
+      .from("email_logs")
+      .select("id")
+      .limit(1);
+
+    if (emailLogsError?.code === "42P01") {
+      missingComponents.push("email_logs table (v1.5.0)");
+      log("⚠️ Falta: email_logs (v1.5.0)");
+    } else {
+      log("✓ email_logs existe");
+    }
+
+    // Check gmail_config table (v1.5.0)
+    const { error: gmailConfigError } = await supabaseAdmin
+      .from("gmail_config")
+      .select("id")
+      .limit(1);
+
+    if (gmailConfigError?.code === "42P01") {
+      missingComponents.push("gmail_config table (v1.5.0)");
+      log("⚠️ Falta: gmail_config (v1.5.0)");
+    } else {
+      log("✓ gmail_config existe");
+    }
+
+    // Check expenses.id_factura column (v1.6.0)
+    const { error: expensesError } = await supabaseAdmin
+      .from("expenses")
+      .select("id_factura")
+      .limit(1);
+
+    if (expensesError?.message?.includes("id_factura")) {
+      missingComponents.push("expenses.id_factura (v1.6.0)");
+      log("⚠️ Falta: expenses.id_factura (v1.6.0)");
+    } else if (!expensesError) {
+      log("✓ expenses.id_factura existe");
     }
 
     // ============================================

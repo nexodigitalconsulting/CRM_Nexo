@@ -9,7 +9,7 @@ export interface SchemaStatus {
   environment: "cloud" | "self-hosted" | "unknown";
 }
 
-export const TARGET_VERSION = "v1.5.0";
+export const TARGET_VERSION = "v1.7.0";
 
 // Required tables for the CRM to function
 const REQUIRED_TABLES = [
@@ -190,6 +190,18 @@ export async function checkSchemaDirectly(): Promise<SchemaStatus> {
     if (gmailConfigError?.code === "42P01") {
       console.warn("[SchemaChecker] Tabla gmail_config no existe (v1.5.0)");
       status.missingComponents.push("gmail_config table (v1.5.0)");
+    }
+
+    // 10. Check expenses.expense_number is TEXT (v1.6.0)
+    // This is checked indirectly - if expense_number exists and works, it's ok
+    const { error: expensesError } = await supabase
+      .from("expenses")
+      .select("expense_number, id_factura")
+      .limit(1);
+
+    if (expensesError?.message?.includes("id_factura")) {
+      console.warn("[SchemaChecker] Columna id_factura no existe (v1.6.0)");
+      status.missingComponents.push("expenses.id_factura column (v1.6.0)");
     }
 
     // 10. Determine if complete - version must match OR be higher

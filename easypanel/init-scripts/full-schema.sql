@@ -37,47 +37,47 @@ DO $$ BEGIN
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 DO $$ BEGIN
-  CREATE TYPE public.client_status AS ENUM ('active', 'inactive');
+  CREATE TYPE public.client_status AS ENUM ('activo', 'inactivo');
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 DO $$ BEGIN
-  CREATE TYPE public.client_segment AS ENUM ('corporate', 'pyme', 'entrepreneur', 'individual');
+  CREATE TYPE public.client_segment AS ENUM ('corporativo', 'pyme', 'autonomo', 'particular');
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 DO $$ BEGIN
-  CREATE TYPE public.contact_status AS ENUM ('new', 'contacted', 'follow_up', 'discarded', 'converted');
+  CREATE TYPE public.contact_status AS ENUM ('nuevo', 'contactado', 'seguimiento', 'descartado', 'convertido');
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 DO $$ BEGIN
-  CREATE TYPE public.contract_status AS ENUM ('active', 'expired', 'cancelled', 'pending_activation');
+  CREATE TYPE public.contract_status AS ENUM ('vigente', 'expirado', 'cancelado', 'pendiente_activacion');
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 DO $$ BEGIN
-  CREATE TYPE public.billing_period AS ENUM ('monthly', 'quarterly', 'annual', 'one_time', 'other');
+  CREATE TYPE public.billing_period AS ENUM ('mensual', 'trimestral', 'anual', 'unico', 'otro');
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 DO $$ BEGIN
-  CREATE TYPE public.payment_status AS ENUM ('paid', 'pending', 'partial', 'claimed');
+  CREATE TYPE public.payment_status AS ENUM ('pagado', 'pendiente', 'parcial', 'reclamado');
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 DO $$ BEGIN
-  CREATE TYPE public.quote_status AS ENUM ('draft', 'sent', 'approved', 'rejected');
+  CREATE TYPE public.quote_status AS ENUM ('borrador', 'enviado', 'aceptado', 'rechazado');
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 DO $$ BEGIN
-  CREATE TYPE public.invoice_status AS ENUM ('draft', 'issued', 'paid', 'cancelled');
+  CREATE TYPE public.invoice_status AS ENUM ('borrador', 'emitida', 'pagada', 'cancelada');
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 DO $$ BEGIN
-  CREATE TYPE public.remittance_status AS ENUM ('pending', 'paid', 'partial', 'overdue');
+  CREATE TYPE public.remittance_status AS ENUM ('pendiente', 'cobrada', 'parcial', 'vencida');
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 DO $$ BEGIN
-  CREATE TYPE public.service_status AS ENUM ('active', 'inactive', 'development');
+  CREATE TYPE public.service_status AS ENUM ('activo', 'inactivo', 'desarrollo');
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 DO $$ BEGIN
-  CREATE TYPE public.event_importance AS ENUM ('high', 'medium', 'low');
+  CREATE TYPE public.event_importance AS ENUM ('alta', 'media', 'baja');
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 -- ============================================
@@ -229,7 +229,7 @@ CREATE TABLE IF NOT EXISTS public.contacts (
   email text,
   phone text,
   source text DEFAULT 'web',
-  status contact_status DEFAULT 'new',
+  status contact_status DEFAULT 'nuevo',
   meeting_date timestamptz,
   presentation_url text,
   quote_url text,
@@ -255,7 +255,7 @@ CREATE TABLE IF NOT EXISTS public.clients (
   country text DEFAULT 'España',
   iban text,
   segment client_segment DEFAULT 'pyme',
-  status client_status DEFAULT 'active',
+  status client_status DEFAULT 'activo',
   source text,
   notes text,
   contact_id uuid REFERENCES public.contacts(id),
@@ -274,7 +274,7 @@ CREATE TABLE IF NOT EXISTS public.services (
   category text,
   price numeric NOT NULL DEFAULT 0,
   iva_percent numeric DEFAULT 21.00,
-  status service_status DEFAULT 'active',
+  status service_status DEFAULT 'activo',
   created_at timestamptz DEFAULT now(),
   updated_at timestamptz DEFAULT now()
 );
@@ -287,7 +287,7 @@ CREATE TABLE IF NOT EXISTS public.quotes (
   name text,
   client_id uuid REFERENCES public.clients(id),
   contact_id uuid REFERENCES public.contacts(id),
-  status quote_status DEFAULT 'draft',
+  status quote_status DEFAULT 'borrador',
   valid_until date,
   subtotal numeric DEFAULT 0,
   iva_total numeric DEFAULT 0,
@@ -327,10 +327,11 @@ CREATE TABLE IF NOT EXISTS public.contracts (
   quote_id uuid REFERENCES public.quotes(id),
   start_date date NOT NULL,
   end_date date,
-  billing_period billing_period DEFAULT 'monthly',
+  billing_period billing_period DEFAULT 'mensual',
   next_billing_date date,
-  status contract_status DEFAULT 'pending_activation',
-  payment_status payment_status DEFAULT 'pending',
+  status contract_status DEFAULT 'pendiente_activacion',
+  payment_status payment_status DEFAULT 'pendiente',
+  payment_status payment_status DEFAULT 'pendiente',
   subtotal numeric DEFAULT 0,
   iva_total numeric DEFAULT 0,
   total numeric DEFAULT 0,
@@ -368,7 +369,7 @@ CREATE TABLE IF NOT EXISTS public.remittances (
   remittance_number integer NOT NULL DEFAULT nextval('remittances_remittance_number_seq'),
   code text,
   issue_date date NOT NULL DEFAULT CURRENT_DATE,
-  status remittance_status DEFAULT 'pending',
+  status remittance_status DEFAULT 'pendiente',
   total_amount numeric DEFAULT 0,
   invoice_count integer DEFAULT 0,
   notes text,
@@ -389,7 +390,7 @@ CREATE TABLE IF NOT EXISTS public.invoices (
   remittance_id uuid REFERENCES public.remittances(id),
   issue_date date NOT NULL DEFAULT CURRENT_DATE,
   due_date date,
-  status invoice_status DEFAULT 'draft',
+  status invoice_status DEFAULT 'borrador',
   subtotal numeric DEFAULT 0,
   iva_percent numeric DEFAULT 21.00,
   iva_amount numeric DEFAULT 0,
@@ -475,7 +476,7 @@ CREATE TABLE IF NOT EXISTS public.calendar_categories (
   user_id uuid NOT NULL,
   name text NOT NULL,
   color text NOT NULL DEFAULT '#3b82f6',
-  importance event_importance DEFAULT 'medium',
+  importance event_importance DEFAULT 'media',
   is_default boolean DEFAULT false,
   created_at timestamptz DEFAULT now(),
   updated_at timestamptz DEFAULT now()
@@ -492,7 +493,7 @@ CREATE TABLE IF NOT EXISTS public.calendar_events (
   end_datetime timestamptz NOT NULL,
   all_day boolean DEFAULT false,
   category_id uuid REFERENCES public.calendar_categories(id),
-  importance event_importance DEFAULT 'medium',
+  importance event_importance DEFAULT 'media',
   status text DEFAULT 'confirmed',
   notes text,
   reminder_minutes integer,
@@ -1198,7 +1199,7 @@ BEGIN
 
   RAISE NOTICE '';
   RAISE NOTICE '[%] ════════════════════════════════════════════', clock_timestamp();
-  RAISE NOTICE '║  ✅ CRM Schema v1.6.0 instalado correctamente  ║';
+  RAISE NOTICE '║  ✅ CRM Schema v1.7.0 instalado correctamente  ║';
   RAISE NOTICE '════════════════════════════════════════════════════';
   RAISE NOTICE '';
   RAISE NOTICE '[%] VERIFICACIÓN DE COMPONENTES:', clock_timestamp();
