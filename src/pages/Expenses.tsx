@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Header } from "@/components/layout/Header";
-import { DataTable } from "@/components/ui/data-table";
+import { FilterableDataTable } from "@/components/ui/filterable-data-table";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -321,7 +321,7 @@ export default function Expenses() {
             Cargando gastos...
           </div>
         ) : (
-          <DataTable columns={columns} data={filteredExpenses} visibleColumns={visibleColumns} />
+          <FilterableDataTable columns={columns} data={expenses || []} visibleColumns={visibleColumns} />
         )}
       </div>
 

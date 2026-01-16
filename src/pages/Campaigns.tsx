@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Header } from "@/components/layout/Header";
-import { DataTable } from "@/components/ui/data-table";
+import { FilterableDataTable } from "@/components/ui/filterable-data-table";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -363,7 +363,11 @@ export default function Campaigns() {
         {isLoading ? (
           <div className="text-center py-8 text-muted-foreground">Cargando campañas...</div>
         ) : (
-          <DataTable columns={visibleColumnsList} data={filteredCampaigns} />
+          <FilterableDataTable 
+            columns={visibleColumnsList} 
+            data={campaigns} 
+            visibleColumns={visibleColumns}
+          />
         )}
       </div>
 
