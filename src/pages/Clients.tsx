@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Header } from "@/components/layout/Header";
-import { DataTable, Column } from "@/components/ui/data-table";
+import { FilterableDataTable, Column } from "@/components/ui/filterable-data-table";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -362,9 +362,9 @@ export default function Clients() {
             <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
           </div>
         ) : (
-          <DataTable 
+          <FilterableDataTable 
             columns={columns} 
-            data={filteredClients} 
+            data={clients || []} 
             visibleColumns={visibleColumns}
           />
         )}

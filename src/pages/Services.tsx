@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Header } from "@/components/layout/Header";
-import { DataTable } from "@/components/ui/data-table";
+import { FilterableDataTable } from "@/components/ui/filterable-data-table";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -311,7 +311,7 @@ export default function Services() {
             <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
           </div>
         ) : viewMode === "table" ? (
-          <DataTable columns={columns} data={filteredServices} visibleColumns={visibleColumns} />
+          <FilterableDataTable columns={columns} data={services || []} visibleColumns={visibleColumns} />
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {filteredServices.map((service) => (
