@@ -20,6 +20,8 @@ interface ContactFormDialogProps {
   contact?: Contact | null;
 }
 
+type ContactStatus = "nuevo" | "reunion_agendada" | "propuesta_enviada" | "ganado" | "perdido";
+
 const initialFormState: ContactInsert = {
   name: "",
   email: "",
@@ -30,6 +32,7 @@ const initialFormState: ContactInsert = {
   meeting_date: null,
   presentation_url: "",
   quote_url: "",
+  place_id: "",
 };
 
 export function ContactFormDialog({ open, onOpenChange, contact }: ContactFormDialogProps) {
@@ -52,6 +55,7 @@ export function ContactFormDialog({ open, onOpenChange, contact }: ContactFormDi
         meeting_date: contact.meeting_date,
         presentation_url: contact.presentation_url || "",
         quote_url: contact.quote_url || "",
+        place_id: contact.place_id || "",
       });
     } else {
       setFormData(initialFormState);
@@ -132,6 +136,7 @@ export function ContactFormDialog({ open, onOpenChange, contact }: ContactFormDi
                   <SelectItem value="email">Email</SelectItem>
                   <SelectItem value="telefono">Teléfono</SelectItem>
                   <SelectItem value="evento">Evento</SelectItem>
+                  <SelectItem value="campaña">Campaña</SelectItem>
                   <SelectItem value="otro">Otro</SelectItem>
                 </SelectContent>
               </Select>
@@ -140,17 +145,17 @@ export function ContactFormDialog({ open, onOpenChange, contact }: ContactFormDi
               <Label>Estado</Label>
               <Select
                 value={formData.status || "nuevo"}
-                onValueChange={(value) => handleChange("status", value as ContactInsert["status"])}
+                onValueChange={(value) => handleChange("status", value as ContactStatus)}
               >
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="nuevo">Nuevo</SelectItem>
-                  <SelectItem value="contactado">Contactado</SelectItem>
-                  <SelectItem value="seguimiento">Seguimiento</SelectItem>
-                  <SelectItem value="descartado">Descartado</SelectItem>
-                  <SelectItem value="convertido">Convertido</SelectItem>
+                  <SelectItem value="reunion_agendada">Reunión Agendada</SelectItem>
+                  <SelectItem value="propuesta_enviada">Propuesta Enviada</SelectItem>
+                  <SelectItem value="ganado">Ganado</SelectItem>
+                  <SelectItem value="perdido">Perdido</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -187,6 +192,16 @@ export function ContactFormDialog({ open, onOpenChange, contact }: ContactFormDi
                 placeholder="https://..."
               />
             </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="place_id">Place ID (Google)</Label>
+            <Input
+              id="place_id"
+              value={formData.place_id || ""}
+              onChange={(e) => handleChange("place_id", e.target.value)}
+              placeholder="ChIJ..."
+            />
           </div>
 
           <div className="space-y-2">

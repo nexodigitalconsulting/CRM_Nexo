@@ -131,10 +131,10 @@ export function useConvertToClient() {
       
       if (clientError) throw clientError;
       
-      // Update contact status
+      // Update contact status to "ganado"
       const { error: updateError } = await supabase
         .from("contacts")
-        .update({ status: "convertido" })
+        .update({ status: "ganado" })
         .eq("id", contact.id);
       
       if (updateError) throw updateError;

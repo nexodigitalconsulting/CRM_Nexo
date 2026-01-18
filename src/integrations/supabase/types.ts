@@ -163,12 +163,16 @@ export type Database = {
           created_by: string | null
           email: string | null
           id: string
+          last_contact_at: string | null
           name: string
           phone: string | null
           place_id: string | null
           postal_code: string | null
           province: string | null
-          status: string | null
+          response_at: string | null
+          response_channel: string | null
+          sent_at: string | null
+          status: Database["public"]["Enums"]["campaign_status"] | null
           updated_at: string | null
           website: string | null
         }
@@ -183,12 +187,16 @@ export type Database = {
           created_by?: string | null
           email?: string | null
           id?: string
+          last_contact_at?: string | null
           name: string
           phone?: string | null
           place_id?: string | null
           postal_code?: string | null
           province?: string | null
-          status?: string | null
+          response_at?: string | null
+          response_channel?: string | null
+          sent_at?: string | null
+          status?: Database["public"]["Enums"]["campaign_status"] | null
           updated_at?: string | null
           website?: string | null
         }
@@ -203,12 +211,16 @@ export type Database = {
           created_by?: string | null
           email?: string | null
           id?: string
+          last_contact_at?: string | null
           name?: string
           phone?: string | null
           place_id?: string | null
           postal_code?: string | null
           province?: string | null
-          status?: string | null
+          response_at?: string | null
+          response_channel?: string | null
+          sent_at?: string | null
+          status?: Database["public"]["Enums"]["campaign_status"] | null
           updated_at?: string | null
           website?: string | null
         }
@@ -421,6 +433,7 @@ export type Database = {
           name: string
           notes: string | null
           phone: string | null
+          place_id: string | null
           presentation_url: string | null
           quote_url: string | null
           source: string | null
@@ -437,6 +450,7 @@ export type Database = {
           name: string
           notes?: string | null
           phone?: string | null
+          place_id?: string | null
           presentation_url?: string | null
           quote_url?: string | null
           source?: string | null
@@ -453,6 +467,7 @@ export type Database = {
           name?: string
           notes?: string | null
           phone?: string | null
+          place_id?: string | null
           presentation_url?: string | null
           quote_url?: string | null
           source?: string | null
@@ -1977,14 +1992,20 @@ export type Database = {
     Enums: {
       app_role: "admin" | "manager" | "user" | "readonly"
       billing_period: "mensual" | "trimestral" | "anual" | "unico" | "otro"
+      campaign_status:
+        | "pendiente"
+        | "enviado"
+        | "respondido"
+        | "descartado"
+        | "cliente"
       client_segment: "corporativo" | "pyme" | "autonomo" | "particular"
       client_status: "activo" | "inactivo"
       contact_status:
         | "nuevo"
-        | "contactado"
-        | "seguimiento"
-        | "descartado"
-        | "convertido"
+        | "reunion_agendada"
+        | "propuesta_enviada"
+        | "ganado"
+        | "perdido"
       contract_status:
         | "vigente"
         | "expirado"
@@ -2132,14 +2153,21 @@ export const Constants = {
     Enums: {
       app_role: ["admin", "manager", "user", "readonly"],
       billing_period: ["mensual", "trimestral", "anual", "unico", "otro"],
+      campaign_status: [
+        "pendiente",
+        "enviado",
+        "respondido",
+        "descartado",
+        "cliente",
+      ],
       client_segment: ["corporativo", "pyme", "autonomo", "particular"],
       client_status: ["activo", "inactivo"],
       contact_status: [
         "nuevo",
-        "contactado",
-        "seguimiento",
-        "descartado",
-        "convertido",
+        "reunion_agendada",
+        "propuesta_enviada",
+        "ganado",
+        "perdido",
       ],
       contract_status: [
         "vigente",

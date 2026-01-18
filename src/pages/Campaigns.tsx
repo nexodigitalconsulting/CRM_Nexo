@@ -11,8 +11,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Plus, Megaphone, Calendar, MapPin, Globe, Trash2, Edit2, Mail, Phone, Building2 } from "lucide-react";
-import { useCampaigns, useDeleteCampaign, type Campaign } from "@/hooks/useCampaigns";
+import { Plus, Megaphone, Calendar, MapPin, Globe, Trash2, Edit2, Mail, Phone, Building2, Clock, MessageSquare, UserPlus } from "lucide-react";
+import { useCampaigns, useDeleteCampaign, useConvertCampaignToContact, type Campaign } from "@/hooks/useCampaigns";
 import { CampaignFormDialog } from "@/components/campaigns/CampaignFormDialog";
 import { ExportDropdown } from "@/components/common/ExportDropdown";
 import { TableViewManager, ColumnConfig } from "@/components/common/TableViewManager";
@@ -30,17 +30,34 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
-const statusMap: Record<string, "active" | "pending" | "inactive"> = {
-  active: "active",
-  scheduled: "pending",
-  completed: "inactive",
+const statusMap: Record<string, "active" | "pending" | "inactive" | "success" | "new"> = {
+  pendiente: "new",
+  enviado: "pending",
+  respondido: "active",
+  descartado: "inactive",
+  cliente: "success",
 };
 
 const statusLabels: Record<string, string> = {
-  active: "Activo",
-  scheduled: "Programado",
-  completed: "Completado",
+  pendiente: "Pendiente",
+  enviado: "Enviado",
+  respondido: "Respondido",
+  descartado: "Descartado",
+  cliente: "Cliente",
+};
+
+const responseChannelLabels: Record<string, string> = {
+  email: "Email",
+  phone: "Teléfono",
+  web: "Web",
+  whatsapp: "WhatsApp",
 };
 
 // Column configuration for view management
@@ -50,13 +67,16 @@ const columnConfigs: ColumnConfig[] = [
   { key: "business_name", label: "Negocio", defaultVisible: true },
   { key: "email", label: "Email", defaultVisible: true },
   { key: "phone", label: "Teléfono", defaultVisible: true },
-  { key: "category", label: "Categoría", defaultVisible: true },
+  { key: "category", label: "Categoría", defaultVisible: false },
   { key: "city", label: "Ciudad", defaultVisible: true },
   { key: "province", label: "Provincia", defaultVisible: false },
   { key: "postal_code", label: "Código Postal", defaultVisible: false },
   { key: "address", label: "Dirección", defaultVisible: false },
-  { key: "website", label: "Web", defaultVisible: true },
-  { key: "capture_date", label: "Fecha Captura", defaultVisible: true },
+  { key: "website", label: "Web", defaultVisible: false },
+  { key: "capture_date", label: "Fecha Captura", defaultVisible: false },
+  { key: "sent_at", label: "Enviado", defaultVisible: true },
+  { key: "response_at", label: "Respuesta", defaultVisible: true },
+  { key: "last_contact_at", label: "Último Contacto", defaultVisible: false },
   { key: "status", label: "Estado", defaultVisible: true },
   { key: "place_id", label: "Place ID", defaultVisible: false },
   { key: "actions", label: "Acciones", defaultVisible: true },
@@ -65,6 +85,7 @@ const columnConfigs: ColumnConfig[] = [
 export default function Campaigns() {
   const { data: campaigns = [], isLoading } = useCampaigns();
   const deleteCampaign = useDeleteCampaign();
+  const convertToContact = useConvertCampaignToContact();
   const { data: defaultView } = useDefaultTableView("campaigns");
   
   const [searchTerm, setSearchTerm] = useState("");
@@ -110,6 +131,10 @@ export default function Campaigns() {
       setDeleteDialogOpen(false);
       setCampaignToDelete(null);
     }
+  };
+
+  const handleConvertToContact = async (campaign: Campaign) => {
+    await convertToContact.mutateAsync(campaign);
   };
 
   const columns = [
@@ -243,6 +268,61 @@ export default function Campaigns() {
       ),
     },
     {
+      key: "sent_at",
+      label: "Enviado",
+      render: (campaign: Campaign) => (
+        <div className="flex items-center gap-2 text-sm">
+          {campaign.sent_at ? (
+            <>
+              <Mail className="h-4 w-4 text-primary" />
+              <span>{format(new Date(campaign.sent_at), "dd/MM/yy HH:mm", { locale: es })}</span>
+            </>
+          ) : (
+            <span className="text-muted-foreground">-</span>
+          )}
+        </div>
+      ),
+    },
+    {
+      key: "response_at",
+      label: "Respuesta",
+      render: (campaign: Campaign) => (
+        <div className="flex items-center gap-2 text-sm">
+          {campaign.response_at ? (
+            <>
+              <MessageSquare className="h-4 w-4 text-success" />
+              <div className="flex flex-col">
+                <span>{format(new Date(campaign.response_at), "dd/MM/yy HH:mm", { locale: es })}</span>
+                {campaign.response_channel && (
+                  <span className="text-xs text-muted-foreground">
+                    {responseChannelLabels[campaign.response_channel] || campaign.response_channel}
+                  </span>
+                )}
+              </div>
+            </>
+          ) : (
+            <span className="text-muted-foreground">-</span>
+          )}
+        </div>
+      ),
+    },
+    {
+      key: "last_contact_at",
+      label: "Último Contacto",
+      render: (campaign: Campaign) => (
+        <div className="flex items-center gap-2 text-sm">
+          {campaign.last_contact_at ? (
+            <>
+              <Clock className="h-4 w-4 text-muted-foreground" />
+              <span>{format(new Date(campaign.last_contact_at), "dd/MM/yy HH:mm", { locale: es })}</span>
+            </>
+          ) : (
+            <span className="text-muted-foreground">-</span>
+          )}
+        </div>
+      ),
+    },
+    {
       key: "place_id",
       label: "Place ID",
       render: (campaign: Campaign) => (
@@ -255,8 +335,8 @@ export default function Campaigns() {
       key: "status",
       label: "Estado",
       render: (campaign: Campaign) => (
-        <StatusBadge variant={statusMap[campaign.status || "active"]}>
-          {statusLabels[campaign.status || "active"]}
+        <StatusBadge variant={statusMap[campaign.status || "pendiente"]}>
+          {statusLabels[campaign.status || "pendiente"]}
         </StatusBadge>
       ),
     },
@@ -264,19 +344,47 @@ export default function Campaigns() {
       key: "actions",
       label: "Acciones",
       render: (campaign: Campaign) => (
-        <div className="flex items-center gap-1">
-          <Button variant="ghost" size="icon" onClick={() => handleEdit(campaign)}>
-            <Edit2 className="h-4 w-4" />
-          </Button>
-          <Button 
-            variant="ghost" 
-            size="icon" 
-            className="text-destructive hover:text-destructive"
-            onClick={() => handleDelete(campaign)}
-          >
-            <Trash2 className="h-4 w-4" />
-          </Button>
-        </div>
+        <TooltipProvider>
+          <div className="flex items-center gap-1">
+            {campaign.status !== "cliente" && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button 
+                    variant="ghost" 
+                    size="icon" 
+                    className="text-success" 
+                    onClick={() => handleConvertToContact(campaign)}
+                    disabled={convertToContact.isPending}
+                  >
+                    <UserPlus className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Convertir a Contacto</TooltipContent>
+              </Tooltip>
+            )}
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button variant="ghost" size="icon" onClick={() => handleEdit(campaign)}>
+                  <Edit2 className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Editar</TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button 
+                  variant="ghost" 
+                  size="icon" 
+                  className="text-destructive hover:text-destructive"
+                  onClick={() => handleDelete(campaign)}
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Eliminar</TooltipContent>
+            </Tooltip>
+          </div>
+        </TooltipProvider>
       ),
     },
   ];
@@ -298,27 +406,33 @@ export default function Campaigns() {
       />
       <div className="p-6 space-y-6">
         {/* Stats */}
-        <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-5 gap-4">
           <div className="bg-card rounded-lg border border-border p-4">
-            <p className="text-sm text-muted-foreground">Total Registros</p>
+            <p className="text-sm text-muted-foreground">Total</p>
             <p className="text-2xl font-semibold mt-1">{campaigns.length}</p>
           </div>
           <div className="bg-card rounded-lg border border-border p-4">
-            <p className="text-sm text-muted-foreground">Activos</p>
+            <p className="text-sm text-muted-foreground">Pendientes</p>
+            <p className="text-2xl font-semibold mt-1 text-primary">
+              {campaigns.filter((c) => c.status === "pendiente").length}
+            </p>
+          </div>
+          <div className="bg-card rounded-lg border border-border p-4">
+            <p className="text-sm text-muted-foreground">Enviados</p>
+            <p className="text-2xl font-semibold mt-1 text-warning">
+              {campaigns.filter((c) => c.status === "enviado").length}
+            </p>
+          </div>
+          <div className="bg-card rounded-lg border border-border p-4">
+            <p className="text-sm text-muted-foreground">Respondidos</p>
+            <p className="text-2xl font-semibold mt-1 text-info">
+              {campaigns.filter((c) => c.status === "respondido").length}
+            </p>
+          </div>
+          <div className="bg-card rounded-lg border border-border p-4">
+            <p className="text-sm text-muted-foreground">Clientes</p>
             <p className="text-2xl font-semibold mt-1 text-success">
-              {campaigns.filter((c) => c.status === "active").length}
-            </p>
-          </div>
-          <div className="bg-card rounded-lg border border-border p-4">
-            <p className="text-sm text-muted-foreground">Con Email</p>
-            <p className="text-2xl font-semibold mt-1">
-              {campaigns.filter((c) => c.email).length}
-            </p>
-          </div>
-          <div className="bg-card rounded-lg border border-border p-4">
-            <p className="text-sm text-muted-foreground">Con Teléfono</p>
-            <p className="text-2xl font-semibold mt-1">
-              {campaigns.filter((c) => c.phone).length}
+              {campaigns.filter((c) => c.status === "cliente").length}
             </p>
           </div>
         </div>
@@ -337,9 +451,11 @@ export default function Campaigns() {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Todos</SelectItem>
-              <SelectItem value="active">Activo</SelectItem>
-              <SelectItem value="scheduled">Programado</SelectItem>
-              <SelectItem value="completed">Completado</SelectItem>
+              <SelectItem value="pendiente">Pendiente</SelectItem>
+              <SelectItem value="enviado">Enviado</SelectItem>
+              <SelectItem value="respondido">Respondido</SelectItem>
+              <SelectItem value="descartado">Descartado</SelectItem>
+              <SelectItem value="cliente">Cliente</SelectItem>
             </SelectContent>
           </Select>
           <div className="flex gap-2 ml-auto">
@@ -365,7 +481,7 @@ export default function Campaigns() {
         ) : (
           <FilterableDataTable 
             columns={visibleColumnsList} 
-            data={campaigns} 
+            data={filteredCampaigns} 
             visibleColumns={visibleColumns}
           />
         )}

@@ -97,3 +97,48 @@ export const useDeleteCampaign = () => {
     },
   });
 };
+
+export const useConvertCampaignToContact = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (campaign: Campaign) => {
+      // 1. Create contact from campaign data
+      const { data: contact, error: contactError } = await supabase
+        .from("contacts")
+        .insert({
+          name: campaign.business_name || campaign.name,
+          email: campaign.email,
+          phone: campaign.phone,
+          source: "campaña",
+          place_id: campaign.place_id,
+          status: "nuevo",
+        })
+        .select()
+        .single();
+      
+      if (contactError) throw contactError;
+      
+      // 2. Update campaign status to "cliente"
+      const { error: updateError } = await supabase
+        .from("campaigns")
+        .update({ 
+          status: "cliente",
+          last_contact_at: new Date().toISOString()
+        })
+        .eq("id", campaign.id);
+      
+      if (updateError) throw updateError;
+      
+      return contact;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["campaigns"] });
+      queryClient.invalidateQueries({ queryKey: ["contacts"] });
+      toast.success("Campaña convertida a contacto");
+    },
+    onError: (error) => {
+      toast.error("Error al convertir la campaña: " + error.message);
+    },
+  });
+};

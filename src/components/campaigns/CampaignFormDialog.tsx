@@ -27,6 +27,7 @@ import {
 } from "@/components/ui/select";
 import { useCreateCampaign, useUpdateCampaign, type Campaign } from "@/hooks/useCampaigns";
 import { useEffect } from "react";
+import { Separator } from "@/components/ui/separator";
 
 const formSchema = z.object({
   name: z.string().min(1, "El nombre es requerido"),
@@ -42,6 +43,10 @@ const formSchema = z.object({
   postal_code: z.string().optional(),
   capture_date: z.string().optional(),
   status: z.string().optional(),
+  sent_at: z.string().optional(),
+  response_at: z.string().optional(),
+  response_channel: z.string().optional(),
+  last_contact_at: z.string().optional(),
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -72,7 +77,11 @@ export function CampaignFormDialog({ open, onOpenChange, campaign }: CampaignFor
       city: "",
       postal_code: "",
       capture_date: new Date().toISOString().split("T")[0],
-      status: "active",
+      status: "pendiente",
+      sent_at: "",
+      response_at: "",
+      response_channel: "",
+      last_contact_at: "",
     },
   });
 
@@ -91,7 +100,11 @@ export function CampaignFormDialog({ open, onOpenChange, campaign }: CampaignFor
         city: campaign.city || "",
         postal_code: campaign.postal_code || "",
         capture_date: campaign.capture_date || new Date().toISOString().split("T")[0],
-        status: campaign.status || "active",
+        status: campaign.status || "pendiente",
+        sent_at: campaign.sent_at ? campaign.sent_at.slice(0, 16) : "",
+        response_at: campaign.response_at ? campaign.response_at.slice(0, 16) : "",
+        response_channel: campaign.response_channel || "",
+        last_contact_at: campaign.last_contact_at ? campaign.last_contact_at.slice(0, 16) : "",
       });
     } else {
       form.reset({
@@ -107,34 +120,46 @@ export function CampaignFormDialog({ open, onOpenChange, campaign }: CampaignFor
         city: "",
         postal_code: "",
         capture_date: new Date().toISOString().split("T")[0],
-        status: "active",
+        status: "pendiente",
+        sent_at: "",
+        response_at: "",
+        response_channel: "",
+        last_contact_at: "",
       });
     }
   }, [campaign, form]);
 
   const onSubmit = async (values: FormValues) => {
     try {
+      type CampaignStatus = "pendiente" | "enviado" | "respondido" | "descartado" | "cliente";
+      
+      const payload = {
+        name: values.name,
+        place_id: values.place_id || null,
+        business_name: values.business_name || null,
+        email: values.email || null,
+        category: values.category || null,
+        phone: values.phone || null,
+        website: values.website || null,
+        address: values.address || null,
+        province: values.province || null,
+        city: values.city || null,
+        postal_code: values.postal_code || null,
+        capture_date: values.capture_date || null,
+        status: (values.status || "pendiente") as CampaignStatus,
+        sent_at: values.sent_at ? new Date(values.sent_at).toISOString() : null,
+        response_at: values.response_at ? new Date(values.response_at).toISOString() : null,
+        response_channel: values.response_channel || null,
+        last_contact_at: values.last_contact_at ? new Date(values.last_contact_at).toISOString() : null,
+      };
+
       if (isEditing && campaign) {
         await updateCampaign.mutateAsync({
           id: campaign.id,
-          ...values,
+          ...payload,
         });
       } else {
-        await createCampaign.mutateAsync({
-          name: values.name,
-          place_id: values.place_id || null,
-          business_name: values.business_name || null,
-          email: values.email || null,
-          category: values.category || null,
-          phone: values.phone || null,
-          website: values.website || null,
-          address: values.address || null,
-          province: values.province || null,
-          city: values.city || null,
-          postal_code: values.postal_code || null,
-          capture_date: values.capture_date || null,
-          status: values.status || "active",
-        });
+        await createCampaign.mutateAsync(payload);
       }
       onOpenChange(false);
     } catch (error) {
@@ -308,6 +333,9 @@ export function CampaignFormDialog({ open, onOpenChange, campaign }: CampaignFor
               />
             </div>
 
+            <Separator className="my-4" />
+            <p className="text-sm font-medium text-muted-foreground">Seguimiento y Estado</p>
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <FormField
                 control={form.control}
@@ -335,11 +363,82 @@ export function CampaignFormDialog({ open, onOpenChange, campaign }: CampaignFor
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        <SelectItem value="active">Activo</SelectItem>
-                        <SelectItem value="scheduled">Programado</SelectItem>
-                        <SelectItem value="completed">Completado</SelectItem>
+                        <SelectItem value="pendiente">Pendiente</SelectItem>
+                        <SelectItem value="enviado">Enviado</SelectItem>
+                        <SelectItem value="respondido">Respondido</SelectItem>
+                        <SelectItem value="descartado">Descartado</SelectItem>
+                        <SelectItem value="cliente">Cliente</SelectItem>
                       </SelectContent>
                     </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="sent_at"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Fecha/Hora de Envío</FormLabel>
+                    <FormControl>
+                      <Input type="datetime-local" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="response_at"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Fecha/Hora de Respuesta</FormLabel>
+                    <FormControl>
+                      <Input type="datetime-local" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="response_channel"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Canal de Respuesta</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Seleccionar canal" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="">Sin especificar</SelectItem>
+                        <SelectItem value="email">Email</SelectItem>
+                        <SelectItem value="phone">Teléfono</SelectItem>
+                        <SelectItem value="web">Web</SelectItem>
+                        <SelectItem value="whatsapp">WhatsApp</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="last_contact_at"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Último Contacto</FormLabel>
+                    <FormControl>
+                      <Input type="datetime-local" {...field} />
+                    </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
