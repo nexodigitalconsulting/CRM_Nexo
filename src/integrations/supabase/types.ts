@@ -252,6 +252,7 @@ export type Database = {
       clients: {
         Row: {
           address: string | null
+          bic: string | null
           cif: string | null
           city: string | null
           client_number: number
@@ -268,12 +269,16 @@ export type Database = {
           postal_code: string | null
           province: string | null
           segment: Database["public"]["Enums"]["client_segment"] | null
+          sepa_mandate_date: string | null
+          sepa_mandate_id: string | null
+          sepa_sequence_type: string | null
           source: string | null
           status: Database["public"]["Enums"]["client_status"] | null
           updated_at: string | null
         }
         Insert: {
           address?: string | null
+          bic?: string | null
           cif?: string | null
           city?: string | null
           client_number?: number
@@ -290,12 +295,16 @@ export type Database = {
           postal_code?: string | null
           province?: string | null
           segment?: Database["public"]["Enums"]["client_segment"] | null
+          sepa_mandate_date?: string | null
+          sepa_mandate_id?: string | null
+          sepa_sequence_type?: string | null
           source?: string | null
           status?: Database["public"]["Enums"]["client_status"] | null
           updated_at?: string | null
         }
         Update: {
           address?: string | null
+          bic?: string | null
           cif?: string | null
           city?: string | null
           client_number?: number
@@ -312,6 +321,9 @@ export type Database = {
           postal_code?: string | null
           province?: string | null
           segment?: Database["public"]["Enums"]["client_segment"] | null
+          sepa_mandate_date?: string | null
+          sepa_mandate_id?: string | null
+          sepa_sequence_type?: string | null
           source?: string | null
           status?: Database["public"]["Enums"]["client_status"] | null
           updated_at?: string | null
@@ -329,6 +341,7 @@ export type Database = {
       company_settings: {
         Row: {
           address: string | null
+          bic: string | null
           cif: string | null
           city: string | null
           country: string | null
@@ -344,12 +357,14 @@ export type Database = {
           phone: string | null
           postal_code: string | null
           province: string | null
+          sepa_creditor_id: string | null
           timezone: string | null
           updated_at: string | null
           website: string | null
         }
         Insert: {
           address?: string | null
+          bic?: string | null
           cif?: string | null
           city?: string | null
           country?: string | null
@@ -365,12 +380,14 @@ export type Database = {
           phone?: string | null
           postal_code?: string | null
           province?: string | null
+          sepa_creditor_id?: string | null
           timezone?: string | null
           updated_at?: string | null
           website?: string | null
         }
         Update: {
           address?: string | null
+          bic?: string | null
           cif?: string | null
           city?: string | null
           country?: string | null
@@ -386,6 +403,7 @@ export type Database = {
           phone?: string | null
           postal_code?: string | null
           province?: string | null
+          sepa_creditor_id?: string | null
           timezone?: string | null
           updated_at?: string | null
           website?: string | null
@@ -1654,9 +1672,63 @@ export type Database = {
           },
         ]
       }
+      remittance_payments: {
+        Row: {
+          amount: number
+          created_at: string | null
+          created_by: string | null
+          id: string
+          invoice_id: string
+          payment_date: string
+          remittance_id: string
+          return_reason: string | null
+          status: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          invoice_id: string
+          payment_date?: string
+          remittance_id: string
+          return_reason?: string | null
+          status?: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          invoice_id?: string
+          payment_date?: string
+          remittance_id?: string
+          return_reason?: string | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "remittance_payments_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "invoices"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "remittance_payments_remittance_id_fkey"
+            columns: ["remittance_id"]
+            isOneToOne: false
+            referencedRelation: "remittances"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       remittances: {
         Row: {
+          cancelled_at: string | null
+          cancelled_reason: string | null
           code: string | null
+          collection_date: string | null
           created_at: string | null
           created_by: string | null
           id: string
@@ -1664,14 +1736,19 @@ export type Database = {
           issue_date: string
           n19_file_url: string | null
           notes: string | null
+          paid_amount: number | null
           remittance_number: number
+          sent_to_bank_at: string | null
           status: Database["public"]["Enums"]["remittance_status"] | null
           total_amount: number | null
           updated_at: string | null
           xml_file_url: string | null
         }
         Insert: {
+          cancelled_at?: string | null
+          cancelled_reason?: string | null
           code?: string | null
+          collection_date?: string | null
           created_at?: string | null
           created_by?: string | null
           id?: string
@@ -1679,14 +1756,19 @@ export type Database = {
           issue_date?: string
           n19_file_url?: string | null
           notes?: string | null
+          paid_amount?: number | null
           remittance_number?: number
+          sent_to_bank_at?: string | null
           status?: Database["public"]["Enums"]["remittance_status"] | null
           total_amount?: number | null
           updated_at?: string | null
           xml_file_url?: string | null
         }
         Update: {
+          cancelled_at?: string | null
+          cancelled_reason?: string | null
           code?: string | null
+          collection_date?: string | null
           created_at?: string | null
           created_by?: string | null
           id?: string
@@ -1694,7 +1776,9 @@ export type Database = {
           issue_date?: string
           n19_file_url?: string | null
           notes?: string | null
+          paid_amount?: number | null
           remittance_number?: number
+          sent_to_bank_at?: string | null
           status?: Database["public"]["Enums"]["remittance_status"] | null
           total_amount?: number | null
           updated_at?: string | null
@@ -1910,7 +1994,14 @@ export type Database = {
       invoice_status: "borrador" | "emitida" | "pagada" | "cancelada"
       payment_status: "pagado" | "pendiente" | "parcial" | "reclamado"
       quote_status: "borrador" | "enviado" | "aceptado" | "rechazado"
-      remittance_status: "pendiente" | "cobrada" | "parcial" | "vencida"
+      remittance_status:
+        | "pendiente"
+        | "cobrada"
+        | "parcial"
+        | "vencida"
+        | "anulada"
+        | "enviada"
+        | "devuelta"
       service_status: "activo" | "inactivo" | "desarrollo"
     }
     CompositeTypes: {
@@ -2060,7 +2151,15 @@ export const Constants = {
       invoice_status: ["borrador", "emitida", "pagada", "cancelada"],
       payment_status: ["pagado", "pendiente", "parcial", "reclamado"],
       quote_status: ["borrador", "enviado", "aceptado", "rechazado"],
-      remittance_status: ["pendiente", "cobrada", "parcial", "vencida"],
+      remittance_status: [
+        "pendiente",
+        "cobrada",
+        "parcial",
+        "vencida",
+        "anulada",
+        "enviada",
+        "devuelta",
+      ],
       service_status: ["activo", "inactivo", "desarrollo"],
     },
   },
