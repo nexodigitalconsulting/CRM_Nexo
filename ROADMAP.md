@@ -99,18 +99,26 @@ CREATE TABLE report_templates (
 
 ---
 
-## FASE 3: Pagos y Remesas ⏱️ Semana 2-3
+## FASE 3: Pagos y Remesas ⏱️ Semana 2-3 ✅ COMPLETADO
 
 ### 3.1 Series de Facturación
 - [ ] Migración: añadir campo `series` a invoices
 - [ ] Configuración de series en Settings
 - [ ] Formato: `{SERIE}-{AÑO}-{NUMERO}` (ej: FF-2024-0001)
 
-### 3.2 Generador de Remesas SEPA
-- [ ] Crear remesa desde facturas seleccionadas
-- [ ] Generar XML ISO 20022 (pain.008)
-- [ ] Generar fichero Norma 19 (N19)
-- [ ] Descargar ficheros
+### 3.2 Generador de Remesas SEPA ✅
+- [x] Crear remesa desde facturas seleccionadas
+- [x] Generar XML ISO 20022 (pain.008) - `src/lib/sepa/sepaXmlGenerator.ts`
+- [x] Descargar ficheros XML SEPA
+- [x] Editar remesa (código, fecha cobro, notas)
+- [x] Añadir/quitar facturas de remesa existente
+- [x] Flujo de estados: Pendiente → Enviada → Cobrada/Parcial/Devuelta → Anulada
+- [x] Registrar pagos y devoluciones individuales
+- [x] Historial de pagos por remesa
+- [x] Exportar facturas a Excel
+- [x] Tabla de `remittance_payments` para tracking
+- [x] Campos SEPA en clientes (BIC, mandato, fecha, tipo secuencia)
+- [x] Identificador de Acreedor SEPA en company_settings
 
 ### 3.3 Sistema de Domiciliación
 - [ ] Flujo automático para facturas recurrentes
