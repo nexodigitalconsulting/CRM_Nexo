@@ -11,7 +11,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Plus, Filter, Mail, Phone, Edit, Trash2, UserPlus, Loader2 } from "lucide-react";
+import { Plus, Filter, Mail, Phone, Edit, Trash2, UserPlus, Loader2, MapPin } from "lucide-react";
 import { ExportDropdown } from "@/components/common/ExportDropdown";
 import { TableViewManager, ColumnConfig } from "@/components/common/TableViewManager";
 import { useDefaultTableView } from "@/hooks/useTableViews";
@@ -37,18 +37,18 @@ import {
 
 const statusMap: Record<string, "new" | "active" | "pending" | "success" | "inactive"> = {
   nuevo: "new",
-  contactado: "pending",
-  seguimiento: "pending",
-  convertido: "success",
-  descartado: "inactive",
+  reunion_agendada: "pending",
+  propuesta_enviada: "active",
+  ganado: "success",
+  perdido: "inactive",
 };
 
 const statusLabels: Record<string, string> = {
   nuevo: "Nuevo",
-  contactado: "Contactado",
-  seguimiento: "Seguimiento",
-  convertido: "Convertido",
-  descartado: "Descartado",
+  reunion_agendada: "Reunión Agendada",
+  propuesta_enviada: "Propuesta Enviada",
+  ganado: "Ganado",
+  perdido: "Perdido",
 };
 
 const columnConfigs: ColumnConfig[] = [
@@ -61,6 +61,7 @@ const columnConfigs: ColumnConfig[] = [
   { key: "meeting_date", label: "Fecha Reunión", defaultVisible: false },
   { key: "presentation_url", label: "URL Presentación", defaultVisible: false },
   { key: "quote_url", label: "URL Presupuesto", defaultVisible: false },
+  { key: "place_id", label: "Place ID", defaultVisible: false },
   { key: "notes", label: "Notas", defaultVisible: false },
   { key: "created_at", label: "Fecha Captación", defaultVisible: true },
   { key: "actions", label: "Acciones", defaultVisible: true },
@@ -201,6 +202,18 @@ export default function Contacts() {
       ),
     },
     {
+      key: "place_id",
+      label: "Place ID",
+      render: (contact: Contact) => (
+        contact.place_id ? (
+          <div className="flex items-center gap-1">
+            <MapPin className="h-3 w-3 text-muted-foreground" />
+            <span className="text-xs font-mono text-muted-foreground truncate max-w-[80px]">{contact.place_id}</span>
+          </div>
+        ) : <span className="text-sm text-muted-foreground">-</span>
+      ),
+    },
+    {
       key: "notes",
       label: "Notas",
       render: (contact: Contact) => (
@@ -222,7 +235,7 @@ export default function Contacts() {
       render: (contact: Contact) => (
         <TooltipProvider>
           <div className="flex gap-1">
-            {contact.status !== "convertido" && (
+            {contact.status !== "ganado" && (
               <Tooltip>
                 <TooltipTrigger asChild>
                   <Button 
@@ -291,21 +304,21 @@ export default function Contacts() {
             </p>
           </div>
           <div className="bg-card rounded-lg border border-border p-4">
-            <p className="text-sm text-muted-foreground">Seguimiento</p>
+            <p className="text-sm text-muted-foreground">Reuniones</p>
             <p className="text-2xl font-semibold mt-1 text-warning">
-              {contacts?.filter((c) => c.status === "seguimiento").length || 0}
+              {contacts?.filter((c) => c.status === "reunion_agendada").length || 0}
             </p>
           </div>
           <div className="bg-card rounded-lg border border-border p-4">
-            <p className="text-sm text-muted-foreground">Convertidos</p>
+            <p className="text-sm text-muted-foreground">Ganados</p>
             <p className="text-2xl font-semibold mt-1 text-success">
-              {contacts?.filter((c) => c.status === "convertido").length || 0}
+              {contacts?.filter((c) => c.status === "ganado").length || 0}
             </p>
           </div>
           <div className="bg-card rounded-lg border border-border p-4">
             <p className="text-sm text-muted-foreground">Tasa Conversión</p>
             <p className="text-2xl font-semibold mt-1">
-              {contacts?.length ? Math.round((contacts.filter((c) => c.status === "convertido").length / contacts.length) * 100) : 0}%
+              {contacts?.length ? Math.round((contacts.filter((c) => c.status === "ganado").length / contacts.length) * 100) : 0}%
             </p>
           </div>
         </div>
@@ -325,10 +338,10 @@ export default function Contacts() {
             <SelectContent>
               <SelectItem value="all">Todos</SelectItem>
               <SelectItem value="nuevo">Nuevo</SelectItem>
-              <SelectItem value="contactado">Contactado</SelectItem>
-              <SelectItem value="seguimiento">Seguimiento</SelectItem>
-              <SelectItem value="convertido">Convertido</SelectItem>
-              <SelectItem value="descartado">Descartado</SelectItem>
+              <SelectItem value="reunion_agendada">Reunión Agendada</SelectItem>
+              <SelectItem value="propuesta_enviada">Propuesta Enviada</SelectItem>
+              <SelectItem value="ganado">Ganado</SelectItem>
+              <SelectItem value="perdido">Perdido</SelectItem>
             </SelectContent>
           </Select>
           <Select value={sourceFilter} onValueChange={setSourceFilter}>
@@ -343,6 +356,7 @@ export default function Contacts() {
               <SelectItem value="email">Email</SelectItem>
               <SelectItem value="telefono">Teléfono</SelectItem>
               <SelectItem value="evento">Evento</SelectItem>
+              <SelectItem value="campaña">Campaña</SelectItem>
             </SelectContent>
           </Select>
           <div className="flex gap-2 ml-auto">
