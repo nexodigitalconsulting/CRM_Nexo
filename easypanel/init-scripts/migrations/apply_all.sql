@@ -591,12 +591,95 @@ BEGIN
 END $$;
 
 -- ============================================
--- VERIFICACIÓN FINAL DE COMPONENTES v1.9.0
+-- MIGRACIÓN v1.11.0 - Campaigns & Contacts Status Model
+-- ============================================
+DO $$
+BEGIN
+  RAISE NOTICE '[%] ───────────────────────────────────────────', clock_timestamp();
+  RAISE NOTICE '[%] Verificando v1.11.0 (Campaigns & Contacts Status)...', clock_timestamp();
+  
+  IF EXISTS (SELECT 1 FROM schema_versions WHERE version = 'v1.11.0') THEN
+    RAISE NOTICE '[%] → v1.11.0 ya aplicada - omitiendo', clock_timestamp();
+    RETURN;
+  END IF;
+
+  RAISE NOTICE '[%] Aplicando v1.11.0 - Campaigns & Contacts Status Model...', clock_timestamp();
+
+  -- 1. Crear ENUM campaign_status si no existe
+  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'campaign_status') THEN
+    CREATE TYPE campaign_status AS ENUM (
+      'pendiente', 'enviado', 'respondido', 'descartado', 'cliente'
+    );
+    RAISE NOTICE '[%]   • ENUM campaign_status creado', clock_timestamp();
+  END IF;
+
+  -- 2. Añadir columnas a campaigns
+  ALTER TABLE campaigns 
+    ADD COLUMN IF NOT EXISTS sent_at TIMESTAMPTZ,
+    ADD COLUMN IF NOT EXISTS response_at TIMESTAMPTZ,
+    ADD COLUMN IF NOT EXISTS response_channel TEXT,
+    ADD COLUMN IF NOT EXISTS last_contact_at TIMESTAMPTZ;
+  RAISE NOTICE '[%]   • Columnas de fecha añadidas a campaigns', clock_timestamp();
+
+  -- 3. Convertir campaigns.status si es TEXT
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns 
+    WHERE table_name = 'campaigns' AND column_name = 'status' AND data_type = 'text'
+  ) THEN
+    ALTER TABLE campaigns ALTER COLUMN status DROP DEFAULT;
+    UPDATE campaigns SET status = 'pendiente' WHERE status IN ('active', 'draft') OR status IS NULL;
+    UPDATE campaigns SET status = 'enviado' WHERE status = 'scheduled';
+    UPDATE campaigns SET status = 'cliente' WHERE status = 'completed';
+    ALTER TABLE campaigns ALTER COLUMN status TYPE campaign_status USING status::campaign_status;
+    ALTER TABLE campaigns ALTER COLUMN status SET DEFAULT 'pendiente';
+    RAISE NOTICE '[%]   • campaigns.status convertido a ENUM', clock_timestamp();
+  END IF;
+
+  -- 4. Actualizar contact_status ENUM
+  IF EXISTS (
+    SELECT 1 FROM pg_enum e JOIN pg_type t ON e.enumtypid = t.oid
+    WHERE t.typname = 'contact_status' AND e.enumlabel = 'contactado'
+  ) THEN
+    ALTER TABLE contacts ALTER COLUMN status DROP DEFAULT;
+    ALTER TABLE contacts ALTER COLUMN status TYPE TEXT;
+    UPDATE contacts SET status = 'nuevo' WHERE status = 'nuevo' OR status IS NULL;
+    UPDATE contacts SET status = 'reunion_agendada' WHERE status = 'contactado';
+    UPDATE contacts SET status = 'propuesta_enviada' WHERE status = 'seguimiento';
+    UPDATE contacts SET status = 'ganado' WHERE status = 'convertido';
+    UPDATE contacts SET status = 'perdido' WHERE status = 'descartado';
+    DROP TYPE IF EXISTS contact_status;
+    CREATE TYPE contact_status AS ENUM ('nuevo', 'reunion_agendada', 'propuesta_enviada', 'ganado', 'perdido');
+    ALTER TABLE contacts ALTER COLUMN status TYPE contact_status USING status::contact_status;
+    ALTER TABLE contacts ALTER COLUMN status SET DEFAULT 'nuevo';
+    RAISE NOTICE '[%]   • contact_status ENUM actualizado', clock_timestamp();
+  END IF;
+
+  -- 5. Añadir place_id a contacts
+  ALTER TABLE contacts ADD COLUMN IF NOT EXISTS place_id TEXT;
+  RAISE NOTICE '[%]   • contacts.place_id añadido', clock_timestamp();
+
+  -- 6. Crear índices
+  CREATE INDEX IF NOT EXISTS idx_contacts_place_id ON contacts(place_id);
+  CREATE INDEX IF NOT EXISTS idx_campaigns_place_id ON campaigns(place_id);
+  CREATE INDEX IF NOT EXISTS idx_campaigns_status ON campaigns(status);
+  CREATE INDEX IF NOT EXISTS idx_campaigns_sent_at ON campaigns(sent_at);
+  CREATE INDEX IF NOT EXISTS idx_campaigns_response_at ON campaigns(response_at);
+  RAISE NOTICE '[%]   • Índices creados', clock_timestamp();
+
+  -- Registrar migración
+  INSERT INTO schema_versions (version, description, applied_at)
+  VALUES ('v1.11.0', 'Modelo de estados para campañas y contactos', now());
+
+  RAISE NOTICE '[%] ✓ v1.11.0 aplicada correctamente', clock_timestamp();
+END $$;
+
+-- ============================================
+-- RESUMEN FINAL Y VERIFICACIÓN
 -- ============================================
 DO $$
 DECLARE
   v_current text;
-  v_count int;
+  v_count integer;
   v_email_logs boolean;
   v_gmail_config boolean;
   v_provider_col boolean;
@@ -607,6 +690,8 @@ DECLARE
   v_id_factura boolean;
   v_expense_unique boolean;
   v_enums_spanish boolean;
+  v_campaign_status boolean;
+  v_contact_status_new boolean;
   v_all_ok boolean;
 BEGIN
   SELECT get_current_schema_version() INTO v_current;
@@ -634,7 +719,14 @@ BEGIN
     WHERE t.typname = 'client_status' AND e.enumlabel = 'activo'
   ) INTO v_enums_spanish;
   
-  v_all_ok := v_email_logs AND v_gmail_config AND v_provider_col AND v_invoices_is_sent AND v_quotes_is_sent AND v_contracts_is_sent AND v_expense_number_text AND v_id_factura AND v_expense_unique AND v_enums_spanish;
+  -- Verificar v1.11.0: campaign_status y contact_status actualizado
+  SELECT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'campaign_status') INTO v_campaign_status;
+  SELECT EXISTS (
+    SELECT 1 FROM pg_enum e JOIN pg_type t ON e.enumtypid = t.oid
+    WHERE t.typname = 'contact_status' AND e.enumlabel = 'reunion_agendada'
+  ) INTO v_contact_status_new;
+  
+  v_all_ok := v_email_logs AND v_gmail_config AND v_provider_col AND v_invoices_is_sent AND v_quotes_is_sent AND v_contracts_is_sent AND v_expense_number_text AND v_id_factura AND v_expense_unique AND v_enums_spanish AND v_campaign_status AND v_contact_status_new;
   
   RAISE NOTICE '';
   RAISE NOTICE '[%] ═══════════════════════════════════════════════════════', clock_timestamp();
@@ -660,6 +752,9 @@ BEGIN
   RAISE NOTICE '[%]   expenses UNIQUE constraint: %', clock_timestamp(), CASE WHEN v_expense_unique THEN '✓' ELSE '✗' END;
   RAISE NOTICE '[%] v1.7.0:', clock_timestamp();
   RAISE NOTICE '[%]   Enums en español:     %', clock_timestamp(), CASE WHEN v_enums_spanish THEN '✓' ELSE '✗' END;
+  RAISE NOTICE '[%] v1.11.0:', clock_timestamp();
+  RAISE NOTICE '[%]   campaign_status ENUM: %', clock_timestamp(), CASE WHEN v_campaign_status THEN '✓' ELSE '✗' END;
+  RAISE NOTICE '[%]   contact_status actualizado: %', clock_timestamp(), CASE WHEN v_contact_status_new THEN '✓' ELSE '✗' END;
   RAISE NOTICE '[%] ═══════════════════════════════════════════════════════', clock_timestamp();
   RAISE NOTICE '[%] ESTADO FINAL: %', clock_timestamp(), CASE WHEN v_all_ok THEN '✅ TODOS LOS COMPONENTES OK' ELSE '⚠️ FALTAN COMPONENTES' END;
   RAISE NOTICE '[%] ═══════════════════════════════════════════════════════', clock_timestamp();
