@@ -160,6 +160,9 @@ Cada migración es una unidad completa:
 | v1.5.0 | 2024-12-18 | Tabla `email_logs`, tabla `gmail_config`, columna `provider` en email_settings |
 | v1.6.0 | 2025-01-03 | Expenses: `expense_number` cambiado a TEXT UNIQUE, nueva columna `id_factura` |
 | v1.7.0 | 2025-01-15 | Migración de todos los ENUMs a español (activo/inactivo, borrador/emitida, etc.) |
+| v1.9.0 | 2025-01-15 | Soporte IRPF en facturas: columnas `irpf_percent` e `irpf_amount` |
+| v1.10.0 | 2025-01-18 | Mejoras en remesas SEPA: campos, pagos, índices |
+| v1.11.0 | 2025-01-19 | Modelo de estados para campañas y contactos: ENUMs, campos y índices |
 
 ## Troubleshooting
 
