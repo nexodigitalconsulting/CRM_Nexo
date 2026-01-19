@@ -79,7 +79,7 @@ export function UpcomingTasksWidget() {
 
     // Follow-up contacts
     contacts?.forEach((contact) => {
-      if (contact.status === "seguimiento" && contact.meeting_date) {
+      if (contact.status === "reunion_agendada" && contact.meeting_date) {
         const meetingDate = new Date(contact.meeting_date);
         if (isWithinInterval(meetingDate, { start: now, end: nextWeek })) {
           items.push({
