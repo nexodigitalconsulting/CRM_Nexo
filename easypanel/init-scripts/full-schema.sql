@@ -69,7 +69,7 @@ DO $$ BEGIN
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 DO $$ BEGIN
-  CREATE TYPE public.remittance_status AS ENUM ('pendiente', 'cobrada', 'parcial', 'vencida');
+  CREATE TYPE public.remittance_status AS ENUM ('pendiente', 'enviada', 'cobrada', 'parcial', 'devuelta', 'anulada', 'vencida');
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 DO $$ BEGIN
@@ -212,6 +212,8 @@ CREATE TABLE IF NOT EXISTS public.company_settings (
   website text,
   logo_url text,
   iban text,
+  bic text,
+  sepa_creditor_id text,
   currency text DEFAULT 'EUR',
   language text DEFAULT 'es',
   timezone text DEFAULT 'Europe/Madrid',
@@ -254,6 +256,10 @@ CREATE TABLE IF NOT EXISTS public.clients (
   postal_code text,
   country text DEFAULT 'España',
   iban text,
+  bic text,
+  sepa_mandate_id text,
+  sepa_mandate_date date,
+  sepa_sequence_type text DEFAULT 'RCUR',
   segment client_segment DEFAULT 'pyme',
   status client_status DEFAULT 'activo',
   source text,
@@ -372,12 +378,30 @@ CREATE TABLE IF NOT EXISTS public.remittances (
   status remittance_status DEFAULT 'pendiente',
   total_amount numeric DEFAULT 0,
   invoice_count integer DEFAULT 0,
+  collection_date date,
+  sent_to_bank_at timestamptz,
+  paid_amount numeric(12,2) DEFAULT 0,
+  cancelled_at timestamptz,
+  cancelled_reason text,
   notes text,
   xml_file_url text,
   n19_file_url text,
   created_by uuid,
   created_at timestamptz DEFAULT now(),
   updated_at timestamptz DEFAULT now()
+);
+
+-- Pagos de remesa (v1.10.0)
+CREATE TABLE IF NOT EXISTS public.remittance_payments (
+  id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+  remittance_id uuid NOT NULL REFERENCES public.remittances(id) ON DELETE CASCADE,
+  invoice_id uuid NOT NULL REFERENCES public.invoices(id),
+  amount numeric(12,2) NOT NULL,
+  payment_date date NOT NULL DEFAULT CURRENT_DATE,
+  status text NOT NULL DEFAULT 'cobrado' CHECK (status IN ('cobrado', 'devuelto', 'rechazado')),
+  return_reason text,
+  created_at timestamptz DEFAULT now(),
+  created_by uuid
 );
 
 -- Facturas
@@ -791,6 +815,7 @@ ALTER TABLE public.invoice_services ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.expenses ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.campaigns ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.remittances ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.remittance_payments ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.calendar_categories ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.calendar_events ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.user_availability ENABLE ROW LEVEL SECURITY;
@@ -920,6 +945,19 @@ CREATE POLICY "Authenticated users can view remittances" ON public.remittances F
 
 DROP POLICY IF EXISTS "Admins and managers can manage remittances" ON public.remittances;
 CREATE POLICY "Admins and managers can manage remittances" ON public.remittances FOR ALL USING (has_role(auth.uid(), 'admin') OR has_role(auth.uid(), 'manager'));
+
+-- Remittance Payments (v1.10.0)
+DROP POLICY IF EXISTS "Authenticated users can view remittance_payments" ON public.remittance_payments;
+CREATE POLICY "Authenticated users can view remittance_payments" ON public.remittance_payments FOR SELECT USING (has_any_role(auth.uid()));
+
+DROP POLICY IF EXISTS "Admins and managers can insert remittance_payments" ON public.remittance_payments;
+CREATE POLICY "Admins and managers can insert remittance_payments" ON public.remittance_payments FOR INSERT WITH CHECK (has_role(auth.uid(), 'admin') OR has_role(auth.uid(), 'manager'));
+
+DROP POLICY IF EXISTS "Admins and managers can update remittance_payments" ON public.remittance_payments;
+CREATE POLICY "Admins and managers can update remittance_payments" ON public.remittance_payments FOR UPDATE USING (has_role(auth.uid(), 'admin') OR has_role(auth.uid(), 'manager'));
+
+DROP POLICY IF EXISTS "Admins and managers can delete remittance_payments" ON public.remittance_payments;
+CREATE POLICY "Admins and managers can delete remittance_payments" ON public.remittance_payments FOR DELETE USING (has_role(auth.uid(), 'admin') OR has_role(auth.uid(), 'manager'));
 
 -- Calendar (personal por usuario)
 DROP POLICY IF EXISTS "Users can view own categories" ON public.calendar_categories;
@@ -1091,9 +1129,14 @@ CREATE INDEX IF NOT EXISTS idx_contracts_client_id ON public.contracts(client_id
 CREATE INDEX IF NOT EXISTS idx_invoices_status ON public.invoices(status);
 CREATE INDEX IF NOT EXISTS idx_invoices_client_id ON public.invoices(client_id);
 CREATE INDEX IF NOT EXISTS idx_invoices_issue_date ON public.invoices(issue_date DESC);
+CREATE INDEX IF NOT EXISTS idx_invoices_remittance_id ON public.invoices(remittance_id);
 CREATE INDEX IF NOT EXISTS idx_expenses_status ON public.expenses(status);
 CREATE INDEX IF NOT EXISTS idx_calendar_events_user_id ON public.calendar_events(user_id);
 CREATE INDEX IF NOT EXISTS idx_calendar_events_start ON public.calendar_events(start_datetime);
+CREATE INDEX IF NOT EXISTS idx_remittances_status ON public.remittances(status);
+CREATE INDEX IF NOT EXISTS idx_remittances_collection_date ON public.remittances(collection_date);
+CREATE INDEX IF NOT EXISTS idx_remittance_payments_remittance ON public.remittance_payments(remittance_id);
+CREATE INDEX IF NOT EXISTS idx_remittance_payments_invoice ON public.remittance_payments(invoice_id);
 
 -- ============================================
 -- PARTE 8: DATOS INICIALES
@@ -1144,11 +1187,12 @@ VALUES
   ('v1.3.0', 'RLS para schema_versions - lectura pública', now()),
   ('v1.4.0', 'Columnas is_sent y sent_at en invoices, quotes, contracts', now()),
   ('v1.5.0', 'Email logs, Gmail OAuth config, provider selector', now()),
-  ('v1.6.0', 'Expenses: expense_number text unique, id_factura', now())
+  ('v1.6.0', 'Expenses: expense_number text unique, id_factura', now()),
+  ('v1.10.0', 'Mejoras remesas SEPA: campos, pagos, índices, RLS', now())
 ON CONFLICT (version) DO NOTHING;
 
 -- ============================================
--- ✅ SCHEMA COMPLETO INSTALADO - v1.6.0
+-- ✅ SCHEMA COMPLETO INSTALADO - v1.10.0
 -- ============================================
 
 DO $$
@@ -1160,6 +1204,8 @@ DECLARE
   v_gmail_config_ok boolean;
   v_expense_number_ok boolean;
   v_id_factura_ok boolean;
+  v_remittance_payments_ok boolean;
+  v_clients_sepa_ok boolean;
 BEGIN
   -- Verificar componentes v1.4.0
   SELECT EXISTS (
@@ -1199,9 +1245,20 @@ BEGIN
     WHERE table_name = 'expenses' AND column_name = 'id_factura'
   ) INTO v_id_factura_ok;
 
+  -- Verificar componentes v1.10.0
+  SELECT EXISTS (
+    SELECT 1 FROM information_schema.tables 
+    WHERE table_name = 'remittance_payments'
+  ) INTO v_remittance_payments_ok;
+  
+  SELECT EXISTS (
+    SELECT 1 FROM information_schema.columns 
+    WHERE table_name = 'clients' AND column_name = 'sepa_mandate_id'
+  ) INTO v_clients_sepa_ok;
+
   RAISE NOTICE '';
   RAISE NOTICE '[%] ════════════════════════════════════════════', clock_timestamp();
-  RAISE NOTICE '║  ✅ CRM Schema v1.7.0 instalado correctamente  ║';
+  RAISE NOTICE '║  ✅ CRM Schema v1.10.0 instalado correctamente ║';
   RAISE NOTICE '════════════════════════════════════════════════════';
   RAISE NOTICE '';
   RAISE NOTICE '[%] VERIFICACIÓN DE COMPONENTES:', clock_timestamp();
@@ -1215,10 +1272,13 @@ BEGIN
   RAISE NOTICE '  v1.6.0:';
   RAISE NOTICE '  • expenses.expense_number text: %', CASE WHEN v_expense_number_ok THEN '✓ OK' ELSE '✗ FALTA' END;
   RAISE NOTICE '  • expenses.id_factura:       %', CASE WHEN v_id_factura_ok THEN '✓ OK' ELSE '✗ FALTA' END;
+  RAISE NOTICE '  v1.10.0:';
+  RAISE NOTICE '  • remittance_payments tabla: %', CASE WHEN v_remittance_payments_ok THEN '✓ OK' ELSE '✗ FALTA' END;
+  RAISE NOTICE '  • clients.sepa_mandate_id:   %', CASE WHEN v_clients_sepa_ok THEN '✓ OK' ELSE '✗ FALTA' END;
   RAISE NOTICE '';
   RAISE NOTICE '[%] ESTADÍSTICAS:', clock_timestamp();
-  RAISE NOTICE '  • Tablas creadas: 30';
-  RAISE NOTICE '  • Políticas RLS: 55+';
+  RAISE NOTICE '  • Tablas creadas: 31';
+  RAISE NOTICE '  • Políticas RLS: 60+';
   RAISE NOTICE '  • Triggers: 14';
   RAISE NOTICE '  • Datos iniciales: Sí';
   RAISE NOTICE '';

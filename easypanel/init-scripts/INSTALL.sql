@@ -30,7 +30,7 @@ DO $$ BEGIN CREATE TYPE public.billing_period AS ENUM ('monthly', 'quarterly', '
 DO $$ BEGIN CREATE TYPE public.payment_status AS ENUM ('paid', 'pending', 'partial', 'claimed'); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 DO $$ BEGIN CREATE TYPE public.quote_status AS ENUM ('draft', 'sent', 'approved', 'rejected'); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 DO $$ BEGIN CREATE TYPE public.invoice_status AS ENUM ('draft', 'issued', 'paid', 'cancelled'); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
-DO $$ BEGIN CREATE TYPE public.remittance_status AS ENUM ('pending', 'paid', 'partial', 'overdue'); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN CREATE TYPE public.remittance_status AS ENUM ('pendiente', 'enviada', 'cobrada', 'parcial', 'devuelta', 'anulada', 'vencida'); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 DO $$ BEGIN CREATE TYPE public.service_status AS ENUM ('active', 'inactive', 'development'); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 DO $$ BEGIN CREATE TYPE public.event_importance AS ENUM ('high', 'medium', 'low'); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
@@ -91,6 +91,7 @@ CREATE TABLE IF NOT EXISTS public.company_settings (
   cif text, address text, city text, province text, postal_code text,
   country text DEFAULT 'España',
   phone text, email text, website text, logo_url text, iban text,
+  bic text, sepa_creditor_id text,
   currency text DEFAULT 'EUR',
   language text DEFAULT 'es',
   timezone text DEFAULT 'Europe/Madrid',
@@ -125,6 +126,7 @@ CREATE TABLE IF NOT EXISTS public.clients (
   address text, city text, province text, postal_code text,
   country text DEFAULT 'España',
   iban text,
+  bic text, sepa_mandate_id text, sepa_mandate_date date, sepa_sequence_type text DEFAULT 'RCUR',
   segment client_segment DEFAULT 'pyme',
   status client_status DEFAULT 'active',
   source text, notes text,
@@ -235,14 +237,30 @@ CREATE TABLE IF NOT EXISTS public.remittances (
   remittance_number integer NOT NULL DEFAULT nextval('remittances_remittance_number_seq'),
   code text,
   issue_date date NOT NULL DEFAULT CURRENT_DATE,
-  status remittance_status DEFAULT 'pending',
+  status remittance_status DEFAULT 'pendiente',
   total_amount numeric DEFAULT 0,
   invoice_count integer DEFAULT 0,
+  collection_date date, sent_to_bank_at timestamptz,
+  paid_amount numeric(12,2) DEFAULT 0,
+  cancelled_at timestamptz, cancelled_reason text,
   notes text,
   xml_file_url text, n19_file_url text,
   created_by uuid,
   created_at timestamptz DEFAULT now(),
   updated_at timestamptz DEFAULT now()
+);
+
+-- Remittance payments (v1.10.0)
+CREATE TABLE IF NOT EXISTS public.remittance_payments (
+  id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+  remittance_id uuid NOT NULL REFERENCES public.remittances(id) ON DELETE CASCADE,
+  invoice_id uuid NOT NULL REFERENCES public.invoices(id),
+  amount numeric(12,2) NOT NULL,
+  payment_date date NOT NULL DEFAULT CURRENT_DATE,
+  status text NOT NULL DEFAULT 'cobrado' CHECK (status IN ('cobrado', 'devuelto', 'rechazado')),
+  return_reason text,
+  created_at timestamptz DEFAULT now(),
+  created_by uuid
 );
 
 -- Invoices

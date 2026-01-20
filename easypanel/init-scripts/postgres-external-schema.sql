@@ -60,7 +60,7 @@ DO $$ BEGIN
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 DO $$ BEGIN
-  CREATE TYPE remittance_status AS ENUM ('pendiente', 'cobrada', 'parcial', 'vencida');
+  CREATE TYPE remittance_status AS ENUM ('pendiente', 'enviada', 'cobrada', 'parcial', 'devuelta', 'anulada', 'vencida');
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 DO $$ BEGIN
@@ -152,6 +152,8 @@ CREATE TABLE IF NOT EXISTS company_settings (
   website text,
   logo_url text,
   iban text,
+  bic text,
+  sepa_creditor_id text,
   currency text DEFAULT 'EUR',
   language text DEFAULT 'es',
   timezone text DEFAULT 'Europe/Madrid',
@@ -194,6 +196,10 @@ CREATE TABLE IF NOT EXISTS clients (
   postal_code text,
   country text DEFAULT 'España',
   iban text,
+  bic text,
+  sepa_mandate_id text,
+  sepa_mandate_date date,
+  sepa_sequence_type text DEFAULT 'RCUR',
   segment client_segment DEFAULT 'pyme',
   status client_status DEFAULT 'active',
   source text,
@@ -307,12 +313,30 @@ CREATE TABLE IF NOT EXISTS remittances (
   status remittance_status DEFAULT 'pending',
   total_amount numeric DEFAULT 0,
   invoice_count integer DEFAULT 0,
+  collection_date date,
+  sent_to_bank_at timestamptz,
+  paid_amount numeric(12,2) DEFAULT 0,
+  cancelled_at timestamptz,
+  cancelled_reason text,
   notes text,
   xml_file_url text,
   n19_file_url text,
   created_by uuid REFERENCES users(id),
   created_at timestamptz DEFAULT now(),
   updated_at timestamptz DEFAULT now()
+);
+
+-- Pagos de remesa (v1.10.0)
+CREATE TABLE IF NOT EXISTS remittance_payments (
+  id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+  remittance_id uuid NOT NULL REFERENCES remittances(id) ON DELETE CASCADE,
+  invoice_id uuid NOT NULL REFERENCES invoices(id),
+  amount numeric(12,2) NOT NULL,
+  payment_date date NOT NULL DEFAULT CURRENT_DATE,
+  status text NOT NULL DEFAULT 'cobrado' CHECK (status IN ('cobrado', 'devuelto', 'rechazado')),
+  return_reason text,
+  created_at timestamptz DEFAULT now(),
+  created_by uuid REFERENCES users(id)
 );
 
 -- Facturas
@@ -695,9 +719,14 @@ CREATE INDEX IF NOT EXISTS idx_contracts_client_id ON contracts(client_id);
 CREATE INDEX IF NOT EXISTS idx_invoices_status ON invoices(status);
 CREATE INDEX IF NOT EXISTS idx_invoices_client_id ON invoices(client_id);
 CREATE INDEX IF NOT EXISTS idx_invoices_issue_date ON invoices(issue_date DESC);
+CREATE INDEX IF NOT EXISTS idx_invoices_remittance_id ON invoices(remittance_id);
 CREATE INDEX IF NOT EXISTS idx_expenses_status ON expenses(status);
 CREATE INDEX IF NOT EXISTS idx_calendar_events_user_id ON calendar_events(user_id);
 CREATE INDEX IF NOT EXISTS idx_calendar_events_start ON calendar_events(start_datetime);
+CREATE INDEX IF NOT EXISTS idx_remittances_status ON remittances(status);
+CREATE INDEX IF NOT EXISTS idx_remittances_collection_date ON remittances(collection_date);
+CREATE INDEX IF NOT EXISTS idx_remittance_payments_remittance ON remittance_payments(remittance_id);
+CREATE INDEX IF NOT EXISTS idx_remittance_payments_invoice ON remittance_payments(invoice_id);
 
 -- ============================================
 -- PARTE 7: DATOS INICIALES
@@ -810,28 +839,31 @@ VALUES
   ('v1.4.0', 'is_sent/sent_at columns', now()),
   ('v1.5.0', 'Email logs, Gmail OAuth config', now()),
   ('v1.6.0', 'Expenses: expense_number text unique, id_factura', now()),
-  ('v1.7.0', 'Enums en español', now())
+  ('v1.7.0', 'Enums en español', now()),
+  ('v1.10.0', 'Mejoras remesas SEPA: campos, pagos, índices', now())
 ON CONFLICT (version) DO NOTHING;
 
 -- ============================================
--- ✅ SCHEMA COMPLETO INSTALADO - v1.6.0
+-- ✅ SCHEMA COMPLETO INSTALADO - v1.10.0
 -- ============================================
 
 DO $$
 BEGIN
   RAISE NOTICE '';
   RAISE NOTICE '╔═══════════════════════════════════════════════════╗';
-  RAISE NOTICE '║  ✅ CRM Schema v1.6.0 (PostgreSQL Externo)        ║';
+  RAISE NOTICE '║  ✅ CRM Schema v1.10.0 (PostgreSQL Externo)       ║';
   RAISE NOTICE '╠═══════════════════════════════════════════════════╣';
-  RAISE NOTICE '║  Tablas creadas: 30 (incluye users)               ║';
+  RAISE NOTICE '║  Tablas creadas: 31 (incluye remittance_payments) ║';
   RAISE NOTICE '║  Triggers: 14                                     ║';
-  RAISE NOTICE '║  Índices: 16                                      ║';
+  RAISE NOTICE '║  Índices: 21                                      ║';
   RAISE NOTICE '║  Datos iniciales: Sí                              ║';
   RAISE NOTICE '║  Usuario admin: admin@tuempresa.com / admin123    ║';
   RAISE NOTICE '║                                                   ║';
-  RAISE NOTICE '║  v1.6.0: expenses mejorado                        ║';
-  RAISE NOTICE '║    • expense_number: text UNIQUE                  ║';
-  RAISE NOTICE '║    • Nueva columna: id_factura                    ║';
+  RAISE NOTICE '║  v1.10.0: Mejoras remesas SEPA                    ║';
+  RAISE NOTICE '║    • remittance_payments tabla                    ║';
+  RAISE NOTICE '║    • clients: campos SEPA (bic, mandate)          ║';
+  RAISE NOTICE '║    • company_settings: sepa_creditor_id, bic      ║';
+  RAISE NOTICE '║    • remittances: campos adicionales              ║';
   RAISE NOTICE '╚═══════════════════════════════════════════════════╝';
   RAISE NOTICE '';
   RAISE NOTICE 'IMPORTANTE: Cambia la contraseña del admin!';
