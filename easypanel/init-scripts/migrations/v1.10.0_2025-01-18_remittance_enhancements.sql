@@ -57,7 +57,23 @@ ON remittances(status);
 CREATE INDEX IF NOT EXISTS idx_remittances_collection_date 
 ON remittances(collection_date);
 
--- 7. Comentarios de documentación
+-- 7. Habilitar RLS para remittance_payments
+ALTER TABLE public.remittance_payments ENABLE ROW LEVEL SECURITY;
+
+-- 8. Políticas RLS para remittance_payments
+DROP POLICY IF EXISTS "Authenticated users can view remittance_payments" ON public.remittance_payments;
+CREATE POLICY "Authenticated users can view remittance_payments" ON public.remittance_payments FOR SELECT USING (has_any_role(auth.uid()));
+
+DROP POLICY IF EXISTS "Admins and managers can insert remittance_payments" ON public.remittance_payments;
+CREATE POLICY "Admins and managers can insert remittance_payments" ON public.remittance_payments FOR INSERT WITH CHECK (has_role(auth.uid(), 'admin') OR has_role(auth.uid(), 'manager'));
+
+DROP POLICY IF EXISTS "Admins and managers can update remittance_payments" ON public.remittance_payments;
+CREATE POLICY "Admins and managers can update remittance_payments" ON public.remittance_payments FOR UPDATE USING (has_role(auth.uid(), 'admin') OR has_role(auth.uid(), 'manager'));
+
+DROP POLICY IF EXISTS "Admins and managers can delete remittance_payments" ON public.remittance_payments;
+CREATE POLICY "Admins and managers can delete remittance_payments" ON public.remittance_payments FOR DELETE USING (has_role(auth.uid(), 'admin') OR has_role(auth.uid(), 'manager'));
+
+-- 9. Comentarios de documentación
 COMMENT ON TABLE remittance_payments IS 'Registro de pagos y devoluciones de remesas SEPA';
 COMMENT ON COLUMN remittances.collection_date IS 'Fecha de cobro solicitada al banco';
 COMMENT ON COLUMN remittances.sent_to_bank_at IS 'Timestamp de envío al banco';
@@ -69,7 +85,7 @@ COMMENT ON COLUMN clients.sepa_mandate_id IS 'Identificador del mandato SEPA';
 COMMENT ON COLUMN clients.sepa_mandate_date IS 'Fecha de firma del mandato SEPA';
 COMMENT ON COLUMN clients.sepa_sequence_type IS 'Tipo de secuencia SEPA (FRST, RCUR, OOFF, FNAL)';
 
--- 8. Registrar versión
+-- 10. Registrar versión
 INSERT INTO schema_versions (version, description)
-VALUES ('1.10.0', 'Mejoras en remesas SEPA: campos, pagos, índices')
+VALUES ('1.10.0', 'Mejoras en remesas SEPA: campos, pagos, índices, RLS')
 ON CONFLICT (version) DO NOTHING;
