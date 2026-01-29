@@ -34,13 +34,22 @@ export function ServiceFormDialog({ open, onOpenChange, service }: ServiceFormDi
   const createService = useCreateService();
   const updateService = useUpdateService();
   
-  const isEditing = !!service;
+  // Determinar si estamos editando (tiene id) o duplicando/creando (sin id)
+  const isEditing = !!service?.id;
+  const isDuplicating = !!service && !service.id;
   const isLoading = createService.isPending || updateService.isPending;
+
+  // Título dinámico según el modo
+  const dialogTitle = isDuplicating 
+    ? "Duplicar Servicio" 
+    : isEditing 
+      ? "Editar Servicio" 
+      : "Nuevo Servicio";
 
   useEffect(() => {
     if (service) {
       setFormData({
-        name: service.name,
+        name: isDuplicating ? `${service.name} (copia)` : service.name,
         description: service.description || "",
         category: service.category || "",
         price: service.price,
@@ -50,7 +59,7 @@ export function ServiceFormDialog({ open, onOpenChange, service }: ServiceFormDi
     } else {
       setFormData(initialFormState);
     }
-  }, [service, open]);
+  }, [service, open, isDuplicating]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -71,7 +80,7 @@ export function ServiceFormDialog({ open, onOpenChange, service }: ServiceFormDi
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-lg">
         <DialogHeader>
-          <DialogTitle>{isEditing ? "Editar Servicio" : "Nuevo Servicio"}</DialogTitle>
+          <DialogTitle>{dialogTitle}</DialogTitle>
         </DialogHeader>
         
         <form onSubmit={handleSubmit} className="space-y-4">
