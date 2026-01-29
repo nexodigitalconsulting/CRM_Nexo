@@ -1,117 +1,215 @@
 
-# Plan: Diagnóstico y Solución - Conexión a Base de Datos Diferente en Easypanel
+# Plan: Revisión y Mejoras de la Tabla Servicios
 
-## Problema Identificado
+## Resumen del Análisis
 
-El CRM en Easypanel se está conectando a **dos bases de datos diferentes** porque las variables de entorno no están configuradas correctamente en tiempo de build.
-
-### Causa Raíz
-
-En `src/integrations/supabase/client.ts`:
-
-```javascript
-export const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || DEFAULT_SUPABASE_URL;
-```
-
-**Comportamiento actual:**
-- Si `VITE_SUPABASE_URL` NO está definido en build time, usa `DEFAULT_SUPABASE_URL` que apunta a `honfwrfkiukckyoelsdm.supabase.co` (Lovable Cloud)
-- Resultado: Tanto Lovable preview como Easypanel (sin Build Args) ven la **misma BD de Lovable Cloud**
-
-### Evidencia
-
-La BD de Lovable Cloud tiene **solo 1 usuario**:
-- `jose maldonado campano` (consultingnexodigital@gmail.com) - role: admin
-
-Si en Easypanel ves que los usuarios "desaparecen", es porque la app está conectando a la BD de Lovable en lugar de tu BD self-hosted.
+He realizado una revisión exhaustiva de la tabla `services`, sus conexiones y funcionalidades. A continuación se detallan los problemas encontrados y las mejoras propuestas.
 
 ---
 
-## Pasos de Verificación (Easypanel)
+## Problemas Identificados
 
-### 1. Verificar Build Args en Easypanel
+### 1. Error en Schema: Columna Duplicada (CRÍTICO)
 
-```text
-CRM → Build → Build Arguments:
+**Archivo**: `easypanel/init-scripts/full-schema.sql` líneas 339-340
 
-VITE_SUPABASE_URL = https://tu-supabase.dominio.com
-VITE_SUPABASE_ANON_KEY = eyJhbGc... (tu anon key)
+```sql
+payment_status payment_status DEFAULT 'pendiente',
+payment_status payment_status DEFAULT 'pendiente',  -- DUPLICADO
 ```
 
-**IMPORTANTE:** Después de cambiar Build Args, hacer **Rebuild** (no solo Restart).
-
-### 2. Verificar la conexión actual
-
-Añadir temporalmente en la consola del navegador:
-
-```javascript
-// Verificar a qué URL conecta
-console.log(window.__SUPABASE_URL || 'No expuesta');
-```
+**Impacto**: Este error impide crear la tabla `contracts` en nuevas instalaciones.
 
 ---
 
-## Solución: Añadir Debug Visual de Conexión
+### 2. Foreign Keys sin ON DELETE RESTRICT explícito
 
-### Archivos a modificar:
+**Problema**: Las FKs desde `quote_services`, `contract_services`, `invoice_services` hacia `services` usan el comportamiento por defecto (RESTRICT), pero la eliminación de un servicio en uso falla silenciosamente sin mensaje claro.
 
-**1. `src/integrations/supabase/client.ts`**
+**Verificación actual**:
+| Tabla | FK | ON DELETE |
+|-------|------|-----------|
+| quote_services | service_id | RESTRICT (default) |
+| contract_services | service_id | RESTRICT (default) |
+| invoice_services | service_id | RESTRICT (default) |
+| invoice_products | service_id | NO ACTION |
+| quote_products | service_id | NO ACTION |
 
-Exportar la URL para debugging:
+**Servicios actualmente referenciados**:
+- "RRSS": 1 factura, 1 presupuesto
+- "Campañas": 1 factura, 2 presupuestos, 1 contrato
+
+---
+
+### 3. Triggers de updated_at NO EXISTEN en la BD
+
+**Problema**: La consulta a `information_schema.triggers` devuelve vacío. Los triggers definidos en `full-schema.sql` no están aplicados.
+
+**Impacto**: La columna `updated_at` no se actualiza automáticamente al editar servicios.
+
+---
+
+### 4. Faltan Índices de Rendimiento
+
+**Problema**: Solo existe el índice primary key. Faltan índices para:
+- Búsqueda por `service_id` en tablas relacionadas
+- Búsqueda por `category` en services
+- Búsqueda por `status` en services
+
+---
+
+### 5. Falta campo `created_by` en Services
+
+**Problema**: A diferencia de otras tablas del CRM (invoices, quotes, contracts), `services` no tiene campo `created_by` para tracking de quién creó el servicio.
+
+---
+
+### 6. Eliminación de Servicios en Uso sin Validación UI
+
+**Problema**: En `src/pages/Services.tsx`, la función `confirmDelete` no verifica si el servicio está siendo usado en facturas, presupuestos o contratos antes de intentar eliminarlo.
 
 ```typescript
-// Añadir al final del archivo
-export const getSupabaseConfig = () => ({
-  url: SUPABASE_URL,
-  isDefault: SUPABASE_URL === DEFAULT_SUPABASE_URL,
-  environment: SUPABASE_URL.includes('supabase.co') ? 'cloud' : 'self-hosted'
-});
+const confirmDelete = async () => {
+  if (serviceToDelete) {
+    await deleteService.mutateAsync(serviceToDelete.id);  // Sin verificación
+    ...
+  }
+};
+```
 
-// Debug: exponer en window para verificación fácil
-if (typeof window !== 'undefined') {
-  (window as any).__SUPABASE_DEBUG = {
-    url: SUPABASE_URL,
-    isDefault: SUPABASE_URL === DEFAULT_SUPABASE_URL
-  };
+**Resultado**: Error de BD al intentar eliminar servicio referenciado.
+
+---
+
+### 7. Duplicación de Servicio con ID vacío (Bug menor)
+
+**Código en líneas 205-208**:
+```typescript
+setSelectedService({ ...service, id: "" });  // ID vacío = crear nuevo
+```
+
+**Problema**: Funciona pero si `service.id` es usado para lógica de edición (`isEditing = !!service`), esto crea un servicio vacío con datos copiados correctamente pero el diálogo muestra "Nuevo Servicio" en lugar de "Duplicar Servicio".
+
+---
+
+## Mejoras Propuestas
+
+### Paso 1: Corregir Schema (full-schema.sql)
+
+**A) Eliminar línea duplicada (línea 340)**:
+```sql
+-- Eliminar línea 340 que duplica payment_status
+```
+
+**B) Añadir campo `created_by` a services**:
+```sql
+CREATE TABLE IF NOT EXISTS public.services (
+  ...
+  created_by uuid,  -- NUEVO
+  created_at timestamptz DEFAULT now(),
+  updated_at timestamptz DEFAULT now()
+);
+```
+
+---
+
+### Paso 2: Añadir Índices de Rendimiento
+
+```sql
+-- Índices para services
+CREATE INDEX IF NOT EXISTS idx_services_status ON services(status);
+CREATE INDEX IF NOT EXISTS idx_services_category ON services(category);
+
+-- Índices para tablas relacionadas (búsqueda por servicio)
+CREATE INDEX IF NOT EXISTS idx_invoice_services_service_id ON invoice_services(service_id);
+CREATE INDEX IF NOT EXISTS idx_quote_services_service_id ON quote_services(service_id);
+CREATE INDEX IF NOT EXISTS idx_contract_services_service_id ON contract_services(service_id);
+```
+
+---
+
+### Paso 3: Crear Función de Verificación de Uso
+
+Añadir función SQL para verificar si un servicio está en uso:
+
+```sql
+CREATE OR REPLACE FUNCTION public.check_service_usage(p_service_id uuid)
+RETURNS jsonb
+LANGUAGE sql STABLE SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT jsonb_build_object(
+    'in_invoices', (SELECT COUNT(*) FROM invoice_services WHERE service_id = p_service_id),
+    'in_quotes', (SELECT COUNT(*) FROM quote_services WHERE service_id = p_service_id),
+    'in_contracts', (SELECT COUNT(*) FROM contract_services WHERE service_id = p_service_id),
+    'can_delete', (
+      NOT EXISTS (SELECT 1 FROM invoice_services WHERE service_id = p_service_id) AND
+      NOT EXISTS (SELECT 1 FROM quote_services WHERE service_id = p_service_id) AND
+      NOT EXISTS (SELECT 1 FROM contract_services WHERE service_id = p_service_id)
+    )
+  );
+$$;
+```
+
+---
+
+### Paso 4: Mejorar Hook useServices
+
+Añadir hook para verificar uso antes de eliminar:
+
+```typescript
+// En src/hooks/useServices.tsx
+
+export function useCheckServiceUsage() {
+  return useMutation({
+    mutationFn: async (serviceId: string) => {
+      const { data, error } = await supabase
+        .rpc('check_service_usage', { p_service_id: serviceId });
+      
+      if (error) throw error;
+      return data as {
+        in_invoices: number;
+        in_quotes: number;
+        in_contracts: number;
+        can_delete: boolean;
+      };
+    },
+  });
 }
 ```
 
-**2. `src/components/settings/DatabaseStatus.tsx`**
+---
 
-Añadir panel de información de conexión:
+### Paso 5: Mejorar Diálogo de Eliminación
 
-```typescript
-// Importar getSupabaseConfig
-import { supabase, getSupabaseConfig, SUPABASE_URL } from "@/integrations/supabase/client";
-
-// Añadir en el render, después del estado general:
-<div className="grid grid-cols-1 gap-2 p-3 bg-muted/30 rounded-lg">
-  <div className="flex justify-between text-sm">
-    <span className="text-muted-foreground">URL de conexión:</span>
-    <code className="font-mono text-xs truncate max-w-xs">
-      {SUPABASE_URL}
-    </code>
-  </div>
-  <div className="flex justify-between text-sm">
-    <span className="text-muted-foreground">Tipo:</span>
-    <Badge variant={getSupabaseConfig().isDefault ? "destructive" : "secondary"}>
-      {getSupabaseConfig().isDefault ? "⚠️ Default (Lovable Cloud)" : "✓ Self-hosted"}
-    </Badge>
-  </div>
-</div>
-```
-
-**3. `src/components/MigrationGate.tsx`**
-
-Añadir advertencia si usa URL por defecto:
+Actualizar `src/pages/Services.tsx` para mostrar advertencia cuando el servicio está en uso:
 
 ```typescript
-// En el estado "verified", añadir alerta si usa default:
-{getSupabaseConfig().isDefault && schemaStatus?.environment === "self-hosted" && (
-  <Alert variant="destructive" className="mt-4">
+// Añadir estado para mostrar uso
+const [serviceUsage, setServiceUsage] = useState<{
+  in_invoices: number;
+  in_quotes: number;
+  in_contracts: number;
+} | null>(null);
+
+// Antes de abrir diálogo de eliminación, verificar uso
+const handleDelete = async (service: Service) => {
+  const usage = await checkUsage.mutateAsync(service.id);
+  setServiceUsage(usage);
+  setServiceToDelete(service);
+  setDeleteDialogOpen(true);
+};
+
+// En el diálogo, mostrar advertencia si está en uso
+{!serviceUsage?.can_delete && (
+  <Alert variant="destructive">
     <AlertCircle className="h-4 w-4" />
     <AlertDescription>
-      <strong>⚠️ Configuración incorrecta:</strong> La app está usando la BD de Lovable Cloud 
-      en lugar de tu BD self-hosted. Configura los Build Args y haz Rebuild.
+      Este servicio está siendo usado en:
+      {serviceUsage?.in_invoices > 0 && ` ${serviceUsage.in_invoices} factura(s),`}
+      {serviceUsage?.in_quotes > 0 && ` ${serviceUsage.in_quotes} presupuesto(s),`}
+      {serviceUsage?.in_contracts > 0 && ` ${serviceUsage.in_contracts} contrato(s)`}
+      <br />No puede eliminarse mientras esté referenciado.
     </AlertDescription>
   </Alert>
 )}
@@ -119,59 +217,94 @@ Añadir advertencia si usa URL por defecto:
 
 ---
 
-## Verificación Manual Inmediata
+### Paso 6: Mejorar Funcionalidad de Duplicar
 
-Ejecuta estos pasos ahora en tu instancia de Easypanel:
+Añadir título claro para duplicación:
 
-### 1. En Easypanel → CRM → Build Arguments, verificar:
-
-| Variable | Debe ser |
-|----------|----------|
-| `VITE_SUPABASE_URL` | `https://TU-SUPABASE-SELFHOSTED.dominio.com` (NO `honfwrfkiukckyoelsdm.supabase.co`) |
-| `VITE_SUPABASE_ANON_KEY` | Tu anon key de Supabase self-hosted |
-
-### 2. Si los valores son incorrectos o faltan:
-- Corregir los valores
-- Hacer **Rebuild** (no restart)
-- Verificar de nuevo
-
-### 3. Verificar en navegador (después del Rebuild):
-
-Abrir DevTools → Console y ejecutar:
-
-```javascript
-// Ver URL actual
-fetch('/index.html').then(r => r.text()).then(html => {
-  const match = html.match(/supabase\.co|easypanel|tu-dominio/);
-  console.log('URL detectada:', match);
-});
+```typescript
+// En ServiceFormDialog
+const isDuplicating = service && !service.id;
+const dialogTitle = isDuplicating 
+  ? "Duplicar Servicio" 
+  : isEditing 
+    ? "Editar Servicio" 
+    : "Nuevo Servicio";
 ```
 
 ---
 
-## Resumen de Cambios
+### Paso 7: Crear Migración v1.12.0
 
-| Archivo | Cambio |
-|---------|--------|
-| `src/integrations/supabase/client.ts` | Exponer config para debug + window.__SUPABASE_DEBUG |
-| `src/components/settings/DatabaseStatus.tsx` | Panel visual mostrando URL de conexión |
-| `src/components/MigrationGate.tsx` | Alerta si usa URL default en self-hosted |
+Crear archivo `easypanel/init-scripts/migrations/v1.12.0_services_improvements.sql`:
+
+```sql
+-- v1.12.0: Mejoras tabla services
+-- 1. Campo created_by
+-- 2. Índices de rendimiento
+-- 3. Función check_service_usage
+-- 4. Aplicar triggers pendientes
+
+-- Campo created_by
+ALTER TABLE services ADD COLUMN IF NOT EXISTS created_by uuid;
+
+-- Índices
+CREATE INDEX IF NOT EXISTS idx_services_status ON services(status);
+CREATE INDEX IF NOT EXISTS idx_services_category ON services(category);
+CREATE INDEX IF NOT EXISTS idx_invoice_services_service_id ON invoice_services(service_id);
+CREATE INDEX IF NOT EXISTS idx_quote_services_service_id ON quote_services(service_id);
+CREATE INDEX IF NOT EXISTS idx_contract_services_service_id ON contract_services(service_id);
+
+-- Función de verificación
+CREATE OR REPLACE FUNCTION public.check_service_usage(p_service_id uuid)
+RETURNS jsonb LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
+  SELECT jsonb_build_object(
+    'in_invoices', (SELECT COUNT(*) FROM invoice_services WHERE service_id = p_service_id),
+    'in_quotes', (SELECT COUNT(*) FROM quote_services WHERE service_id = p_service_id),
+    'in_contracts', (SELECT COUNT(*) FROM contract_services WHERE service_id = p_service_id),
+    'can_delete', (
+      NOT EXISTS (SELECT 1 FROM invoice_services WHERE service_id = p_service_id) AND
+      NOT EXISTS (SELECT 1 FROM quote_services WHERE service_id = p_service_id) AND
+      NOT EXISTS (SELECT 1 FROM contract_services WHERE service_id = p_service_id)
+    )
+  );
+$$;
+
+-- Trigger updated_at para services
+DROP TRIGGER IF EXISTS update_services_updated_at ON services;
+CREATE TRIGGER update_services_updated_at 
+  BEFORE UPDATE ON services 
+  FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+-- Registrar versión
+INSERT INTO schema_versions (version, description)
+VALUES ('v1.12.0', 'Mejoras tabla services: campo created_by, índices, función check_usage, trigger updated_at')
+ON CONFLICT (version) DO NOTHING;
+```
 
 ---
 
-## Información Técnica
+## Archivos a Modificar
 
-### Por qué ocurre esto
+| Archivo | Cambios |
+|---------|---------|
+| `easypanel/init-scripts/full-schema.sql` | Eliminar línea duplicada, añadir created_by, índices |
+| `easypanel/init-scripts/postgres-external-schema.sql` | Mismos cambios |
+| `easypanel/init-scripts/INSTALL.sql` | Actualizar definición services |
+| `src/hooks/useServices.tsx` | Añadir useCheckServiceUsage |
+| `src/pages/Services.tsx` | Validar uso antes de eliminar, mejorar UX |
+| `src/components/services/ServiceFormDialog.tsx` | Título para duplicar |
+| `easypanel/init-scripts/migrations/v1.12.0_services_improvements.sql` | Nueva migración |
+| `easypanel/README-migrations.md` | Documentar v1.12.0 |
 
-1. Vite inyecta `import.meta.env.VITE_*` en **build time**, no runtime
-2. Si los Build Args no están en Easypanel, el build usa los defaults del código
-3. Los defaults apuntan a Lovable Cloud (`honfwrfkiukckyoelsdm.supabase.co`)
-4. El `.env` del repositorio también tiene valores de Lovable Cloud (solo para desarrollo)
+---
 
-### Flujo correcto
+## Resumen de Problemas por Severidad
 
-```text
-Easypanel Build Args → Docker Build Args → ENV vars en build → Vite inyecta → Bundle final
-```
-
-Si cualquier paso falla, se usa el default de Lovable Cloud.
+| Severidad | Problema | Solución |
+|-----------|----------|----------|
+| CRÍTICO | Columna duplicada en schema | Eliminar línea 340 |
+| ALTO | Triggers no aplicados | Crear migración v1.12.0 |
+| MEDIO | Sin validación al eliminar | Añadir función + UI |
+| BAJO | Falta created_by | Añadir columna |
+| BAJO | Faltan índices | Crear índices |
+| MENOR | UX duplicar | Mejorar título diálogo |
