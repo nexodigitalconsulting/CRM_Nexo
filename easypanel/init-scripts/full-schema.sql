@@ -281,6 +281,7 @@ CREATE TABLE IF NOT EXISTS public.services (
   price numeric NOT NULL DEFAULT 0,
   iva_percent numeric DEFAULT 21.00,
   status service_status DEFAULT 'activo',
+  created_by uuid,
   created_at timestamptz DEFAULT now(),
   updated_at timestamptz DEFAULT now()
 );
@@ -336,7 +337,6 @@ CREATE TABLE IF NOT EXISTS public.contracts (
   billing_period billing_period DEFAULT 'mensual',
   next_billing_date date,
   status contract_status DEFAULT 'pendiente_activacion',
-  payment_status payment_status DEFAULT 'pendiente',
   payment_status payment_status DEFAULT 'pendiente',
   subtotal numeric DEFAULT 0,
   iva_total numeric DEFAULT 0,

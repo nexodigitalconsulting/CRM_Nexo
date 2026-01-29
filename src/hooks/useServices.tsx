@@ -7,6 +7,13 @@ export type Service = Tables<"services">;
 export type ServiceInsert = TablesInsert<"services">;
 export type ServiceUpdate = TablesUpdate<"services">;
 
+export interface ServiceUsage {
+  in_invoices: number;
+  in_quotes: number;
+  in_contracts: number;
+  can_delete: boolean;
+}
+
 export function useServices() {
   return useQuery({
     queryKey: ["services"],
@@ -53,6 +60,30 @@ export function useService(id: string | undefined) {
       return data;
     },
     enabled: !!id,
+  });
+}
+
+export function useCheckServiceUsage() {
+  return useMutation({
+    mutationFn: async (serviceId: string): Promise<ServiceUsage> => {
+      // Consultar uso en paralelo
+      const [invoicesResult, quotesResult, contractsResult] = await Promise.all([
+        supabase.from("invoice_services").select("id", { count: "exact", head: true }).eq("service_id", serviceId),
+        supabase.from("quote_services").select("id", { count: "exact", head: true }).eq("service_id", serviceId),
+        supabase.from("contract_services").select("id", { count: "exact", head: true }).eq("service_id", serviceId),
+      ]);
+      
+      const in_invoices = invoicesResult.count || 0;
+      const in_quotes = quotesResult.count || 0;
+      const in_contracts = contractsResult.count || 0;
+      
+      return {
+        in_invoices,
+        in_quotes,
+        in_contracts,
+        can_delete: in_invoices === 0 && in_quotes === 0 && in_contracts === 0,
+      };
+    },
   });
 }
 

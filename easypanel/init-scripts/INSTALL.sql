@@ -146,6 +146,7 @@ CREATE TABLE IF NOT EXISTS public.services (
   price numeric NOT NULL DEFAULT 0,
   iva_percent numeric DEFAULT 21.00,
   status service_status DEFAULT 'active',
+  created_by uuid,
   created_at timestamptz DEFAULT now(),
   updated_at timestamptz DEFAULT now()
 );

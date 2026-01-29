@@ -4,14 +4,14 @@ import { FilterableDataTable } from "@/components/ui/filterable-data-table";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Plus, Filter, Package, MoreVertical, Loader2, LayoutGrid, List } from "lucide-react";
+import { Plus, Filter, Package, MoreVertical, Loader2, LayoutGrid, List, AlertCircle } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { useServices, useDeleteService, Service } from "@/hooks/useServices";
+import { useServices, useDeleteService, useCheckServiceUsage, Service, ServiceUsage } from "@/hooks/useServices";
 import { ServiceFormDialog } from "@/components/services/ServiceFormDialog";
 import { TableViewManager, ColumnConfig } from "@/components/common/TableViewManager";
 import { ExportDropdown } from "@/components/common/ExportDropdown";
@@ -26,6 +26,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 const categoryColors: Record<string, string> = {
   Marketing: "bg-primary/10 text-primary",
@@ -64,12 +65,15 @@ const columnConfigs: ColumnConfig[] = [
 export default function Services() {
   const { data: services, isLoading, error } = useServices();
   const deleteService = useDeleteService();
+  const checkServiceUsage = useCheckServiceUsage();
   const { data: defaultView } = useDefaultTableView("services");
   
   const [dialogOpen, setDialogOpen] = useState(false);
   const [selectedService, setSelectedService] = useState<Service | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [serviceToDelete, setServiceToDelete] = useState<Service | null>(null);
+  const [serviceUsage, setServiceUsage] = useState<ServiceUsage | null>(null);
+  const [checkingUsage, setCheckingUsage] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [viewMode, setViewMode] = useState<"cards" | "table">("cards");
   const [visibleColumns, setVisibleColumns] = useState<string[]>(
@@ -87,16 +91,29 @@ export default function Services() {
     setDialogOpen(true);
   };
 
-  const handleDelete = (service: Service) => {
+  const handleDelete = async (service: Service) => {
     setServiceToDelete(service);
+    setServiceUsage(null);
+    setCheckingUsage(true);
     setDeleteDialogOpen(true);
+    
+    try {
+      const usage = await checkServiceUsage.mutateAsync(service.id);
+      setServiceUsage(usage);
+    } catch (error) {
+      // Si falla la verificación, permitimos intentar eliminar (el backend validará)
+      setServiceUsage({ in_invoices: 0, in_quotes: 0, in_contracts: 0, can_delete: true });
+    } finally {
+      setCheckingUsage(false);
+    }
   };
 
   const confirmDelete = async () => {
-    if (serviceToDelete) {
+    if (serviceToDelete && serviceUsage?.can_delete) {
       await deleteService.mutateAsync(serviceToDelete.id);
       setDeleteDialogOpen(false);
       setServiceToDelete(null);
+      setServiceUsage(null);
     }
   };
 
@@ -218,6 +235,16 @@ export default function Services() {
   if (error) {
     return <div className="p-6 text-destructive">Error al cargar servicios: {error.message}</div>;
   }
+
+  // Construir mensaje de uso
+  const buildUsageMessage = () => {
+    if (!serviceUsage) return "";
+    const parts = [];
+    if (serviceUsage.in_invoices > 0) parts.push(`${serviceUsage.in_invoices} factura(s)`);
+    if (serviceUsage.in_quotes > 0) parts.push(`${serviceUsage.in_quotes} presupuesto(s)`);
+    if (serviceUsage.in_contracts > 0) parts.push(`${serviceUsage.in_contracts} contrato(s)`);
+    return parts.join(", ");
+  };
 
   return (
     <div className="animate-fade-in">
@@ -393,12 +420,44 @@ export default function Services() {
           <AlertDialogHeader>
             <AlertDialogTitle>¿Eliminar servicio?</AlertDialogTitle>
             <AlertDialogDescription>
-              Esta acción no se puede deshacer. Se eliminará permanentemente el servicio "{serviceToDelete?.name}".
+              {checkingUsage ? (
+                <span className="flex items-center gap-2">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Verificando uso del servicio...
+                </span>
+              ) : serviceUsage?.can_delete ? (
+                <>Esta acción no se puede deshacer. Se eliminará permanentemente el servicio "{serviceToDelete?.name}".</>
+              ) : (
+                <>No se puede eliminar el servicio "{serviceToDelete?.name}".</>
+              )}
             </AlertDialogDescription>
           </AlertDialogHeader>
+          
+          {!checkingUsage && serviceUsage && !serviceUsage.can_delete && (
+            <Alert variant="destructive">
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>
+                <strong>Este servicio está siendo usado en:</strong>
+                <br />
+                {buildUsageMessage()}
+                <br />
+                <span className="text-sm mt-1 block">
+                  No puede eliminarse mientras esté referenciado en documentos.
+                </span>
+              </AlertDescription>
+            </Alert>
+          )}
+          
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+            <AlertDialogAction 
+              onClick={confirmDelete} 
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={checkingUsage || !serviceUsage?.can_delete}
+            >
+              {checkingUsage ? (
+                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+              ) : null}
               Eliminar
             </AlertDialogAction>
           </AlertDialogFooter>

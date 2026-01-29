@@ -163,6 +163,7 @@ Cada migración es una unidad completa:
 | v1.9.0 | 2025-01-15 | Soporte IRPF en facturas: columnas `irpf_percent` e `irpf_amount` |
 | v1.10.0 | 2025-01-18 | Mejoras en remesas SEPA: campos, pagos, índices |
 | v1.11.0 | 2025-01-19 | Modelo de estados para campañas y contactos: ENUMs, campos y índices |
+| v1.12.0 | 2025-01-29 | Mejoras tabla services: campo created_by, índices, función check_usage, trigger updated_at |
 
 ## Troubleshooting
 
