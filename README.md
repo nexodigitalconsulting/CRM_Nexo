@@ -333,6 +333,48 @@ npm run db:studio    # Drizzle Studio — UI visual de la BD
 
 ## Changelog
 
+### v2.1.0 — 2026-04-12
+
+#### Infraestructura de BD (Block A)
+
+**Nuevas tablas**
+
+| Tabla | Propósito |
+|-------|-----------|
+| `flows` | Flujos de trabajo / automatizaciones n8n. Campos: `name`, `description`, `n8n_workflow_id`, `status` (active/paused/inactive), `trigger_type`, `last_run_at`, `execution_count`, `success_count` |
+| `remittance_invoices` | Tabla de auditoría: registra cada factura que se añade/elimina de una remesa, con `amount` y `added_by` |
+| `notifications` | Notificaciones persistentes por usuario: `user_id`, `type`, `title`, `message`, `entity_type`, `entity_id`, `is_read`, `read_at` |
+
+**Columna añadida**
+- `profiles.dashboard_config` — `JSONB` que almacena la configuración de widgets del dashboard por usuario
+
+---
+
+#### A1 — Remesas: auditoría de facturas
+- `app/api/data/remittances/[id]/invoices/route.ts` — al añadir facturas a una remesa, se escribe una fila en `remittance_invoices` con el importe. Al eliminarlas, se borra la fila de auditoría.
+
+#### A2 — Notificaciones persistentes
+- `app/api/data/notifications/route.ts` — reescrito: genera notificaciones desde datos de negocio (contratos por vencer, facturas, presupuestos), las persiste en BD y devuelve el estado `is_read` real.
+- Nuevo endpoint `PATCH /api/data/notifications` — marca una notificación o todas como leídas (`{ entityId, entityType }` o `{ all: true }`).
+- `src/lib/api/notifications.ts` — helpers fetch/markRead/markAllRead.
+- `NotificationCenter.tsx` — integrado con API real; el estado de lectura sobrevive recargas.
+
+#### A3 — Módulo Flows (datos reales)
+- `app/api/data/flows/route.ts` — `GET` lista + `POST` crear.
+- `app/api/data/flows/[id]/route.ts` — `GET` detalle, `PUT` actualizar (incluye toggle de estado), `DELETE`.
+- `src/lib/api/flows.ts` — capa fetch tipada (`FlowRow`, `FlowInsertPayload`).
+- `src/hooks/useFlows.tsx` — hooks TanStack Query (`useFlows`, `useCreateFlow`, `useUpdateFlow`, `useDeleteFlow`).
+- `src/views/Flows.tsx` — reescrito completamente: elimina los 4 registros hardcoded, añade diálogo de creación, búsqueda, toggle activo/pausado, borrado, stats dinámicas.
+
+#### A4 — Dashboard config persistente
+- `app/api/data/profiles/route.ts` — GET y PUT exponen `dashboard_config`; PUT acepta `{ dashboard_config: DashboardConfig }`.
+- `src/hooks/useDashboardWidgets.tsx` — `useDashboardConfig` carga la config desde `profiles`, `useUpdateDashboardConfig` la persiste. Los widgets ya no se pierden al recargar.
+
+#### D1 — Fix colores calendario
+- `src/views/Calendar.tsx` — eliminadas clases Tailwind dinámicas `bg-[${hex}]/20` (incompatibles con JIT). Ahora los eventos de categoría personalizada usan `style={{ backgroundColor: hex+'33', borderColor: hex+'4d' }}`.
+
+---
+
 ### v2.0.0 — 2026-04-12
 - Migración completa Supabase → Drizzle ORM (0 imports Supabase)
 - 50+ API routes con Next.js 15 App Router
