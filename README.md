@@ -1,6 +1,10 @@
 # CRM Nexo v2.0
 
-CRM completo para gestión de clientes, facturación, contratos y campañas. Construido con Next.js 15 App Router, Drizzle ORM y Better Auth. Sin dependencias de Supabase — stack 100% propio.
+CRM completo para gestión de clientes, facturación, contratos y campañas.  
+Stack: Next.js 15 App Router · Drizzle ORM · Better Auth · PostgreSQL.  
+Sin Supabase — infraestructura 100% propia.
+
+---
 
 ## Stack técnico
 
@@ -31,131 +35,262 @@ CRM completo para gestión de clientes, facturación, contratos y campañas. Con
 
 ---
 
-## Requisitos
-
-- Node.js 20+
-- PostgreSQL 14+
-- (Opcional) Cloudflare R2 para almacenamiento de archivos
-
----
-
-## Instalación local
+## Instalación rápida
 
 ```bash
-# 1. Clonar
-git clone https://github.com/nexodigitalconsulting/Crm_Nexo.git
-cd Crm_Nexo
-
-# 2. Instalar dependencias
+git clone https://github.com/nexodigitalconsulting/CRM_Nexo.git
+cd CRM_Nexo
 npm install
-
-# 3. Configurar entorno
-cp .env.example .env
-# Editar .env con tus valores
-
-# 4. Ejecutar migraciones
-npm run db:migrate
-
-# 5. Arrancar desarrollo
+npm run setup        # asistente interactivo que crea .env
+npm run db:migrate   # aplica el schema en tu base de datos
 npm run dev
 ```
 
-La app estará en `http://localhost:3000`.
+El asistente `npm run setup` genera automáticamente el `BETTER_AUTH_SECRET` y guía el resto de variables paso a paso.
 
 ---
 
 ## Variables de entorno
 
-Copia `.env.example` a `.env` y rellena:
+### Setup automático
 
-| Variable | Descripción | Requerido |
-|----------|-------------|-----------|
-| `DATABASE_URL` | PostgreSQL connection string | Si |
-| `BETTER_AUTH_SECRET` | Secret 32+ chars (`openssl rand -hex 32`) | Si |
-| `BETTER_AUTH_URL` | URL pública de la app | Si |
-| `NEXT_PUBLIC_APP_URL` | URL pública (browser) | Si |
-| `R2_ACCOUNT_ID` | Cloudflare Account ID | Opcional |
-| `R2_ACCESS_KEY_ID` | R2 Access Key | Opcional |
-| `R2_SECRET_ACCESS_KEY` | R2 Secret Key | Opcional |
-| `R2_BUCKET_NAME` | Nombre del bucket R2 | Opcional |
-| `R2_PUBLIC_URL` | URL pública del bucket | Opcional |
-| `SMTP_HOST` | Servidor SMTP | Opcional |
-| `SMTP_PORT` | Puerto SMTP (587) | Opcional |
-| `SMTP_USER` | Usuario SMTP | Opcional |
-| `SMTP_PASS` | Contraseña SMTP | Opcional |
-| `SMTP_FROM` | Email remitente | Opcional |
+```bash
+npm run setup
+```
+
+Genera `BETTER_AUTH_SECRET` con `crypto.randomBytes(32)`, solicita el resto de forma interactiva y escribe el `.env` final.
 
 ---
 
-## Deploy con Docker
+### Referencia completa
 
-### Build local
+#### Base de datos
+
+| Variable | Obligatoria | Descripción |
+|----------|-------------|-------------|
+| `DATABASE_URL` | **Sí** | Connection string PostgreSQL |
+
+**Formato:**
+```
+postgresql://USUARIO:CONTRASEÑA@HOST:PUERTO/NOMBRE_BD
+```
+
+**Cómo obtener según entorno:**
+
+| Entorno | Pasos |
+|---------|-------|
+| **EasyPanel** | Crear servicio PostgreSQL → copiar *Internal Connection String* |
+| **Supabase** | Settings → Database → URI (modo "Transaction pooler" recomendado) |
+| **Neon** | Dashboard → Connection string |
+| **Railway** | Servicio PostgreSQL → Variables → DATABASE_URL |
+| **Local** | `postgresql://crm:crm@localhost:5432/Crm_Nexo` (con docker-compose) |
+
+---
+
+#### Autenticación — Better Auth
+
+| Variable | Obligatoria | Descripción |
+|----------|-------------|-------------|
+| `BETTER_AUTH_SECRET` | **Sí** | Clave de firma de tokens. Mín. 32 caracteres |
+| `BETTER_AUTH_URL` | **Sí** | URL pública de la app (sin slash final) |
+| `NEXT_PUBLIC_APP_URL` | **Sí** | Igual que `BETTER_AUTH_URL` (accesible en browser) |
+
+**`BETTER_AUTH_SECRET` — generación:**
+
 ```bash
-docker build \
-  --build-arg NEXT_PUBLIC_APP_URL=https://tudominio.com \
-  --build-arg NEXT_PUBLIC_BETTER_AUTH_URL=https://tudominio.com \
-  -t crm-nexo .
+# Opción 1: con el asistente (recomendado)
+npm run setup
 
-docker run -p 3000:3000 \
-  --env-file .env \
-  crm-nexo
+# Opción 2: manual en terminal
+node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+
+# Opción 3: OpenSSL
+openssl rand -hex 32
+
+# Opción 4: EasyPanel
+# En el campo de la variable → icono de dado → genera valor aleatorio
+```
+
+> **Importante:** Cambia este valor en producción. Si lo cambias, todas las sesiones activas se invalidan.
+
+**`BETTER_AUTH_URL` / `NEXT_PUBLIC_APP_URL`:**
+
+Debe ser la URL exacta donde está desplegada la app, incluyendo protocolo y sin slash final.  
+Ejemplos: `https://crm.miempresa.com` · `https://crm-nexo.tuservidor.easypanel.host`
+
+---
+
+#### Cloudflare R2 — almacenamiento de archivos
+
+Necesario para subir PDFs, documentos y adjuntos. Si no se configura, la funcionalidad de archivos queda desactivada.
+
+| Variable | Descripción |
+|----------|-------------|
+| `R2_ACCOUNT_ID` | ID de tu cuenta Cloudflare |
+| `R2_ACCESS_KEY_ID` | Access Key del token R2 |
+| `R2_SECRET_ACCESS_KEY` | Secret Key del token R2 |
+| `R2_BUCKET_NAME` | Nombre del bucket (ej: `crm-nexo-assets`) |
+| `R2_PUBLIC_URL` | URL pública del bucket |
+
+**Cómo obtenerlo paso a paso:**
+
+```
+1. cloudflare.com → inicia sesión
+
+2. ACCOUNT_ID:
+   Página principal → barra lateral derecha → "Account ID" → copiar
+
+3. Crear bucket:
+   R2 → Create bucket → nombre: crm-nexo-assets → región: auto
+
+4. Activar acceso público (para URLs de descarga):
+   bucket → Settings → Public Access → Allow Access → Enable
+
+5. R2_PUBLIC_URL:
+   bucket → Settings → Public Access → copia la URL (ej: https://pub-abc123.r2.dev)
+   O configura un dominio personalizado en "Custom Domains"
+
+6. Crear API Token:
+   My Profile → API Tokens → Create Token
+   → Template: "Edit Cloudflare Workers"
+   → Permisos adicionales: R2:Edit
+   → Create Token → copia el valor (solo se muestra una vez)
+   ⚠ Este valor va en R2_SECRET_ACCESS_KEY
+
+7. R2_ACCESS_KEY_ID:
+   R2 → Manage R2 API Tokens → Create API Token
+   → Permissions: Object Read & Write
+   → Specify bucket: crm-nexo-assets
+   → Create → copia Access Key ID y Secret Access Key
+```
+
+---
+
+#### SMTP — Email
+
+Necesario para enviar facturas, presupuestos y notificaciones automáticas. Sin esto, el envío de emails queda desactivado.
+
+| Variable | Descripción |
+|----------|-------------|
+| `SMTP_HOST` | Servidor SMTP |
+| `SMTP_PORT` | Puerto (587 STARTTLS · 465 SSL) |
+| `SMTP_USER` | Usuario SMTP |
+| `SMTP_PASS` | Contraseña o API key SMTP |
+| `SMTP_FROM` | Email del remitente |
+
+**Proveedores recomendados:**
+
+| Proveedor | Gratis | Configuración |
+|-----------|--------|---------------|
+| **Resend** | 100/día, 3000/mes | Host: `smtp.resend.com` · Puerto: `465` · User: `resend` · Pass: API key desde resend.com |
+| **Brevo** | 300/día | Host: `smtp-relay.brevo.com` · Puerto: `587` · User: email cuenta · Pass: clave SMTP en Settings |
+| **Gmail** | 500/día | Host: `smtp.gmail.com` · Puerto: `587` · User: tu@gmail.com · Pass: contraseña de aplicación |
+| **Postmark** | 100/mes | Host: `smtp.postmarkapp.com` · Puerto: `587` · User: API key · Pass: API key |
+
+**Obtener contraseña de aplicación Gmail:**
+```
+Google Account → Seguridad → Verificación en 2 pasos (activar) →
+Contraseñas de aplicación → Seleccionar app: Correo → Generar
+```
+
+**Obtener API key Resend (más sencillo):**
+```
+resend.com → Signup gratis → API Keys → Create API Key → copiar
 ```
 
 ---
 
 ## Deploy en EasyPanel
 
-EasyPanel construye y despliega la imagen directamente desde GitHub.
+### 1. Crear proyecto y servicio
 
-### 1. Crear el servicio
-
-1. EasyPanel → **Crear proyecto** → nombre `crm-nexo`
-2. Crear servicio tipo **App**
-3. **Source** → **GitHub** → conectar repo `Crm_Nexo`, branch `main`
+1. EasyPanel → **+ Create Project** → nombre: `crm-nexo`
+2. **+ New Service** → tipo **App**
+3. **Source** → **GitHub** → autorizar → seleccionar repo `CRM_Nexo`, branch `main`
 4. Build method: **Dockerfile** (detectado automáticamente)
 
-### 2. Build arguments
+### 2. Build Arguments
+
+En la pestaña **Build** del servicio:
 
 ```
-NEXT_PUBLIC_APP_URL=https://tudominio.com
-NEXT_PUBLIC_BETTER_AUTH_URL=https://tudominio.com
+NEXT_PUBLIC_APP_URL     → https://tudominio.com
+NEXT_PUBLIC_BETTER_AUTH_URL → https://tudominio.com
 ```
 
-### 3. Variables de entorno (runtime)
+### 3. Environment Variables
+
+En la pestaña **Environment**. Para `BETTER_AUTH_SECRET` usa el icono de dado de EasyPanel o ejecuta `openssl rand -hex 32`:
 
 ```
-DATABASE_URL=postgresql://user:pass@db-host:5432/Crm_Nexo
-BETTER_AUTH_SECRET=<openssl rand -hex 32>
-BETTER_AUTH_URL=https://tudominio.com
-NEXT_PUBLIC_APP_URL=https://tudominio.com
+DATABASE_URL            → postgresql://... (de tu servicio PostgreSQL)
+BETTER_AUTH_SECRET      → <genera con dado o openssl rand -hex 32>
+BETTER_AUTH_URL         → https://tudominio.com
+NEXT_PUBLIC_APP_URL     → https://tudominio.com
+
+# Opcionales
+R2_ACCOUNT_ID           → ...
+R2_ACCESS_KEY_ID        → ...
+R2_SECRET_ACCESS_KEY    → ...
+R2_BUCKET_NAME          → crm-nexo-assets
+R2_PUBLIC_URL           → https://pub-xxx.r2.dev
+
+SMTP_HOST               → smtp.resend.com
+SMTP_PORT               → 465
+SMTP_USER               → resend
+SMTP_PASS               → re_xxxxx (API key de Resend)
+SMTP_FROM               → noreply@tudominio.com
 ```
-(Resto de variables opcionales según necesidad)
 
-### 4. Dominio
+### 4. Base de datos en EasyPanel
 
-**Domains** → añadir dominio → SSL automático con Let's Encrypt.
+1. **+ New Service** → tipo **PostgreSQL**
+2. Configura nombre de BD: `Crm_Nexo`, usuario y contraseña
+3. Copia la **Internal Connection String**
+4. Pégala en `DATABASE_URL` del servicio App
 
-### 5. Auto Deploy
+### 5. Dominio y SSL
 
-Activar **Auto Deploy** para que cada push a `main` redepliegue automáticamente.
+**Domains** → Add domain → `tudominio.com` → EasyPanel provisiona Let's Encrypt automáticamente.
 
-### Base de datos en EasyPanel
+### 6. Primer deploy y migraciones
 
-1. Crear servicio **PostgreSQL** en EasyPanel
-2. Copiar la connection string interna
-3. Pegar en `DATABASE_URL` del servicio App
+Tras el primer deploy, ejecuta las migraciones desde el terminal de EasyPanel:
+
+```bash
+npm run db:migrate
+```
+
+### 7. Auto Deploy
+
+**Settings** → activar **Auto Deploy** → cada push a `main` redespliega automáticamente.
+
+---
+
+## Deploy local con Docker
+
+```bash
+# Build y arranque completo (app + PostgreSQL)
+docker-compose up -d
+
+# Aplicar schema
+docker-compose exec app npm run db:migrate
+```
+
+La app quedará en `http://localhost:3000`.
 
 ---
 
 ## Scripts npm
 
 ```bash
-npm run dev          # Desarrollo con HMR
+npm run setup        # Asistente interactivo → crea/actualiza .env
+npm run dev          # Desarrollo con HMR (Next.js)
 npm run build        # Build de producción
 npm run start        # Servidor de producción
-npm run db:generate  # Generar migraciones Drizzle
-npm run db:migrate   # Aplicar migraciones
-npm run db:studio    # Drizzle Studio (UI de BD)
+npm run db:generate  # Genera migraciones Drizzle desde schema
+npm run db:migrate   # Aplica migraciones pendientes
+npm run db:studio    # Drizzle Studio — UI visual de la BD
 ```
 
 ---
@@ -165,26 +300,31 @@ npm run db:studio    # Drizzle Studio (UI de BD)
 ```
 ├── app/
 │   ├── api/
-│   │   ├── auth/          # Better Auth handler
-│   │   ├── data/          # API routes Drizzle (50+)
+│   │   ├── auth/[...all]/    # Better Auth handler
+│   │   ├── data/             # 50+ API routes (Drizzle)
 │   │   │   ├── clients/
 │   │   │   ├── invoices/
+│   │   │   ├── remittances/
 │   │   │   └── ...
-│   │   ├── email/
-│   │   └── health/
-│   └── auth/              # Login / registro
+│   │   ├── email/send/       # Envío SMTP
+│   │   └── health/           # Health check
+│   ├── (app)/                # Páginas protegidas
+│   └── auth/                 # Login / registro
+├── scripts/
+│   └── setup-env.mjs         # Asistente de configuración
 ├── src/
-│   ├── components/
-│   ├── hooks/             # React Query hooks
+│   ├── components/           # Componentes UI
+│   ├── hooks/                # React Query hooks
 │   ├── lib/
-│   │   ├── api/           # Fetch helpers (cliente)
-│   │   ├── api-server.ts  # Utils servidor
-│   │   ├── auth.ts        # Better Auth config
-│   │   ├── db.ts          # Drizzle client
-│   │   └── schema.ts      # Schema PostgreSQL
-│   └── views/
-├── .env.example
-├── Dockerfile
+│   │   ├── api/              # Fetch helpers (cliente)
+│   │   ├── api-server.ts     # Utils servidor (requireSession, nextSeq…)
+│   │   ├── auth.ts           # Better Auth config
+│   │   ├── db.ts             # Drizzle client
+│   │   └── schema.ts         # Schema PostgreSQL completo
+│   └── views/                # Vistas principales
+├── .env.example              # Plantilla de variables
+├── Dockerfile                # Multi-stage para EasyPanel
+├── docker-compose.yml        # Dev local con PostgreSQL
 ├── drizzle.config.ts
 └── next.config.ts
 ```
@@ -195,13 +335,16 @@ npm run db:studio    # Drizzle Studio (UI de BD)
 
 ### v2.0.0 — 2026-04-12
 - Migración completa Supabase → Drizzle ORM (0 imports Supabase)
-- 50+ API routes con Next.js App Router
+- 50+ API routes con Next.js 15 App Router
 - Autenticación migrada a Better Auth
-- Dockerfile multi-stage para EasyPanel
-- TypeScript: 0 errores
+- `npm run setup` — asistente interactivo de configuración con generación automática de secrets
+- Dockerfile multi-stage optimizado para EasyPanel
+- docker-compose.yml para desarrollo local
+- TypeScript: 0 errores (`tsc --noEmit` limpio)
+- package.json: versión 2.0.0
 
 ### v1.x
-- Versión inicial con Supabase
+- Stack original con Supabase
 
 ---
 
