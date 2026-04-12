@@ -26,6 +26,7 @@ interface CalendarDisplayEvent {
   date: Date;
   type: "contract_start" | "contract_end" | "billing" | "invoice_due" | "renewal" | "custom" | "google";
   color: string;
+  hexColor?: string; // hex for custom category color — use inline style instead of dynamic Tailwind
   details?: string;
   dbEvent?: DBCalendarEvent;
   googleEvent?: GoogleCalendarEvent;
@@ -177,9 +178,8 @@ export default function Calendar() {
         title: event.title,
         date: new Date(event.start_datetime),
         type: "custom",
-        color: event.category?.color 
-          ? `bg-[${event.category.color}]/20 text-foreground border-[${event.category.color}]/30`
-          : eventTypeConfig.custom.color,
+        color: event.category?.color ? "" : eventTypeConfig.custom.color,
+        hexColor: event.category?.color ?? undefined,
         details: event.description || undefined,
         dbEvent: event,
       });
@@ -329,6 +329,10 @@ export default function Calendar() {
                                     key={event.id}
                                     onClick={(e) => handleEventClick(event, e)}
                                     className={`text-[10px] px-1 py-0.5 rounded truncate border ${event.color}`}
+                                    style={event.hexColor ? {
+                                      backgroundColor: event.hexColor + "33",
+                                      borderColor: event.hexColor + "4d",
+                                    } : undefined}
                                     title={`${event.title}${event.details ? ` - ${event.details}` : ""}`}
                                   >
                                     {event.title}
@@ -478,7 +482,13 @@ export default function Calendar() {
                             {event.details && (
                               <p className="text-[10px] text-muted-foreground truncate">{event.details}</p>
                             )}
-                            <span className={`inline-block text-[10px] px-1.5 py-0.5 rounded mt-1 ${event.color}`}>
+                            <span
+                              className={`inline-block text-[10px] px-1.5 py-0.5 rounded mt-1 ${event.color}`}
+                              style={event.hexColor ? {
+                                backgroundColor: event.hexColor + "33",
+                                borderColor: event.hexColor + "4d",
+                              } : undefined}
+                            >
                               {eventTypeConfig[event.type].label}
                             </span>
                           </div>
