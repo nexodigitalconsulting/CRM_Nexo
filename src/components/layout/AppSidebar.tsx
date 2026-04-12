@@ -1,4 +1,7 @@
-import { Link, useLocation } from "react-router-dom";
+"use client";
+
+import Link from "next/link";
+import { usePathname } from "next/navigation";
 import {
   LayoutDashboard,
   Users,
@@ -93,13 +96,13 @@ const navigationGroups: NavGroup[] = [
 ];
 
 export function AppSidebar() {
-  const location = useLocation();
+  const pathname = usePathname();
   const { user, signOut, isAdmin } = useAuth();
   const { data: companySettings } = useCompanySettings();
   const { state, setOpenMobile, isMobile } = useSidebar();
   const isCollapsed = state === "collapsed";
 
-  const isActive = (href: string) => location.pathname === href;
+  const isActive = (href: string) => pathname === href;
 
   const getInitials = (email: string) => {
     return email.substring(0, 2).toUpperCase();
@@ -156,7 +159,7 @@ export function AppSidebar() {
                       isActive={isActive(item.href)}
                       tooltip={item.label}
                     >
-                      <Link to={item.href} onClick={handleNavClick}>
+                      <Link href={item.href} onClick={handleNavClick}>
                         <item.icon className="h-4 w-4" />
                         <span>{item.label}</span>
                       </Link>
@@ -181,7 +184,7 @@ export function AppSidebar() {
                 isActive={isActive("/profile")}
                 tooltip="Mi Perfil"
               >
-                <Link to="/profile" onClick={handleNavClick}>
+                <Link href="/profile" onClick={handleNavClick}>
                   <User className="h-4 w-4" />
                   <span>Mi Perfil</span>
                 </Link>
@@ -194,7 +197,7 @@ export function AppSidebar() {
                   isActive={isActive("/settings")}
                   tooltip="Configuración"
                 >
-                  <Link to="/settings" onClick={handleNavClick}>
+                  <Link href="/settings" onClick={handleNavClick}>
                     <Settings className="h-4 w-4" />
                     <span>Configuración</span>
                   </Link>

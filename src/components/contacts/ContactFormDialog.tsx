@@ -1,3 +1,5 @@
+"use client";
+
 import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -33,6 +35,7 @@ const initialFormState: ContactInsert = {
   presentation_url: "",
   quote_url: "",
   place_id: "",
+  created_by: null,
 };
 
 export function ContactFormDialog({ open, onOpenChange, contact }: ContactFormDialogProps) {
@@ -56,6 +59,7 @@ export function ContactFormDialog({ open, onOpenChange, contact }: ContactFormDi
         presentation_url: contact.presentation_url || "",
         quote_url: contact.quote_url || "",
         place_id: contact.place_id || "",
+        created_by: contact.created_by || null,
       });
     } else {
       setFormData(initialFormState);

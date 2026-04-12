@@ -1,3 +1,5 @@
+"use client";
+
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -154,6 +156,7 @@ export function EntityConfigManager() {
     try {
       await updateEntity.mutateAsync({
         id: selectedEntity.id,
+        entity_name: selectedEntity.entity_name,
         fields: editingFields,
       });
       setSelectedEntity(null);

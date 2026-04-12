@@ -1,6 +1,18 @@
+// Migrado de Supabase a Drizzle - v2
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import {
+  fetchInvoices,
+  fetchInvoice,
+  createInvoice,
+  updateInvoice,
+  updateInvoiceStatus,
+  markInvoiceAsSent,
+  deleteInvoice,
+  type InvoiceRow,
+  type InvoiceServiceRow,
+} from "@/lib/api/invoices";
+import { fetchContractsForInvoice } from "@/lib/api/contracts";
 
 export interface InvoiceService {
   id?: string;
@@ -87,21 +99,32 @@ export interface InvoiceUpdate {
   services?: InvoiceService[];
 }
 
+function toInvoiceWithDetails(row: InvoiceRow): InvoiceWithDetails {
+  return {
+    ...row,
+    status: row.status as InvoiceWithDetails["status"],
+    services: row.invoice_services?.map((s) => ({
+      id: s.id,
+      service_id: s.service_id,
+      quantity: s.quantity,
+      unit_price: Number(s.unit_price),
+      discount_percent: Number(s.discount_percent),
+      discount_amount: Number(s.discount_amount),
+      subtotal: Number(s.subtotal),
+      iva_percent: Number(s.iva_percent),
+      iva_amount: Number(s.iva_amount),
+      total: Number(s.total),
+      description: s.description ?? undefined,
+    })),
+  } as unknown as InvoiceWithDetails;
+}
+
 export function useInvoices() {
   return useQuery({
     queryKey: ["invoices"],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("invoices")
-        .select(`
-          *,
-          client:clients(id, name, cif, email, iban),
-          contract:contracts(id, name, contract_number)
-        `)
-        .order("invoice_number", { ascending: false });
-      
-      if (error) throw error;
-      return data as InvoiceWithDetails[];
+      const rows = await fetchInvoices();
+      return rows as unknown as InvoiceWithDetails[];
     },
   });
 }
@@ -111,22 +134,8 @@ export function useInvoice(id: string | undefined) {
     queryKey: ["invoices", id],
     queryFn: async () => {
       if (!id) return null;
-      const { data, error } = await supabase
-        .from("invoices")
-        .select(`
-          *,
-          client:clients(id, name, cif, email, iban),
-          contract:contracts(id, name, contract_number),
-          services:invoice_services(
-            *,
-            service:services(id, name, price)
-          )
-        `)
-        .eq("id", id)
-        .maybeSingle();
-      
-      if (error) throw error;
-      return data as InvoiceWithDetails | null;
+      const row = await fetchInvoice(id);
+      return toInvoiceWithDetails(row);
     },
     enabled: !!id,
   });
@@ -134,50 +143,29 @@ export function useInvoice(id: string | undefined) {
 
 export function useCreateInvoice() {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
     mutationFn: async (invoice: InvoiceInsert) => {
       const { services, ...invoiceData } = invoice;
-      
-      // Create invoice
-      const { data: invoiceResult, error: invoiceError } = await supabase
-        .from("invoices")
-        .insert(invoiceData)
-        .select()
-        .single();
-      
-      if (invoiceError) throw invoiceError;
-      
-      // Create invoice services
-      if (services.length > 0) {
-        const invoiceServices = services.map((s) => ({
-          invoice_id: invoiceResult.id,
-          service_id: s.service_id,
-          quantity: s.quantity,
-          unit_price: s.unit_price,
-          discount_percent: s.discount_percent,
-          discount_amount: s.discount_amount,
-          subtotal: s.subtotal,
-          iva_percent: s.iva_percent,
-          iva_amount: s.iva_amount,
-          total: s.total,
-          description: s.description,
-        }));
-        
-        const { error: servicesError } = await supabase
-          .from("invoice_services")
-          .insert(invoiceServices);
-        
-        if (servicesError) throw servicesError;
-      }
-      
-      return invoiceResult;
+      const serviceRows = services.map((s) => ({
+        service_id: s.service_id,
+        quantity: s.quantity,
+        unit_price: s.unit_price,
+        discount_percent: s.discount_percent,
+        discount_amount: s.discount_amount,
+        subtotal: s.subtotal,
+        iva_percent: s.iva_percent,
+        iva_amount: s.iva_amount,
+        total: s.total,
+        description: s.description,
+      })) as Omit<InvoiceServiceRow, "id" | "invoice_id" | "created_at">[];
+      return createInvoice(invoiceData as Parameters<typeof createInvoice>[0], serviceRows);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["invoices"] });
       toast.success("Factura creada correctamente");
     },
-    onError: (error) => {
+    onError: (error: Error) => {
       toast.error("Error al crear la factura: " + error.message);
     },
   });
@@ -185,60 +173,29 @@ export function useCreateInvoice() {
 
 export function useUpdateInvoice() {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
     mutationFn: async ({ id, invoice }: { id: string; invoice: InvoiceUpdate }) => {
       const { services, ...invoiceData } = invoice;
-      
-      // Update invoice
-      const { data: invoiceResult, error: invoiceError } = await supabase
-        .from("invoices")
-        .update(invoiceData)
-        .eq("id", id)
-        .select()
-        .single();
-      
-      if (invoiceError) throw invoiceError;
-      
-      // Update services if provided
-      if (services) {
-        // Delete existing services
-        await supabase
-          .from("invoice_services")
-          .delete()
-          .eq("invoice_id", id);
-        
-        // Insert new services
-        if (services.length > 0) {
-          const invoiceServices = services.map((s) => ({
-            invoice_id: id,
-            service_id: s.service_id,
-            quantity: s.quantity,
-            unit_price: s.unit_price,
-            discount_percent: s.discount_percent,
-            discount_amount: s.discount_amount,
-            subtotal: s.subtotal,
-            iva_percent: s.iva_percent,
-            iva_amount: s.iva_amount,
-            total: s.total,
-            description: s.description,
-          }));
-          
-          const { error: servicesError } = await supabase
-            .from("invoice_services")
-            .insert(invoiceServices);
-          
-          if (servicesError) throw servicesError;
-        }
-      }
-      
-      return invoiceResult;
+      const serviceRows = services?.map((s) => ({
+        service_id: s.service_id,
+        quantity: s.quantity,
+        unit_price: s.unit_price,
+        discount_percent: s.discount_percent,
+        discount_amount: s.discount_amount,
+        subtotal: s.subtotal,
+        iva_percent: s.iva_percent,
+        iva_amount: s.iva_amount,
+        total: s.total,
+        description: s.description,
+      })) as Omit<InvoiceServiceRow, "id" | "invoice_id" | "created_at">[] | undefined;
+      return updateInvoice(id, invoiceData as Parameters<typeof updateInvoice>[1], serviceRows);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["invoices"] });
       toast.success("Factura actualizada correctamente");
     },
-    onError: (error) => {
+    onError: (error: Error) => {
       toast.error("Error al actualizar la factura: " + error.message);
     },
   });
@@ -246,24 +203,15 @@ export function useUpdateInvoice() {
 
 export function useUpdateInvoiceStatus() {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
-    mutationFn: async ({ id, status }: { id: string; status: "borrador" | "emitida" | "pagada" | "cancelada" }) => {
-      const { data, error } = await supabase
-        .from("invoices")
-        .update({ status })
-        .eq("id", id)
-        .select()
-        .single();
-      
-      if (error) throw error;
-      return data;
-    },
+    mutationFn: ({ id, status }: { id: string; status: "borrador" | "emitida" | "pagada" | "cancelada" }) =>
+      updateInvoiceStatus(id, status),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["invoices"] });
       toast.success("Estado de factura actualizado");
     },
-    onError: (error) => {
+    onError: (error: Error) => {
       toast.error("Error: " + error.message);
     },
   });
@@ -271,28 +219,14 @@ export function useUpdateInvoiceStatus() {
 
 export function useDeleteInvoice() {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
-    mutationFn: async (id: string) => {
-      // Delete invoice services first
-      await supabase
-        .from("invoice_services")
-        .delete()
-        .eq("invoice_id", id);
-      
-      // Delete invoice
-      const { error } = await supabase
-        .from("invoices")
-        .delete()
-        .eq("id", id);
-      
-      if (error) throw error;
-    },
+    mutationFn: (id: string) => deleteInvoice(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["invoices"] });
       toast.success("Factura eliminada correctamente");
     },
-    onError: (error) => {
+    onError: (error: Error) => {
       toast.error("Error al eliminar la factura: " + error.message);
     },
   });
@@ -301,49 +235,19 @@ export function useDeleteInvoice() {
 export function useContractsForInvoice() {
   return useQuery({
     queryKey: ["contracts", "for-invoice"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("contracts")
-        .select(`
-          id,
-          name,
-          contract_number,
-          client_id,
-          status,
-          client:clients(id, name, cif)
-        `)
-        .in("status", ["vigente", "pendiente_activacion"])
-        .order("contract_number", { ascending: false });
-      
-      if (error) throw error;
-      return data;
-    },
+    queryFn: fetchContractsForInvoice,
   });
 }
 
-// Mark invoice as sent (for automation control)
 export function useMarkInvoiceAsSent() {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
-    mutationFn: async (id: string) => {
-      const { data, error } = await supabase
-        .from("invoices")
-        .update({ 
-          is_sent: true,
-          sent_at: new Date().toISOString()
-        })
-        .eq("id", id)
-        .select()
-        .single();
-      
-      if (error) throw error;
-      return data;
-    },
+    mutationFn: (id: string) => markInvoiceAsSent(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["invoices"] });
     },
-    onError: (error) => {
+    onError: (error: Error) => {
       toast.error("Error al marcar como enviada: " + error.message);
     },
   });

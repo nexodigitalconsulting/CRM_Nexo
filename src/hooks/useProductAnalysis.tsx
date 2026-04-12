@@ -1,5 +1,10 @@
+// Migrado de Supabase a Drizzle - v2
 import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import {
+  fetchContractProducts,
+  fetchInvoiceProducts,
+  fetchQuoteProducts,
+} from "@/lib/api/product-analysis";
 
 export interface InvoiceProduct {
   id: string;
@@ -75,30 +80,14 @@ export interface ContractProduct {
 export function useInvoiceProducts() {
   return useQuery({
     queryKey: ["invoice-products"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("invoice_products")
-        .select("*")
-        .order("invoice_date", { ascending: false });
-
-      if (error) throw error;
-      return data as InvoiceProduct[];
-    },
+    queryFn: () => fetchInvoiceProducts() as unknown as Promise<InvoiceProduct[]>,
   });
 }
 
 export function useQuoteProducts() {
   return useQuery({
     queryKey: ["quote-products"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("quote_products")
-        .select("*")
-        .order("quote_date", { ascending: false });
-
-      if (error) throw error;
-      return data as QuoteProduct[];
-    },
+    queryFn: () => fetchQuoteProducts() as unknown as Promise<QuoteProduct[]>,
   });
 }
 
@@ -106,38 +95,28 @@ export function useContractProducts() {
   return useQuery({
     queryKey: ["contract-products"],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("contract_services")
-        .select(`
-          *,
-          contract:contracts(id, contract_number, name, status, billing_period, start_date, client_id, client:clients(id, name)),
-          service:services(id, name, category)
-        `)
-        .order("created_at", { ascending: false });
-
-      if (error) throw error;
-      
-      return (data || []).map(item => ({
+      const rows = await fetchContractProducts();
+      return rows.map((item) => ({
         id: item.id,
         contract_id: item.contract_id,
-        contract_number: item.contract?.contract_number || 0,
-        contract_name: item.contract?.name,
-        contract_status: item.contract?.status,
-        client_id: item.contract?.client_id || '',
-        client_name: item.contract?.client?.name || '',
+        contract_number: (item.contract as { contract_number?: number })?.contract_number ?? 0,
+        contract_name: null,
+        contract_status: (item.contract as { status?: string })?.status ?? null,
+        client_id: (item.contract as { client?: { id?: string } })?.client?.id ?? "",
+        client_name: (item.contract as { client?: { name?: string } })?.client?.name ?? "",
         service_id: item.service_id,
-        service_name: item.service?.name || '',
-        service_category: item.service?.category,
-        quantity: item.quantity || 1,
+        service_name: (item.service as { name?: string })?.name ?? "",
+        service_category: (item.service as { category?: string | null })?.category ?? null,
+        quantity: item.quantity ?? 1,
         unit_price: Number(item.unit_price),
-        discount_percent: item.discount_percent,
-        discount_amount: item.discount_amount,
-        subtotal: Number(item.subtotal),
-        iva_percent: item.iva_percent,
-        iva_amount: item.iva_amount,
+        discount_percent: null,
+        discount_amount: null,
+        subtotal: Number(item.unit_price) * (item.quantity ?? 1),
+        iva_percent: null,
+        iva_amount: null,
         total: Number(item.total),
-        billing_period: item.contract?.billing_period,
-        start_date: item.contract?.start_date,
+        billing_period: null,
+        start_date: null,
         is_active: item.is_active ?? true,
       })) as ContractProduct[];
     },
@@ -150,42 +129,30 @@ export function useProductStats() {
   const { data: contractProducts } = useContractProducts();
 
   const invoiceStats = invoiceProducts ? {
-    totalInvoiced: invoiceProducts
-      .filter(p => p.invoice_status !== 'cancelada')
-      .reduce((sum, p) => sum + Number(p.subtotal), 0),
-    totalPaid: invoiceProducts
-      .filter(p => p.invoice_status === 'pagada')
-      .reduce((sum, p) => sum + Number(p.subtotal), 0),
-    totalPending: invoiceProducts
-      .filter(p => p.invoice_status === 'emitida')
-      .reduce((sum, p) => sum + Number(p.subtotal), 0),
+    totalInvoiced: invoiceProducts.filter((p) => p.invoice_status !== "cancelada").reduce((sum, p) => sum + Number(p.subtotal), 0),
+    totalPaid: invoiceProducts.filter((p) => p.invoice_status === "pagada").reduce((sum, p) => sum + Number(p.subtotal), 0),
+    totalPending: invoiceProducts.filter((p) => p.invoice_status === "emitida").reduce((sum, p) => sum + Number(p.subtotal), 0),
     productCount: invoiceProducts.length,
-    uniqueProducts: new Set(invoiceProducts.map(p => p.service_id)).size,
+    uniqueProducts: new Set(invoiceProducts.map((p) => p.service_id)).size,
     topProducts: getTopProducts(invoiceProducts),
     byCategory: groupByCategory(invoiceProducts),
   } : null;
 
   const quoteStats = quoteProducts ? {
-    totalQuoted: quoteProducts
-      .filter(p => p.quote_status !== 'rechazado')
-      .reduce((sum, p) => sum + Number(p.subtotal), 0),
-    approvedTotal: quoteProducts
-      .filter(p => p.quote_status === 'aceptado')
-      .reduce((sum, p) => sum + Number(p.subtotal), 0),
+    totalQuoted: quoteProducts.filter((p) => p.quote_status !== "rechazado").reduce((sum, p) => sum + Number(p.subtotal), 0),
+    approvedTotal: quoteProducts.filter((p) => p.quote_status === "aceptado").reduce((sum, p) => sum + Number(p.subtotal), 0),
     productCount: quoteProducts.length,
-    uniqueProducts: new Set(quoteProducts.map(p => p.service_id)).size,
+    uniqueProducts: new Set(quoteProducts.map((p) => p.service_id)).size,
     topProducts: getTopProducts(quoteProducts),
     byCategory: groupByCategory(quoteProducts),
   } : null;
 
   const contractStats = contractProducts ? {
-    totalContracted: contractProducts
-      .filter(p => p.contract_status === 'vigente')
-      .reduce((sum, p) => sum + Number(p.subtotal), 0),
+    totalContracted: contractProducts.filter((p) => p.contract_status === "vigente").reduce((sum, p) => sum + Number(p.subtotal), 0),
     totalAll: contractProducts.reduce((sum, p) => sum + Number(p.subtotal), 0),
     productCount: contractProducts.length,
-    uniqueProducts: new Set(contractProducts.map(p => p.service_id)).size,
-    activeContracts: new Set(contractProducts.filter(p => p.contract_status === 'vigente').map(p => p.contract_id)).size,
+    uniqueProducts: new Set(contractProducts.map((p) => p.service_id)).size,
+    activeContracts: new Set(contractProducts.filter((p) => p.contract_status === "vigente").map((p) => p.contract_id)).size,
     topProducts: getTopContractProducts(contractProducts),
     byCategory: groupByCategory(contractProducts),
   } : null;
@@ -196,41 +163,29 @@ export function useProductStats() {
 function getTopProducts(products: (InvoiceProduct | QuoteProduct)[]) {
   const grouped = products.reduce((acc, p) => {
     const key = p.service_id;
-    if (!acc[key]) {
-      acc[key] = { service_name: p.service_name, service_category: p.service_category, total: 0, quantity: 0 };
-    }
+    if (!acc[key]) acc[key] = { service_name: p.service_name, service_category: p.service_category, total: 0, quantity: 0 };
     acc[key].total += Number(p.subtotal);
     acc[key].quantity += p.quantity;
     return acc;
   }, {} as Record<string, { service_name: string; service_category: string | null; total: number; quantity: number }>);
-
-  return Object.values(grouped)
-    .sort((a, b) => b.total - a.total)
-    .slice(0, 10);
+  return Object.values(grouped).sort((a, b) => b.total - a.total).slice(0, 10);
 }
 
 function getTopContractProducts(products: ContractProduct[]) {
   const grouped = products.reduce((acc, p) => {
     const key = p.service_id;
-    if (!acc[key]) {
-      acc[key] = { service_name: p.service_name, service_category: p.service_category, total: 0, quantity: 0 };
-    }
+    if (!acc[key]) acc[key] = { service_name: p.service_name, service_category: p.service_category, total: 0, quantity: 0 };
     acc[key].total += Number(p.subtotal);
     acc[key].quantity += p.quantity;
     return acc;
   }, {} as Record<string, { service_name: string; service_category: string | null; total: number; quantity: number }>);
-
-  return Object.values(grouped)
-    .sort((a, b) => b.total - a.total)
-    .slice(0, 10);
+  return Object.values(grouped).sort((a, b) => b.total - a.total).slice(0, 10);
 }
 
 function groupByCategory(products: (InvoiceProduct | QuoteProduct | ContractProduct)[]) {
   return products.reduce((acc, p) => {
-    const key = p.service_category || 'Sin categoría';
-    if (!acc[key]) {
-      acc[key] = { total: 0, quantity: 0 };
-    }
+    const key = p.service_category || "Sin categoría";
+    if (!acc[key]) acc[key] = { total: 0, quantity: 0 };
     acc[key].total += Number(p.subtotal);
     acc[key].quantity += p.quantity;
     return acc;

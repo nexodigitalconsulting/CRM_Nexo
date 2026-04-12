@@ -1,23 +1,20 @@
+// Migrado de Supabase a Drizzle - v2
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
-import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
+import {
+  fetchTableViews,
+  fetchDefaultTableView,
+  createTableView,
+  updateTableView,
+  deleteTableView,
+  type TableViewRow,
+  type TableViewInsert,
+} from "@/lib/api/table-views";
+import { useAuth } from "@/hooks/useAuth";
 
-export interface TableView {
-  id: string;
-  user_id: string;
-  entity_name: string;
-  view_name: string;
-  visible_columns: string[];
-  column_order: string[];
-  filters: Record<string, unknown>;
-  sort_config: Record<string, unknown>;
-  is_default: boolean;
-  created_at: string;
-  updated_at: string;
-}
+export interface TableView extends TableViewRow {}
 
-export interface TableViewInsert {
+export interface TableViewInsertPayload {
   entity_name: string;
   view_name: string;
   visible_columns: string[];
@@ -32,17 +29,7 @@ export function useTableViews(entityName: string) {
 
   return useQuery({
     queryKey: ["table-views", entityName, session?.user?.id],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("user_table_views")
-        .select("*")
-        .eq("entity_name", entityName)
-        .order("is_default", { ascending: false })
-        .order("view_name");
-
-      if (error) throw error;
-      return data as TableView[];
-    },
+    queryFn: () => fetchTableViews(entityName),
     enabled: !!session?.user?.id,
   });
 }
@@ -52,17 +39,7 @@ export function useDefaultTableView(entityName: string) {
 
   return useQuery({
     queryKey: ["table-view-default", entityName, session?.user?.id],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("user_table_views")
-        .select("*")
-        .eq("entity_name", entityName)
-        .eq("is_default", true)
-        .maybeSingle();
-
-      if (error) throw error;
-      return data as TableView | null;
-    },
+    queryFn: () => fetchDefaultTableView(entityName),
     enabled: !!session?.user?.id,
   });
 }
@@ -72,26 +49,18 @@ export function useCreateTableView() {
   const { session } = useAuth();
 
   return useMutation({
-    mutationFn: async (view: TableViewInsert) => {
+    mutationFn: (view: TableViewInsertPayload) => {
       if (!session?.user?.id) throw new Error("No authenticated user");
-
-      const { data, error } = await supabase
-        .from("user_table_views")
-        .insert({
-          entity_name: view.entity_name,
-          view_name: view.view_name,
-          visible_columns: view.visible_columns as unknown as string,
-          column_order: (view.column_order || []) as unknown as string,
-          filters: (view.filters || {}) as unknown as string,
-          sort_config: (view.sort_config || {}) as unknown as string,
-          is_default: view.is_default || false,
-          user_id: session.user.id,
-        })
-        .select()
-        .single();
-
-      if (error) throw error;
-      return data as unknown as TableView;
+      return createTableView({
+        user_id: session.user.id,
+        entity_name: view.entity_name,
+        view_name: view.view_name,
+        visible_columns: view.visible_columns,
+        column_order: view.column_order ?? [],
+        filters: view.filters ?? {},
+        sort_config: view.sort_config ?? {},
+        is_default: view.is_default ?? false,
+      });
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["table-views", data.entity_name] });
@@ -108,25 +77,8 @@ export function useUpdateTableView() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async ({ id, view }: { id: string; view: Partial<TableViewInsert> }) => {
-      const updateData: Record<string, unknown> = {};
-      if (view.view_name) updateData.view_name = view.view_name;
-      if (view.visible_columns) updateData.visible_columns = view.visible_columns;
-      if (view.column_order) updateData.column_order = view.column_order;
-      if (view.filters) updateData.filters = view.filters;
-      if (view.sort_config) updateData.sort_config = view.sort_config;
-      if (view.is_default !== undefined) updateData.is_default = view.is_default;
-
-      const { data, error } = await supabase
-        .from("user_table_views")
-        .update(updateData)
-        .eq("id", id)
-        .select()
-        .single();
-
-      if (error) throw error;
-      return data as unknown as TableView;
-    },
+    mutationFn: ({ id, view }: { id: string; view: Partial<TableViewInsertPayload> }) =>
+      updateTableView(id, view as Partial<TableViewInsert>),
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["table-views", data.entity_name] });
       queryClient.invalidateQueries({ queryKey: ["table-view-default", data.entity_name] });
@@ -142,15 +94,8 @@ export function useDeleteTableView() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async ({ id, entityName }: { id: string; entityName: string }) => {
-      const { error } = await supabase
-        .from("user_table_views")
-        .delete()
-        .eq("id", id);
-
-      if (error) throw error;
-      return entityName;
-    },
+    mutationFn: ({ id, entityName }: { id: string; entityName: string }) =>
+      deleteTableView(id).then(() => entityName),
     onSuccess: (entityName) => {
       queryClient.invalidateQueries({ queryKey: ["table-views", entityName] });
       queryClient.invalidateQueries({ queryKey: ["table-view-default", entityName] });

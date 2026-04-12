@@ -1,11 +1,22 @@
+// Migrado de Supabase a Drizzle - v2
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
-import { Tables, TablesInsert, TablesUpdate } from "@/integrations/supabase/types";
 import { toast } from "sonner";
+import {
+  fetchServices,
+  fetchActiveServices,
+  fetchService as fetchServiceById,
+  createService,
+  updateService,
+  deleteService,
+  checkServiceUsage,
+  type ServiceRow,
+  type ServiceInsert as ServiceInsertApi,
+  type ServiceUpdate as ServiceUpdateApi,
+} from "@/lib/api/services";
 
-export type Service = Tables<"services">;
-export type ServiceInsert = TablesInsert<"services">;
-export type ServiceUpdate = TablesUpdate<"services">;
+export type Service = ServiceRow;
+export type ServiceInsert = ServiceInsertApi;
+export type ServiceUpdate = Partial<ServiceInsertApi>;
 
 export interface ServiceUsage {
   in_invoices: number;
@@ -17,31 +28,14 @@ export interface ServiceUsage {
 export function useServices() {
   return useQuery({
     queryKey: ["services"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("services")
-        .select("*")
-        .order("service_number", { ascending: false });
-      
-      if (error) throw error;
-      return data;
-    },
+    queryFn: fetchServices,
   });
 }
 
 export function useActiveServices() {
   return useQuery({
     queryKey: ["services", "active"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("services")
-        .select("*")
-        .eq("status", "activo")
-        .order("name");
-      
-      if (error) throw error;
-      return data;
-    },
+    queryFn: fetchActiveServices,
   });
 }
 
@@ -50,14 +44,7 @@ export function useService(id: string | undefined) {
     queryKey: ["services", id],
     queryFn: async () => {
       if (!id) return null;
-      const { data, error } = await supabase
-        .from("services")
-        .select("*")
-        .eq("id", id)
-        .maybeSingle();
-      
-      if (error) throw error;
-      return data;
+      return fetchServiceById(id);
     },
     enabled: !!id,
   });
@@ -66,22 +53,12 @@ export function useService(id: string | undefined) {
 export function useCheckServiceUsage() {
   return useMutation({
     mutationFn: async (serviceId: string): Promise<ServiceUsage> => {
-      // Consultar uso en paralelo
-      const [invoicesResult, quotesResult, contractsResult] = await Promise.all([
-        supabase.from("invoice_services").select("id", { count: "exact", head: true }).eq("service_id", serviceId),
-        supabase.from("quote_services").select("id", { count: "exact", head: true }).eq("service_id", serviceId),
-        supabase.from("contract_services").select("id", { count: "exact", head: true }).eq("service_id", serviceId),
-      ]);
-      
-      const in_invoices = invoicesResult.count || 0;
-      const in_quotes = quotesResult.count || 0;
-      const in_contracts = contractsResult.count || 0;
-      
+      const { invoiceCount, quoteCount, contractCount } = await checkServiceUsage(serviceId);
       return {
-        in_invoices,
-        in_quotes,
-        in_contracts,
-        can_delete: in_invoices === 0 && in_quotes === 0 && in_contracts === 0,
+        in_invoices: invoiceCount,
+        in_quotes: quoteCount,
+        in_contracts: contractCount,
+        can_delete: invoiceCount === 0 && quoteCount === 0 && contractCount === 0,
       };
     },
   });
@@ -89,23 +66,14 @@ export function useCheckServiceUsage() {
 
 export function useCreateService() {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
-    mutationFn: async (service: ServiceInsert) => {
-      const { data, error } = await supabase
-        .from("services")
-        .insert(service)
-        .select()
-        .single();
-      
-      if (error) throw error;
-      return data;
-    },
+    mutationFn: (service: ServiceInsert) => createService(service),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["services"] });
       toast.success("Servicio creado correctamente");
     },
-    onError: (error) => {
+    onError: (error: Error) => {
       toast.error("Error al crear el servicio: " + error.message);
     },
   });
@@ -113,24 +81,15 @@ export function useCreateService() {
 
 export function useUpdateService() {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
-    mutationFn: async ({ id, ...service }: ServiceUpdate & { id: string }) => {
-      const { data, error } = await supabase
-        .from("services")
-        .update(service)
-        .eq("id", id)
-        .select()
-        .single();
-      
-      if (error) throw error;
-      return data;
-    },
+    mutationFn: ({ id, ...service }: ServiceUpdate & { id: string }) =>
+      updateService(id, service),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["services"] });
       toast.success("Servicio actualizado correctamente");
     },
-    onError: (error) => {
+    onError: (error: Error) => {
       toast.error("Error al actualizar el servicio: " + error.message);
     },
   });
@@ -138,21 +97,14 @@ export function useUpdateService() {
 
 export function useDeleteService() {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
-    mutationFn: async (id: string) => {
-      const { error } = await supabase
-        .from("services")
-        .delete()
-        .eq("id", id);
-      
-      if (error) throw error;
-    },
+    mutationFn: (id: string) => deleteService(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["services"] });
       toast.success("Servicio eliminado correctamente");
     },
-    onError: (error) => {
+    onError: (error: Error) => {
       toast.error("Error al eliminar el servicio: " + error.message);
     },
   });

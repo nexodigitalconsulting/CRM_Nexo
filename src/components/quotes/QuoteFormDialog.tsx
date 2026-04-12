@@ -1,3 +1,5 @@
+"use client";
+
 import { useState, useEffect, useMemo } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -65,8 +67,9 @@ export function QuoteFormDialog({ open, onOpenChange, quote }: QuoteFormDialogPr
       setValidUntil(quoteWithServices.valid_until || "");
       setNotes(quoteWithServices.notes || "");
       
-      if (quoteWithServices.services && quoteWithServices.services.length > 0) {
-        setServiceLines(quoteWithServices.services.map(s => ({
+      const quoteServices = quoteWithServices.quote_services;
+      if (quoteServices && quoteServices.length > 0) {
+        setServiceLines(quoteServices.map(s => ({
           service_id: s.service_id,
           quantity: s.quantity || 1,
           unit_price: s.unit_price,
@@ -165,6 +168,10 @@ export function QuoteFormDialog({ open, onOpenChange, quote }: QuoteFormDialogPr
       iva_total: totals.iva,
       total: totals.total,
       status: quote?.status || "borrador" as const,
+      document_url: null,
+      is_sent: false,
+      sent_at: null,
+      created_by: null,
     };
 
     const servicesData = serviceLines.map(line => {

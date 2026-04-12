@@ -1,66 +1,38 @@
-import { useState, useEffect, useCallback } from "react";
+"use client";
+
+// Migrado de Supabase a Drizzle - v2
+import { useState, useCallback } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
+import {
+  fetchGoogleCalendarEvents,
+  getGoogleCalendarAuthUrl,
+  disconnectGoogleCalendar,
+  type GoogleCalendarEvent,
+  type GoogleCalendarResponse,
+} from "@/lib/api/google-calendar";
 
-export interface GoogleCalendarEvent {
-  id: string;
-  title: string;
-  description?: string;
-  start: string;
-  end: string;
-  allDay: boolean;
-  location?: string;
-  htmlLink?: string;
-}
-
-interface GoogleCalendarResponse {
-  connected: boolean;
-  events: GoogleCalendarEvent[];
-  needsReauth?: boolean;
-  error?: string;
-}
+export type { GoogleCalendarEvent };
 
 export function useGoogleCalendar(timeMin?: string, timeMax?: string) {
   const { session } = useAuth();
   const queryClient = useQueryClient();
   const [isConnecting, setIsConnecting] = useState(false);
 
-  const fetchEvents = async (): Promise<GoogleCalendarResponse> => {
-    if (!session?.access_token) {
-      return { connected: false, events: [] };
-    }
-
-    const params = new URLSearchParams();
-    if (timeMin) params.set("timeMin", timeMin);
-    if (timeMax) params.set("timeMax", timeMax);
-
-    const { data, error } = await supabase.functions.invoke("google-calendar-events", {
-      body: null,
-      headers: {
-        Authorization: `Bearer ${session.access_token}`,
-      },
-    });
-
-    if (error) {
-      console.error("Error fetching Google Calendar events:", error);
-      return { connected: false, events: [] };
-    }
-
-    return data as GoogleCalendarResponse;
-  };
-
   const query = useQuery({
     queryKey: ["google-calendar-events", session?.user?.id, timeMin, timeMax],
-    queryFn: fetchEvents,
-    enabled: !!session?.access_token,
-    staleTime: 5 * 60 * 1000, // 5 minutes
+    queryFn: (): Promise<GoogleCalendarResponse> => {
+      if (!session?.user?.id) return Promise.resolve({ connected: false, events: [] });
+      return fetchGoogleCalendarEvents("", timeMin, timeMax);
+    },
+    enabled: !!session?.user?.id,
+    staleTime: 5 * 60 * 1000,
     refetchOnWindowFocus: false,
   });
 
   const connectGoogleCalendar = useCallback(async () => {
-    if (!session?.access_token) {
+    if (!session?.user?.id) {
       toast.error("Debes iniciar sesión primero");
       return;
     }
@@ -68,19 +40,11 @@ export function useGoogleCalendar(timeMin?: string, timeMax?: string) {
     setIsConnecting(true);
 
     try {
-      const { data, error } = await supabase.functions.invoke("google-calendar-auth", {
-        headers: {
-          Authorization: `Bearer ${session.access_token}`,
-        },
-      });
-
-      if (error || !data?.authUrl) {
-        throw new Error(error?.message || "No se pudo obtener la URL de autenticación");
-      }
+      const authUrl = await getGoogleCalendarAuthUrl("");
 
       // Open popup for OAuth
       const popup = window.open(
-        data.authUrl,
+        authUrl,
         "google-calendar-auth",
         "width=600,height=700,scrollbars=yes"
       );
@@ -116,17 +80,11 @@ export function useGoogleCalendar(timeMin?: string, timeMax?: string) {
     }
   }, [session, queryClient]);
 
-  const disconnectGoogleCalendar = useCallback(async () => {
+  const disconnectCalendar = useCallback(async () => {
     if (!session?.user?.id) return;
 
     try {
-      const { error } = await supabase
-        .from("google_calendar_config")
-        .delete()
-        .eq("user_id", session.user.id);
-
-      if (error) throw error;
-
+      await disconnectGoogleCalendar(session.user.id);
       toast.success("Google Calendar desconectado");
       queryClient.invalidateQueries({ queryKey: ["google-calendar-events"] });
     } catch (error) {
@@ -142,7 +100,7 @@ export function useGoogleCalendar(timeMin?: string, timeMax?: string) {
     isLoading: query.isLoading,
     isConnecting,
     connectGoogleCalendar,
-    disconnectGoogleCalendar,
+    disconnectGoogleCalendar: disconnectCalendar,
     refetch: query.refetch,
   };
 }

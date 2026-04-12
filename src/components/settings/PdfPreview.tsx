@@ -1,3 +1,5 @@
+"use client";
+
 import { PdfConfig } from '@/lib/pdf/pdfUtils';
 import { ContractPdfPreview } from './ContractPdfPreview';
 import { InvoicePdfPreview } from './InvoicePdfPreview';

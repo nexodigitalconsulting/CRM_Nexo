@@ -1,3 +1,5 @@
+"use client";
+
 import { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -371,6 +373,9 @@ export function PdfSettingsManager() {
         entity_type: selectedDocument,
         content: defaultContent,
         is_default: templates.length === 0,
+        is_active: true,
+        created_by: null,
+        variables: null,
       });
       setNewTemplateName('');
       setShowNewDialog(false);
@@ -390,6 +395,9 @@ export function PdfSettingsManager() {
         entity_type: selectedDocument,
         content: contentWithConfig,
         is_default: false,
+        is_active: true,
+        created_by: null,
+        variables: null,
       });
       toast.success('Plantilla duplicada');
     } catch (error) {

@@ -1,8 +1,36 @@
-import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
-import { User, Session } from '@supabase/supabase-js';
-import { supabase } from '@/integrations/supabase/client';
+"use client";
 
-type AppRole = 'admin' | 'manager' | 'user' | 'readonly';
+// useAuth — Better Auth (Fase 1)
+import { createContext, useContext, ReactNode } from "react";
+import { useSession } from "@/lib/auth-client";
+import {
+  authSignIn,
+  authSignUp,
+  authSignOut,
+  authResetPassword,
+  type User,
+  type Session,
+  type AppRole,
+} from "@/lib/api/auth";
+
+// Tipo interno para el dato de sesión de Better Auth
+interface BetterAuthSessionData {
+  user: {
+    id: string;
+    email: string;
+    name: string;
+    image?: string | null;
+    emailVerified: boolean;
+    createdAt: Date;
+    updatedAt: Date;
+  };
+  session: {
+    id: string;
+    userId: string;
+    token: string;
+    expiresAt: Date;
+  };
+}
 
 interface AuthContextType {
   user: User | null;
@@ -20,106 +48,50 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
-  const [session, setSession] = useState<Session | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [roles, setRoles] = useState<AppRole[]>([]);
+  const { data: rawSession, isPending } = useSession();
+  const sessionData = rawSession as BetterAuthSessionData | null | undefined;
 
-  const fetchUserRoles = async (userId: string) => {
-    const { data, error } = await supabase
-      .from('user_roles')
-      .select('role')
-      .eq('user_id', userId);
-    
-    if (!error && data) {
-      setRoles(data.map(r => r.role as AppRole));
-    }
-  };
-
-  useEffect(() => {
-    // Set up auth state listener FIRST
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, session) => {
-        setSession(session);
-        setUser(session?.user ?? null);
-        
-        // Defer role fetching with setTimeout to prevent deadlock
-        if (session?.user) {
-          setTimeout(() => {
-            fetchUserRoles(session.user.id);
-          }, 0);
-        } else {
-          setRoles([]);
-        }
-        
-        setLoading(false);
+  // Map Better Auth session to our internal types
+  const user: User | null = sessionData?.user
+    ? {
+        id: sessionData.user.id,
+        email: sessionData.user.email,
+        name: sessionData.user.name,
+        image: sessionData.user.image ?? undefined,
+        emailVerified: sessionData.user.emailVerified,
+        createdAt: sessionData.user.createdAt,
+        updatedAt: sessionData.user.updatedAt,
       }
-    );
+    : null;
 
-    // THEN check for existing session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      
-      if (session?.user) {
-        fetchUserRoles(session.user.id);
+  const session: Session | null = sessionData
+    ? {
+        id: sessionData.session.id,
+        userId: sessionData.session.userId,
+        token: sessionData.session.token,
+        expiresAt: sessionData.session.expiresAt,
+        user: user!,
       }
-      
-      setLoading(false);
-    });
+    : null;
 
-    return () => subscription.unsubscribe();
-  }, []);
-
-  const signIn = async (email: string, password: string) => {
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    return { error: error as Error | null };
-  };
-
-  const signUp = async (email: string, password: string, fullName?: string) => {
-    const redirectUrl = `${window.location.origin}/`;
-    
-    const { error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        emailRedirectTo: redirectUrl,
-        data: {
-          full_name: fullName,
-        },
-      },
-    });
-    return { error: error as Error | null };
-  };
-
-  const signOut = async () => {
-    await supabase.auth.signOut();
-    setRoles([]);
-  };
-
-  const resetPassword = async (email: string) => {
-    const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/auth/reset-password`,
-    });
-    return { error: error as Error | null };
-  };
-
-  const isAdmin = roles.includes('admin');
-  const isManager = roles.includes('manager') || isAdmin;
+  // Roles: placeholder for Fase 2 (user_roles table via Drizzle)
+  const roles: AppRole[] = [];
+  const isAdmin = roles.includes("admin");
+  const isManager = roles.includes("manager") || isAdmin;
 
   return (
     <AuthContext.Provider
       value={{
         user,
         session,
-        loading,
+        loading: isPending,
         roles,
         isAdmin,
         isManager,
-        signIn,
-        signUp,
-        signOut,
-        resetPassword,
+        signIn: authSignIn,
+        signUp: authSignUp,
+        signOut: authSignOut,
+        resetPassword: authResetPassword,
       }}
     >
       {children}
@@ -130,7 +102,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 export function useAuth() {
   const context = useContext(AuthContext);
   if (context === undefined) {
-    throw new Error('useAuth must be used within an AuthProvider');
+    throw new Error("useAuth must be used within an AuthProvider");
   }
   return context;
 }

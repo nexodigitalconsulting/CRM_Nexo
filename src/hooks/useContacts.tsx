@@ -1,24 +1,27 @@
+// Migrado de Supabase a Drizzle - v2
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
-import { Tables, TablesInsert, TablesUpdate } from "@/integrations/supabase/types";
 import { toast } from "sonner";
+import {
+  fetchContacts,
+  fetchContact as fetchContactById,
+  createContact,
+  updateContact,
+  deleteContact,
+  convertContactToClient,
+  type ContactRow,
+  type ContactInsert as ContactInsertApi,
+  type ContactUpdate as ContactUpdateApi,
+} from "@/lib/api/contacts";
+import { useAuth } from "@/hooks/useAuth";
 
-export type Contact = Tables<"contacts">;
-export type ContactInsert = TablesInsert<"contacts">;
-export type ContactUpdate = TablesUpdate<"contacts">;
+export type Contact = ContactRow;
+export type ContactInsert = ContactInsertApi;
+export type ContactUpdate = Partial<ContactInsertApi>;
 
 export function useContacts() {
   return useQuery({
     queryKey: ["contacts"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("contacts")
-        .select("*")
-        .order("contact_number", { ascending: false });
-      
-      if (error) throw error;
-      return data;
-    },
+    queryFn: fetchContacts,
   });
 }
 
@@ -27,14 +30,7 @@ export function useContact(id: string | undefined) {
     queryKey: ["contacts", id],
     queryFn: async () => {
       if (!id) return null;
-      const { data, error } = await supabase
-        .from("contacts")
-        .select("*")
-        .eq("id", id)
-        .maybeSingle();
-      
-      if (error) throw error;
-      return data;
+      return fetchContactById(id).catch(() => null);
     },
     enabled: !!id,
   });
@@ -42,23 +38,14 @@ export function useContact(id: string | undefined) {
 
 export function useCreateContact() {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
-    mutationFn: async (contact: ContactInsert) => {
-      const { data, error } = await supabase
-        .from("contacts")
-        .insert(contact)
-        .select()
-        .single();
-      
-      if (error) throw error;
-      return data;
-    },
+    mutationFn: (contact: ContactInsert) => createContact(contact),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["contacts"] });
       toast.success("Contacto creado correctamente");
     },
-    onError: (error) => {
+    onError: (error: Error) => {
       toast.error("Error al crear el contacto: " + error.message);
     },
   });
@@ -66,24 +53,15 @@ export function useCreateContact() {
 
 export function useUpdateContact() {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
-    mutationFn: async ({ id, ...contact }: ContactUpdate & { id: string }) => {
-      const { data, error } = await supabase
-        .from("contacts")
-        .update(contact)
-        .eq("id", id)
-        .select()
-        .single();
-      
-      if (error) throw error;
-      return data;
-    },
+    mutationFn: ({ id, ...contact }: ContactUpdate & { id: string }) =>
+      updateContact(id, contact),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["contacts"] });
       toast.success("Contacto actualizado correctamente");
     },
-    onError: (error) => {
+    onError: (error: Error) => {
       toast.error("Error al actualizar el contacto: " + error.message);
     },
   });
@@ -91,21 +69,14 @@ export function useUpdateContact() {
 
 export function useDeleteContact() {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
-    mutationFn: async (id: string) => {
-      const { error } = await supabase
-        .from("contacts")
-        .delete()
-        .eq("id", id);
-      
-      if (error) throw error;
-    },
+    mutationFn: (id: string) => deleteContact(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["contacts"] });
       toast.success("Contacto eliminado correctamente");
     },
-    onError: (error) => {
+    onError: (error: Error) => {
       toast.error("Error al eliminar el contacto: " + error.message);
     },
   });
@@ -113,40 +84,29 @@ export function useDeleteContact() {
 
 export function useConvertToClient() {
   const queryClient = useQueryClient();
-  
+  const { session } = useAuth();
+
   return useMutation({
     mutationFn: async (contact: Contact) => {
-      // Create client from contact
-      const { data: client, error: clientError } = await supabase
-        .from("clients")
-        .insert({
+      const userId = session?.user?.id ?? "";
+      return convertContactToClient(
+        contact.id,
+        {
           name: contact.name,
           email: contact.email,
           phone: contact.phone,
           source: contact.source,
           contact_id: contact.id,
-        })
-        .select()
-        .single();
-      
-      if (clientError) throw clientError;
-      
-      // Update contact status to "ganado"
-      const { error: updateError } = await supabase
-        .from("contacts")
-        .update({ status: "ganado" })
-        .eq("id", contact.id);
-      
-      if (updateError) throw updateError;
-      
-      return client;
+        },
+        userId
+      );
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["contacts"] });
       queryClient.invalidateQueries({ queryKey: ["clients"] });
       toast.success("Contacto convertido a cliente");
     },
-    onError: (error) => {
+    onError: (error: Error) => {
       toast.error("Error al convertir el contacto: " + error.message);
     },
   });

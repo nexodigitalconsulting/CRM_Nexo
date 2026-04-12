@@ -1,3 +1,5 @@
+"use client";
+
 import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -31,10 +33,16 @@ const initialFormState: ClientInsert = {
   postal_code: "",
   country: "España",
   iban: "",
+  bic: null,
+  sepa_mandate_id: null,
+  sepa_mandate_date: null,
+  sepa_sequence_type: null,
   segment: "pyme",
   status: "activo",
   source: "",
   notes: "",
+  contact_id: null,
+  created_by: null,
 };
 
 export function ClientFormDialog({ open, onOpenChange, client }: ClientFormDialogProps) {
@@ -58,10 +66,16 @@ export function ClientFormDialog({ open, onOpenChange, client }: ClientFormDialo
         postal_code: client.postal_code || "",
         country: client.country || "España",
         iban: client.iban || "",
+        bic: client.bic || null,
+        sepa_mandate_id: client.sepa_mandate_id || null,
+        sepa_mandate_date: client.sepa_mandate_date || null,
+        sepa_sequence_type: client.sepa_sequence_type || null,
         segment: client.segment || "pyme",
         status: client.status || "activo",
         source: client.source || "",
         notes: client.notes || "",
+        contact_id: client.contact_id || null,
+        created_by: client.created_by || null,
       });
     } else {
       setFormData(initialFormState);

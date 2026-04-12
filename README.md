@@ -1,197 +1,210 @@
-# CRM Web - Sistema de Gestión Empresarial
+# CRM Nexo v2.0
 
-> **CRM completo con gestión de clientes, facturas, contratos, presupuestos y más**
+CRM completo para gestión de clientes, facturación, contratos y campañas. Construido con Next.js 15 App Router, Drizzle ORM y Better Auth. Sin dependencias de Supabase — stack 100% propio.
 
-## 🏗️ Arquitectura
+## Stack técnico
 
-Este CRM soporta **dos modos de despliegue**:
+| Capa | Tecnología |
+|------|-----------|
+| Framework | Next.js 15 (App Router) |
+| Base de datos | PostgreSQL + Drizzle ORM |
+| Autenticación | Better Auth |
+| UI | shadcn/ui + Tailwind CSS |
+| Almacenamiento | Cloudflare R2 |
+| Email | Nodemailer (SMTP) |
+| Deploy | Docker · EasyPanel |
 
-| Modo | Backend | Ideal para |
-|------|---------|------------|
-| **Lovable Cloud** | Supabase gestionado | Desarrollo rápido, prototipado |
-| **Self-hosted (Easypanel)** | Supabase + PostgreSQL en VPS | Producción, control total |
+## Módulos
 
-## 🚀 Inicio Rápido
-
-### Opción 1: Lovable (Recomendado para empezar)
-
-1. Abre el proyecto en [Lovable](https://lovable.dev/projects/103cb171-61c9-4650-a3cf-21a027d0cee1)
-2. El schema ya está configurado automáticamente
-3. Ve a `/auth` para crear tu cuenta
-4. ¡Listo!
-
-### Opción 2: Self-hosted en Easypanel
-
-Consulta la guía detallada: [`easypanel/README.md`](./easypanel/README.md)
-
-**Resumen rápido:**
-1. Despliega PostgreSQL + Supabase en Easypanel
-2. **Ejecuta el SQL manualmente** en Supabase Studio (ver abajo)
-3. Despliega el CRM desde GitHub
-4. Configura las variables de entorno
-5. Crea el usuario admin desde `/setup`
-
-## 📊 Creación del Schema de Base de Datos
-
-### ⚠️ Importante: El schema NO se crea automáticamente
-
-Cuando conectas las claves de Supabase, **las tablas NO se crean solas**. Debes ejecutar el SQL manualmente.
-
-### Para Lovable Cloud (ya configurado)
-- ✅ El schema ya existe
-- ✅ No necesitas hacer nada
-
-### Para Supabase Self-hosted (Easypanel)
-
-**Paso 1: Abrir Supabase Studio**
-- En Easypanel → Tu proyecto Supabase → Accede al Studio
-
-**Paso 2: Ejecutar el SQL**
-- Ve a **SQL Editor** en Supabase Studio
-- Copia el contenido de [`easypanel/init-scripts/full-schema.sql`](./easypanel/init-scripts/full-schema.sql)
-- Ejecuta el SQL completo
-
-**Paso 3: Verificar**
-- Deberías ver ~30 tablas creadas
-- Ve a **Table Editor** para confirmar
-
-### Archivos SQL disponibles
-
-| Archivo | Uso |
-|---------|-----|
-| `easypanel/init-scripts/full-schema.sql` | Schema completo con RLS, triggers, datos iniciales |
-| `easypanel/init-scripts/postgres-external-schema.sql` | Solo para PostgreSQL externo sin Supabase |
-
-## 🔧 Variables de Entorno
-
-### Para desarrollo local
-
-```bash
-# .env.local
-VITE_SUPABASE_URL=https://tu-proyecto.supabase.co
-VITE_SUPABASE_ANON_KEY=eyJhbGc...tu_anon_key
-```
-
-### Para Easypanel (Build Args en Dockerfile)
-
-Las variables se configuran directamente en Easypanel → Environment:
-
-| Variable | Descripción |
-|----------|-------------|
-| `VITE_SUPABASE_URL` | URL de tu Supabase |
-| `VITE_SUPABASE_ANON_KEY` | Clave anónima de Supabase |
-
-## 📁 Estructura del Proyecto
-
-```
-├── src/
-│   ├── components/     # Componentes React
-│   ├── hooks/          # Custom hooks (useClients, useInvoices, etc.)
-│   ├── pages/          # Páginas de la app
-│   └── integrations/   # Cliente Supabase
-├── supabase/
-│   └── functions/      # Edge Functions
-├── easypanel/
-│   ├── README.md       # Guía de despliegue Easypanel
-│   └── init-scripts/   # SQL para inicializar la DB
-└── docs/
-    └── MIGRATION_HYBRID_ARCHITECTURE.md  # Arquitectura híbrida
-```
-
-## 🛠️ Desarrollo Local
-
-```bash
-# Clonar repositorio
-git clone <repo-url>
-cd <project>
-
-# Instalar dependencias
-npm install
-
-# Iniciar servidor de desarrollo
-npm run dev
-```
-
-## 📚 Documentación Adicional
-
-- [Guía de Despliegue en Easypanel](./easypanel/README.md)
-- [Arquitectura Híbrida PostgreSQL + Supabase](./docs/MIGRATION_HYBRID_ARCHITECTURE.md)
-
-## 📧 Configuración de Correo Electrónico
-
-### Opción 1: Gmail SMTP con App Password (Recomendado)
-
-La forma más sencilla de enviar emails con Gmail:
-
-1. **Habilitar verificación en 2 pasos** en tu cuenta de Google
-2. **Generar App Password**:
-   - Ve a [https://myaccount.google.com/apppasswords](https://myaccount.google.com/apppasswords)
-   - Selecciona "Correo" y "Otro (nombre personalizado)"
-   - Copia la contraseña de 16 caracteres generada
-
-3. **Configuración SMTP** en el CRM:
-   | Campo | Valor |
-   |-------|-------|
-   | Host SMTP | `smtp.gmail.com` |
-   | Puerto | `587` (TLS) o `465` (SSL) |
-   | Usuario | tu-email@gmail.com |
-   | Contraseña | La App Password generada |
-   | Conexión segura | ✅ Activada |
-
-### Opción 2: SMTP Genérico
-
-Puedes usar cualquier proveedor SMTP (SendGrid, Mailgun, tu propio servidor):
-
-| Campo | Descripción |
-|-------|-------------|
-| Host SMTP | Servidor SMTP de tu proveedor |
-| Puerto | Generalmente 587 (TLS) o 465 (SSL) |
-| Usuario | Tu usuario SMTP |
-| Contraseña | Tu contraseña SMTP |
-
-### Opción 3: Resend (Alternativa moderna)
-
-1. Crea cuenta en [https://resend.com](https://resend.com) (100 emails/día gratis)
-2. Genera una API Key
-3. Verifica tu dominio (opcional, para enviar desde tu dominio)
+- **Clientes** — ficha completa, documentos, historial
+- **Contactos** — agenda con conversión a cliente
+- **Servicios** — catálogo con IVA y categorías
+- **Presupuestos** — generación PDF, envío por email
+- **Facturas** — numeración automática, remesas SEPA
+- **Contratos** — renovaciones, facturación recurrente
+- **Remesas** — XML SEPA (pain.008) y Norma 19
+- **Campañas** — seguimiento de leads y conversiones
+- **Gastos** — control de costes
+- **Dashboard** — widgets configurables, pipeline de ventas
+- **Calendario** — eventos, disponibilidad, sync Google
+- **Configuración** — ajustes de empresa, plantillas PDF, email
 
 ---
 
-## 🔐 Configuración de Google Calendar
+## Requisitos
 
-Para la integración con Google Calendar, configura la URL de callback en Google Cloud Console:
+- Node.js 20+
+- PostgreSQL 14+
+- (Opcional) Cloudflare R2 para almacenamiento de archivos
 
-| Integración | URL de Callback |
-|-------------|-----------------|
-| **Google Calendar** | `https://honfwrfkiukckyoelsdm.supabase.co/functions/v1/google-calendar-callback` |
+---
 
-**Pasos:**
-1. Ve a [Google Cloud Console → Credenciales](https://console.cloud.google.com/apis/credentials)
-2. Edita tu cliente OAuth 2.0
-3. En "URIs de redirección autorizados", añade la URL de arriba
-4. En "Pantalla de consentimiento OAuth", añade tu email como usuario de prueba si está en modo Testing
+## Instalación local
 
-## 🔒 Seguridad
+```bash
+# 1. Clonar
+git clone https://github.com/nexodigitalconsulting/Crm_Nexo.git
+cd Crm_Nexo
 
-- ✅ Row Level Security (RLS) en todas las tablas
-- ✅ Autenticación via Supabase Auth
-- ✅ Roles: `admin`, `manager`, `user`
-- ✅ Políticas de acceso por rol
+# 2. Instalar dependencias
+npm install
 
-## 📝 Funcionalidades
+# 3. Configurar entorno
+cp .env.example .env
+# Editar .env con tus valores
 
-- **Clientes**: Gestión completa de clientes y contactos
-- **Presupuestos**: Creación y seguimiento de quotes
-- **Contratos**: Gestión de contratos recurrentes
-- **Facturas**: Facturación con soporte para remesas bancarias
-- **Gastos**: Control de gastos con IVA/IRPF
-- **Calendario**: Eventos con integración Google Calendar
-- **Dashboard**: Widgets personalizables con métricas
-- **Campañas**: Gestión de campañas de marketing
-- **Notificaciones**: Sistema de notificaciones por email
+# 4. Ejecutar migraciones
+npm run db:migrate
 
-## 🤝 Tecnologías
+# 5. Arrancar desarrollo
+npm run dev
+```
 
-- **Frontend**: React 18, TypeScript, Vite, Tailwind CSS, shadcn/ui
-- **Backend**: Supabase (Auth, Database, Edge Functions)
-- **Base de datos**: PostgreSQL con pgvector para RAG
+La app estará en `http://localhost:3000`.
+
+---
+
+## Variables de entorno
+
+Copia `.env.example` a `.env` y rellena:
+
+| Variable | Descripción | Requerido |
+|----------|-------------|-----------|
+| `DATABASE_URL` | PostgreSQL connection string | Si |
+| `BETTER_AUTH_SECRET` | Secret 32+ chars (`openssl rand -hex 32`) | Si |
+| `BETTER_AUTH_URL` | URL pública de la app | Si |
+| `NEXT_PUBLIC_APP_URL` | URL pública (browser) | Si |
+| `R2_ACCOUNT_ID` | Cloudflare Account ID | Opcional |
+| `R2_ACCESS_KEY_ID` | R2 Access Key | Opcional |
+| `R2_SECRET_ACCESS_KEY` | R2 Secret Key | Opcional |
+| `R2_BUCKET_NAME` | Nombre del bucket R2 | Opcional |
+| `R2_PUBLIC_URL` | URL pública del bucket | Opcional |
+| `SMTP_HOST` | Servidor SMTP | Opcional |
+| `SMTP_PORT` | Puerto SMTP (587) | Opcional |
+| `SMTP_USER` | Usuario SMTP | Opcional |
+| `SMTP_PASS` | Contraseña SMTP | Opcional |
+| `SMTP_FROM` | Email remitente | Opcional |
+
+---
+
+## Deploy con Docker
+
+### Build local
+```bash
+docker build \
+  --build-arg NEXT_PUBLIC_APP_URL=https://tudominio.com \
+  --build-arg NEXT_PUBLIC_BETTER_AUTH_URL=https://tudominio.com \
+  -t crm-nexo .
+
+docker run -p 3000:3000 \
+  --env-file .env \
+  crm-nexo
+```
+
+---
+
+## Deploy en EasyPanel
+
+EasyPanel construye y despliega la imagen directamente desde GitHub.
+
+### 1. Crear el servicio
+
+1. EasyPanel → **Crear proyecto** → nombre `crm-nexo`
+2. Crear servicio tipo **App**
+3. **Source** → **GitHub** → conectar repo `Crm_Nexo`, branch `main`
+4. Build method: **Dockerfile** (detectado automáticamente)
+
+### 2. Build arguments
+
+```
+NEXT_PUBLIC_APP_URL=https://tudominio.com
+NEXT_PUBLIC_BETTER_AUTH_URL=https://tudominio.com
+```
+
+### 3. Variables de entorno (runtime)
+
+```
+DATABASE_URL=postgresql://user:pass@db-host:5432/Crm_Nexo
+BETTER_AUTH_SECRET=<openssl rand -hex 32>
+BETTER_AUTH_URL=https://tudominio.com
+NEXT_PUBLIC_APP_URL=https://tudominio.com
+```
+(Resto de variables opcionales según necesidad)
+
+### 4. Dominio
+
+**Domains** → añadir dominio → SSL automático con Let's Encrypt.
+
+### 5. Auto Deploy
+
+Activar **Auto Deploy** para que cada push a `main` redepliegue automáticamente.
+
+### Base de datos en EasyPanel
+
+1. Crear servicio **PostgreSQL** en EasyPanel
+2. Copiar la connection string interna
+3. Pegar en `DATABASE_URL` del servicio App
+
+---
+
+## Scripts npm
+
+```bash
+npm run dev          # Desarrollo con HMR
+npm run build        # Build de producción
+npm run start        # Servidor de producción
+npm run db:generate  # Generar migraciones Drizzle
+npm run db:migrate   # Aplicar migraciones
+npm run db:studio    # Drizzle Studio (UI de BD)
+```
+
+---
+
+## Estructura del proyecto
+
+```
+├── app/
+│   ├── api/
+│   │   ├── auth/          # Better Auth handler
+│   │   ├── data/          # API routes Drizzle (50+)
+│   │   │   ├── clients/
+│   │   │   ├── invoices/
+│   │   │   └── ...
+│   │   ├── email/
+│   │   └── health/
+│   └── auth/              # Login / registro
+├── src/
+│   ├── components/
+│   ├── hooks/             # React Query hooks
+│   ├── lib/
+│   │   ├── api/           # Fetch helpers (cliente)
+│   │   ├── api-server.ts  # Utils servidor
+│   │   ├── auth.ts        # Better Auth config
+│   │   ├── db.ts          # Drizzle client
+│   │   └── schema.ts      # Schema PostgreSQL
+│   └── views/
+├── .env.example
+├── Dockerfile
+├── drizzle.config.ts
+└── next.config.ts
+```
+
+---
+
+## Changelog
+
+### v2.0.0 — 2026-04-12
+- Migración completa Supabase → Drizzle ORM (0 imports Supabase)
+- 50+ API routes con Next.js App Router
+- Autenticación migrada a Better Auth
+- Dockerfile multi-stage para EasyPanel
+- TypeScript: 0 errores
+
+### v1.x
+- Versión inicial con Supabase
+
+---
+
+## Licencia
+
+Privado — Nexo Digital Consulting

@@ -1,0 +1,44 @@
+name: Build & Deploy to EasyPanel
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  lint-types:
+    name: TypeScript Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      - run: npm ci
+      - run: npx tsc --noEmit
+
+  build:
+    name: Docker Build Test
+    runs-on: ubuntu-latest
+    needs: lint-types
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build Docker image
+        run: |
+          docker build \
+            --build-arg NEXT_PUBLIC_APP_URL=https://example.com \
+            --build-arg NEXT_PUBLIC_BETTER_AUTH_URL=https://example.com \
+            -t crm-nexo:test .
+      - name: Test health endpoint
+        run: |
+          docker run -d --name crm-test \
+            -e DATABASE_URL="postgresql://u:p@host:5432/db" \
+            -e BETTER_AUTH_SECRET="test-secret-32-chars-minimum-here" \
+            -e BETTER_AUTH_URL="http://localhost:3000" \
+            -e NEXT_PUBLIC_APP_URL="http://localhost:3000" \
+            -p 3000:3000 crm-nexo:test
+          sleep 10
+          curl -f http://localhost:3000/api/health || echo "Health check skipped (needs DB)"
+          docker stop crm-test

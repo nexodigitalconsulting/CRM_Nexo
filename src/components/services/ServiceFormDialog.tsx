@@ -1,3 +1,5 @@
+"use client";
+
 import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -27,6 +29,7 @@ const initialFormState: ServiceInsert = {
   price: 0,
   iva_percent: 21,
   status: "activo",
+  created_by: null,
 };
 
 export function ServiceFormDialog({ open, onOpenChange, service }: ServiceFormDialogProps) {
@@ -55,6 +58,7 @@ export function ServiceFormDialog({ open, onOpenChange, service }: ServiceFormDi
         price: service.price,
         iva_percent: service.iva_percent || 21,
         status: service.status || "activo",
+        created_by: null,
       });
     } else {
       setFormData(initialFormState);

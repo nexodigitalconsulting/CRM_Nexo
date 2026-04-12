@@ -1,3 +1,5 @@
+"use client";
+
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
@@ -5,7 +7,7 @@ import { ExternalLink, AlertTriangle, Copy, CheckCircle2, Info, Shield } from 'l
 import { useState } from 'react';
 import { toast } from 'sonner';
 
-import { SUPABASE_URL } from '@/integrations/supabase/client';
+const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
 
 interface GmailOAuthInstructionsProps {
   /** Permite sobreescribir la URL (útil en tests o casos especiales) */

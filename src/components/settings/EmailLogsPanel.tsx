@@ -1,3 +1,5 @@
+"use client";
+
 import { useState } from 'react';
 import { useEmailLogs, EmailLog } from '@/hooks/useEmailLogs';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';

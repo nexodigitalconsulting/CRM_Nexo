@@ -1,3 +1,5 @@
+"use client";
+
 import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -148,6 +150,8 @@ export function ExpenseFormDialog({ open, onOpenChange, expense }: ExpenseFormDi
       iva_amount: ivaAmount,
       irpf_amount: irpfAmount,
       total: total,
+      created_by: null,
+      document_url: null,
     };
 
     if (isEditing && expense) {

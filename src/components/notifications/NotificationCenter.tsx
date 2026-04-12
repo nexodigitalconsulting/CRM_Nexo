@@ -1,3 +1,5 @@
+"use client";
+
 import { useState, useEffect } from "react";
 import { Bell, X, Check, AlertCircle, Calendar, FileText, Receipt, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -9,7 +11,6 @@ import {
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
 import { formatDistanceToNow } from "date-fns";
 import { es } from "date-fns/locale";
 import { toast } from "sonner";
@@ -30,97 +31,11 @@ interface Notification {
 function useNotifications() {
   return useQuery({
     queryKey: ["notifications"],
-    queryFn: async () => {
-      const notifications: Notification[] = [];
-      const today = new Date();
-      const in7Days = new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000);
-      const in30Days = new Date(today.getTime() + 30 * 24 * 60 * 60 * 1000);
-
-      // Contracts expiring soon
-      const { data: expiringContracts } = await supabase
-        .from("contracts")
-        .select("id, contract_number, name, end_date, client:clients(name)")
-        .eq("status", "vigente")
-        .gte("end_date", today.toISOString())
-        .lte("end_date", in30Days.toISOString());
-
-      expiringContracts?.forEach((contract) => {
-        notifications.push({
-          id: `contract-${contract.id}`,
-          type: "contract_expiring",
-          title: "Contrato por vencer",
-          message: `El contrato ${contract.name || `#${contract.contract_number}`} de ${contract.client?.name || "Sin cliente"} vence el ${new Date(contract.end_date!).toLocaleDateString("es-ES")}`,
-          entityType: "contract",
-          entityId: contract.id,
-          isRead: false,
-          createdAt: new Date().toISOString(),
-        });
-      });
-
-      // Invoices due soon
-      const { data: dueInvoices } = await supabase
-        .from("invoices")
-        .select("id, invoice_number, due_date, total, client:clients(name)")
-        .eq("status", "emitida")
-        .gte("due_date", today.toISOString())
-        .lte("due_date", in7Days.toISOString());
-
-      dueInvoices?.forEach((invoice) => {
-        notifications.push({
-          id: `invoice-${invoice.id}`,
-          type: "invoice_due",
-          title: "Factura por vencer",
-          message: `Factura FF-${String(invoice.invoice_number).padStart(4, "0")} de ${invoice.client?.name || "Sin cliente"} (${Number(invoice.total || 0).toLocaleString("es-ES", { style: "currency", currency: "EUR" })}) vence pronto`,
-          entityType: "invoice",
-          entityId: invoice.id,
-          isRead: false,
-          createdAt: new Date().toISOString(),
-        });
-      });
-
-      // Pending billing
-      const { data: pendingBilling } = await supabase
-        .from("contracts")
-        .select("id, contract_number, name, next_billing_date, total, client:clients(name)")
-        .eq("status", "vigente")
-        .gte("next_billing_date", today.toISOString())
-        .lte("next_billing_date", in7Days.toISOString());
-
-      pendingBilling?.forEach((contract) => {
-        notifications.push({
-          id: `billing-${contract.id}`,
-          type: "billing_reminder",
-          title: "Facturación pendiente",
-          message: `Facturar ${contract.name || `Contrato #${contract.contract_number}`} de ${contract.client?.name || "Sin cliente"} - ${Number(contract.total || 0).toLocaleString("es-ES", { style: "currency", currency: "EUR" })}`,
-          entityType: "contract",
-          entityId: contract.id,
-          isRead: false,
-          createdAt: new Date().toISOString(),
-        });
-      });
-
-      // Pending quotes
-      const { data: pendingQuotes } = await supabase
-        .from("quotes")
-        .select("id, quote_number, name, valid_until, total, client:clients(name)")
-        .in("status", ["borrador", "enviado"])
-        .gte("valid_until", today.toISOString())
-        .lte("valid_until", in7Days.toISOString());
-
-      pendingQuotes?.forEach((quote) => {
-        notifications.push({
-          id: `quote-${quote.id}`,
-          type: "quote_pending",
-          title: "Presupuesto por caducar",
-          message: `Presupuesto PP-${String(quote.quote_number).padStart(4, "0")} ${quote.client?.name ? `de ${quote.client.name}` : ""} caduca pronto`,
-          entityType: "quote",
-          entityId: quote.id,
-          isRead: false,
-          createdAt: new Date().toISOString(),
-        });
-      });
-
-      return notifications.sort((a, b) => 
+    queryFn: async (): Promise<Notification[]> => {
+      const res = await fetch("/api/data/notifications");
+      if (!res.ok) return [];
+      const data = await res.json() as Notification[];
+      return data.sort((a, b) =>
         new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
       );
     },

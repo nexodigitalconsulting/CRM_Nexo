@@ -1,3 +1,5 @@
+"use client";
+
 import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -115,13 +117,14 @@ export function ContractFormDialog({ open, onOpenChange, contract }: ContractFor
         quote_id: contractData.quote_id || "",
         start_date: contractData.start_date,
         end_date: contractData.end_date || "",
-        billing_period: contractData.billing_period || "mensual",
-        status: contractData.status || "pendiente_activacion",
-        payment_status: contractData.payment_status || "pendiente",
+        billing_period: (contractData.billing_period || "mensual") as "mensual" | "trimestral" | "anual" | "unico" | "otro",
+        status: (contractData.status || "pendiente_activacion") as "pendiente_activacion" | "vigente" | "expirado" | "cancelado",
+        payment_status: (contractData.payment_status || "pendiente") as "pendiente" | "pagado" | "parcial" | "reclamado",
         notes: contractData.notes || "",
       });
-      if (contractData.services) {
-        setServiceLines(contractData.services.map(s => ({
+      const contractServices = contractData.contract_services;
+      if (contractServices) {
+        setServiceLines(contractServices.map(s => ({
           service_id: s.service_id,
           service_name: s.service?.name || "",
           quantity: s.quantity || 1,
@@ -281,12 +284,17 @@ export function ContractFormDialog({ open, onOpenChange, contract }: ContractFor
       start_date: values.start_date,
       end_date: values.end_date || null,
       billing_period: values.billing_period,
-      status: values.status,
-      payment_status: values.payment_status,
+      next_billing_date: null,
+      status: values.status ?? "pendiente_activacion",
+      payment_status: values.payment_status ?? "pendiente",
       notes: values.notes || null,
       subtotal: totals.subtotal,
       iva_total: totals.ivaTotal,
       total: totals.total,
+      document_url: null,
+      is_sent: false,
+      sent_at: null,
+      created_by: null,
     };
 
     const servicesData = serviceLines.map(line => ({
@@ -299,6 +307,7 @@ export function ContractFormDialog({ open, onOpenChange, contract }: ContractFor
       iva_percent: line.iva_percent,
       iva_amount: line.iva_amount,
       total: line.total,
+      is_active: true,
     }));
 
     if (contract) {
