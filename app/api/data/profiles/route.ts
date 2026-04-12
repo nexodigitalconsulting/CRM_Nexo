@@ -15,6 +15,7 @@ function mapProfile(p: typeof profiles.$inferSelect) {
     language: p.language,
     timezone: p.timezone,
     is_active: p.isActive,
+    dashboard_config: p.dashboardConfig ?? null,
     created_at: dateToStr(p.createdAt) ?? "",
     updated_at: dateToStr(p.updatedAt) ?? "",
   };
@@ -44,6 +45,7 @@ export async function PUT(request: NextRequest) {
       if (body.full_name !== undefined) update.fullName = body.full_name as string | null;
       if (body.phone !== undefined) update.phone = body.phone as string | null;
       if (body.avatar_url !== undefined) update.avatarUrl = body.avatar_url as string | null;
+      if (body.dashboard_config !== undefined) update.dashboardConfig = body.dashboard_config;
       update.updatedAt = new Date();
       const [updated] = await db.update(profiles).set(update).where(eq(profiles.id, existing.id)).returning();
       return NextResponse.json(mapProfile(updated));
