@@ -15,35 +15,14 @@ import { formatDistanceToNow } from "date-fns";
 import { es } from "date-fns/locale";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import {
+  fetchNotifications,
+  markNotificationRead,
+  markAllNotificationsRead,
+  type NotificationRow,
+} from "@/lib/api/notifications";
 
-interface Notification {
-  id: string;
-  type: "contract_expiring" | "invoice_due" | "quote_pending" | "billing_reminder" | "general";
-  title: string;
-  message: string;
-  entityType?: string;
-  entityId?: string;
-  isRead: boolean;
-  createdAt: string;
-}
-
-// Generate notifications from data
-function useNotifications() {
-  return useQuery({
-    queryKey: ["notifications"],
-    queryFn: async (): Promise<Notification[]> => {
-      const res = await fetch("/api/data/notifications");
-      if (!res.ok) return [];
-      const data = await res.json() as Notification[];
-      return data.sort((a, b) =>
-        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-      );
-    },
-    refetchInterval: 5 * 60 * 1000, // Refetch every 5 minutes
-  });
-}
-
-const notificationIcons: Record<Notification["type"], typeof Bell> = {
+const notificationIcons: Record<NotificationRow["type"], typeof Bell> = {
   contract_expiring: Calendar,
   invoice_due: Receipt,
   quote_pending: FileText,
@@ -51,7 +30,7 @@ const notificationIcons: Record<Notification["type"], typeof Bell> = {
   general: AlertCircle,
 };
 
-const notificationColors: Record<Notification["type"], string> = {
+const notificationColors: Record<NotificationRow["type"], string> = {
   contract_expiring: "text-warning",
   invoice_due: "text-destructive",
   quote_pending: "text-primary",
@@ -60,20 +39,35 @@ const notificationColors: Record<Notification["type"], string> = {
 };
 
 export function NotificationCenter() {
-  const { data: notifications = [], isLoading } = useNotifications();
-  const [readIds, setReadIds] = useState<Set<string>>(new Set());
+  const queryClient = useQueryClient();
   const [isOpen, setIsOpen] = useState(false);
-  const [showToasts, setShowToasts] = useState(true);
+  const [toastsShown, setToastsShown] = useState(false);
 
-  const unreadCount = notifications.filter((n) => !readIds.has(n.id)).length;
+  const { data: notifs = [], isLoading } = useQuery({
+    queryKey: ["notifications"],
+    queryFn: fetchNotifications,
+    refetchInterval: 5 * 60 * 1000,
+  });
 
-  // Show toast for new notifications
+  const markOneMutation = useMutation({
+    mutationFn: ({ entityId, entityType }: { entityId: string; entityType: string }) =>
+      markNotificationRead(entityId, entityType),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["notifications"] }),
+  });
+
+  const markAllMutation = useMutation({
+    mutationFn: markAllNotificationsRead,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["notifications"] }),
+  });
+
+  const unreadCount = notifs.filter((n) => !n.isRead).length;
+
+  // Show toasts for new unread notifications (once per load)
   useEffect(() => {
-    if (showToasts && notifications.length > 0 && !isOpen) {
-      const unreadNotifications = notifications.filter((n) => !readIds.has(n.id));
-      if (unreadNotifications.length > 0 && unreadNotifications.length <= 3) {
-        // Only show toasts if there are 1-3 new notifications
-        unreadNotifications.slice(0, 3).forEach((notification) => {
+    if (!toastsShown && notifs.length > 0 && !isOpen) {
+      const unread = notifs.filter((n) => !n.isRead);
+      if (unread.length > 0 && unread.length <= 3) {
+        unread.slice(0, 3).forEach((notification) => {
           const Icon = notificationIcons[notification.type];
           toast(notification.title, {
             description: notification.message,
@@ -81,17 +75,15 @@ export function NotificationCenter() {
             icon: <Icon className={cn("h-4 w-4", notificationColors[notification.type])} />,
           });
         });
-        setShowToasts(false); // Don't show again until next fetch
+        setToastsShown(true);
       }
     }
-  }, [notifications, readIds, isOpen, showToasts]);
+  }, [notifs, isOpen, toastsShown]);
 
-  const markAsRead = (id: string) => {
-    setReadIds((prev) => new Set([...prev, id]));
-  };
-
-  const markAllAsRead = () => {
-    setReadIds(new Set(notifications.map((n) => n.id)));
+  const handleMarkOne = (n: NotificationRow) => {
+    if (!n.isRead && n.entityId && n.entityType) {
+      markOneMutation.mutate({ entityId: n.entityId, entityType: n.entityType });
+    }
   };
 
   return (
@@ -116,7 +108,12 @@ export function NotificationCenter() {
             )}
           </div>
           {unreadCount > 0 && (
-            <Button variant="ghost" size="sm" onClick={markAllAsRead}>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => markAllMutation.mutate()}
+              disabled={markAllMutation.isPending}
+            >
               <Check className="h-4 w-4 mr-1" />
               Marcar todas
             </Button>
@@ -127,25 +124,24 @@ export function NotificationCenter() {
             <div className="p-8 text-center text-muted-foreground">
               Cargando notificaciones...
             </div>
-          ) : notifications.length === 0 ? (
+          ) : notifs.length === 0 ? (
             <div className="p-8 text-center text-muted-foreground">
               <Bell className="h-12 w-12 mx-auto mb-4 opacity-20" />
               <p>No hay notificaciones</p>
             </div>
           ) : (
             <div className="divide-y">
-              {notifications.map((notification) => {
+              {notifs.map((notification) => {
                 const Icon = notificationIcons[notification.type];
-                const isRead = readIds.has(notification.id);
-                
+
                 return (
                   <div
                     key={notification.id}
                     className={cn(
                       "p-4 hover:bg-muted/50 cursor-pointer transition-colors",
-                      !isRead && "bg-primary/5"
+                      !notification.isRead && "bg-primary/5"
                     )}
-                    onClick={() => markAsRead(notification.id)}
+                    onClick={() => handleMarkOne(notification)}
                   >
                     <div className="flex gap-3">
                       <div className={cn(
@@ -162,11 +158,11 @@ export function NotificationCenter() {
                         <div className="flex items-center justify-between gap-2">
                           <p className={cn(
                             "text-sm font-medium truncate",
-                            isRead && "text-muted-foreground"
+                            notification.isRead && "text-muted-foreground"
                           )}>
                             {notification.title}
                           </p>
-                          {!isRead && (
+                          {!notification.isRead && (
                             <div className="w-2 h-2 rounded-full bg-primary shrink-0" />
                           )}
                         </div>
