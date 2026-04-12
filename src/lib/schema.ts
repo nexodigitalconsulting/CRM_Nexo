@@ -51,6 +51,7 @@ export const profiles = pgTable("profiles", {
   language: text("language").default("es"),
   timezone: text("timezone").default("Europe/Madrid"),
   isActive: boolean("is_active").default(true),
+  dashboardConfig: jsonb("dashboard_config"),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
 });
@@ -289,6 +290,15 @@ export const remittancePayments = pgTable("remittance_payments", {
   createdBy: uuid("created_by"),
 });
 
+export const remittanceInvoices = pgTable("remittance_invoices", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  remittanceId: uuid("remittance_id").notNull().references(() => remittances.id, { onDelete: "cascade" }),
+  invoiceId: uuid("invoice_id").notNull().references(() => invoices.id, { onDelete: "cascade" }),
+  amount: numeric("amount").notNull().default("0"),
+  addedAt: timestamp("added_at", { withTimezone: true }).defaultNow(),
+  addedBy: uuid("added_by"),
+});
+
 export const invoiceServices = pgTable("invoice_services", {
   id: uuid("id").defaultRandom().primaryKey(),
   invoiceId: uuid("invoice_id").notNull().references(() => invoices.id, { onDelete: "cascade" }),
@@ -348,6 +358,24 @@ export const campaigns = pgTable("campaigns", {
   placeId: text("place_id"),
   captureDate: date("capture_date"),
   status: text("status").default("active"),
+  createdBy: uuid("created_by"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
+});
+
+export const flowStatusEnum = pgEnum("flow_status", ["active", "paused", "inactive"]);
+
+export const flows = pgTable("flows", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  orgId: uuid("org_id"),
+  name: text("name").notNull(),
+  description: text("description"),
+  n8nWorkflowId: text("n8n_workflow_id"),
+  status: flowStatusEnum("status").default("inactive"),
+  triggerType: text("trigger_type").default("manual"),
+  lastRunAt: timestamp("last_run_at", { withTimezone: true }),
+  executionCount: integer("execution_count").default(0),
+  successCount: integer("success_count").default(0),
   createdBy: uuid("created_by"),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
@@ -570,6 +598,19 @@ export const userTableViews = pgTable("user_table_views", {
 });
 
 // ============================================
+export const notifications = pgTable("notifications", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  userId: uuid("user_id").notNull(),
+  type: text("type").notNull(),
+  title: text("title").notNull(),
+  message: text("message").notNull(),
+  entityType: text("entity_type"),
+  entityId: uuid("entity_id"),
+  isRead: boolean("is_read").default(false),
+  readAt: timestamp("read_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+});
+
 // RELACIONES (para joins con Drizzle)
 // ============================================
 
@@ -618,6 +659,12 @@ export const quoteServicesRelations = relations(quoteServices, ({ one }) => ({
 export const remittancesRelations = relations(remittances, ({ many }) => ({
   invoices: many(invoices),
   payments: many(remittancePayments),
+  remittanceInvoices: many(remittanceInvoices),
+}));
+
+export const remittanceInvoicesRelations = relations(remittanceInvoices, ({ one }) => ({
+  remittance: one(remittances, { fields: [remittanceInvoices.remittanceId], references: [remittances.id] }),
+  invoice: one(invoices, { fields: [remittanceInvoices.invoiceId], references: [invoices.id] }),
 }));
 
 export const remittancePaymentsRelations = relations(remittancePayments, ({ one }) => ({
@@ -678,6 +725,12 @@ export type UserTableViewInsert = typeof userTableViews.$inferInsert;
 export type EmailTemplate = typeof emailTemplates.$inferSelect;
 export type NotificationRule = typeof notificationRules.$inferSelect;
 export type EmailLog = typeof emailLogs.$inferSelect;
+export type Flow = typeof flows.$inferSelect;
+export type FlowInsert = typeof flows.$inferInsert;
+export type RemittanceInvoice = typeof remittanceInvoices.$inferSelect;
+export type RemittanceInvoiceInsert = typeof remittanceInvoices.$inferInsert;
+export type Notification = typeof notifications.$inferSelect;
+export type NotificationInsert = typeof notifications.$inferInsert;
 
 // ============================================
 // BETTER AUTH TABLES
