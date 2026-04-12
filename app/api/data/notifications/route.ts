@@ -20,9 +20,9 @@ interface NotificationPayload {
 // ── GET — generate + persist + merge read state ────────────────────────────────
 
 export async function GET(request: NextRequest) {
-  const { session, response } = await requireSession(request);
+  const { user, response } = await requireSession(request);
   if (response) return response;
-  const userId = session.user.id as string;
+  const userId = user.id as string;
 
   try {
     const today = new Date();
@@ -178,9 +178,9 @@ export async function GET(request: NextRequest) {
 // ── PATCH — mark read ──────────────────────────────────────────────────────────
 
 export async function PATCH(request: NextRequest) {
-  const { session, response } = await requireSession(request);
+  const { user, response } = await requireSession(request);
   if (response) return response;
-  const userId = session.user.id as string;
+  const userId = user.id as string;
 
   try {
     const body = await request.json() as { entityId?: string; entityType?: string; all?: boolean };

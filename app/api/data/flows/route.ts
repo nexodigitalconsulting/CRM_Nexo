@@ -27,7 +27,7 @@ function mapFlow(f: any) {
 }
 
 export async function GET(request: NextRequest) {
-  const { session, response } = await requireSession(request);
+  const { response } = await requireSession(request);
   if (response) return response;
   try {
     const rows = await db
@@ -41,7 +41,7 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  const { session, response } = await requireSession(request);
+  const { user, response } = await requireSession(request);
   if (response) return response;
   try {
     const body = await request.json() as Record<string, unknown>;
@@ -51,7 +51,7 @@ export async function POST(request: NextRequest) {
       n8nWorkflowId: (body.n8n_workflow_id as string) ?? null,
       status: (body.status as "active" | "paused" | "inactive") ?? "inactive",
       triggerType: (body.trigger_type as string) ?? "manual",
-      createdBy: session.user.id as string,
+      createdBy: user.id as string,
     }).returning();
     return NextResponse.json(mapFlow(row), { status: 201 });
   } catch (e) {

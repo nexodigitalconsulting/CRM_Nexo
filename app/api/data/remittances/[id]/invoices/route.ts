@@ -24,7 +24,7 @@ export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const { session, response } = await requireSession(request);
+  const { user, response } = await requireSession(request);
   if (response) return response;
   const { id } = await params;
   try {
@@ -45,7 +45,7 @@ export async function POST(
         remittanceId: id,
         invoiceId: inv.id,
         amount: inv.total ?? "0",
-        addedBy: session.user.id as string,
+        addedBy: user.id as string,
       }));
       if (auditRows.length > 0) {
         await db.insert(remittanceInvoices).values(auditRows).onConflictDoNothing();
