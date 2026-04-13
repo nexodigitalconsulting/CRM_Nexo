@@ -333,6 +333,26 @@ npm run db:studio    # Drizzle Studio — UI visual de la BD
 
 ## Changelog
 
+### v2.7.0 — 2026-04-13
+
+#### Block F — Dashboard con datos reales + MRR de contratos
+
+**API (`/api/data/dashboard?type=widget`) — nueva entidad:**
+```json
+"contracts": { "count": 12, "active": 8, "mrr": 4250.00 }
+```
+MRR calculado normalizando el total de cada contrato activo a equivalente mensual según `billing_period` (mensual / trimestral / anual).
+
+**Nuevos componentes:**
+- `ContractsMrrChart` — gráfica de línea con tendencia MRR de los últimos 12 meses (Recharts)
+
+**Dashboard actualizado:**
+- Stat widget "Contratos Activos" en posición 0 (con MRR como subtítulo)
+- Widget de chart "MRR Contratos" añadido por defecto
+- Tarjeta KPI summary: 5 columnas — **MRR · Ingresos · Gastos · Balance · Pendiente cobro**
+
+---
+
 ### v2.6.0 — 2026-04-13
 
 #### Block E — Integración n8n: trigger de flujos desde CRM
