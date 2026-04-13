@@ -333,6 +333,32 @@ npm run db:studio    # Drizzle Studio — UI visual de la BD
 
 ## Changelog
 
+### v2.6.0 — 2026-04-13
+
+#### Block E — Integración n8n: trigger de flujos desde CRM
+
+**Endpoint:** `POST /api/data/flows/[id]/trigger`
+
+| Modo | Configuración | Comportamiento |
+|------|--------------|----------------|
+| **Webhook** | `n8nWorkflowId` = URL completa (`https://...`) | POST directo al webhook de n8n |
+| **REST API** | `n8nWorkflowId` = ID + `N8N_BASE_URL` env | Llama `/api/v1/workflows/{id}/run` con API key |
+
+**Comportamiento:**
+- En éxito: incrementa `executionCount` + `successCount`, actualiza `lastRunAt`
+- En fallo: incrementa solo `executionCount`
+- Devuelve `{ ok, executionId?, error? }`
+
+**UI:** Botón ⚡ (Zap) por fila en la tabla de flujos — spinner durante la ejecución, toast con resultado. Solo visible para flujos activos/pausados con `n8nWorkflowId` configurado.
+
+**Variables de entorno nuevas:**
+```
+N8N_BASE_URL=""   # http://n8n:5678 (modo REST API)
+N8N_API_KEY=""    # API key de n8n (opcional en webhook mode)
+```
+
+---
+
 ### v2.5.0 — 2026-04-13
 
 #### Block D — Vistas de calendario: Semana y Agenda
