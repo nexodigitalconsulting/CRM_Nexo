@@ -333,6 +333,29 @@ npm run db:studio    # Drizzle Studio — UI visual de la BD
 
 ## Changelog
 
+### v2.3.0 — 2026-04-13
+
+#### Block B (mejorado) — Webcal Feed: sincronización real CRM → Google Calendar
+
+**Arquitectura:** Feed ICS público con token de seguridad por usuario. Google Calendar sondea la URL automáticamente cada 6-24 h. Sin OAuth. Compatible con Google Calendar, Apple Calendar, Outlook y Thunderbird.
+
+| Componente | Descripción |
+|------------|-------------|
+| `src/lib/schema.ts` | Columna `profiles.calendar_feed_token TEXT` — token único por usuario para autenticar el feed sin sesión |
+| `drizzle/0002_melodic_fenris.sql` | Migración: `ALTER TABLE profiles ADD COLUMN calendar_feed_token text` |
+| `app/api/calendar/feed/route.ts` | **Endpoint público** `GET /api/calendar/feed?token=xxx`. Sin session, autenticado por token. Devuelve `VCALENDAR` completo con todos los eventos del usuario: título, descripción, ubicación, all-day, recordatorios (VALARM), color de categoría, entidades vinculadas en DESCRIPTION. Headers `Content-Type: text/calendar` y `Cache-Control: no-cache`. |
+| `app/api/data/profiles/calendar-token/route.ts` | `GET` devuelve (o genera) el token del usuario. `POST` rota el token (invalida la URL anterior). |
+| `src/views/Settings.tsx` | Tab **"Calendario"** en Configuración con: URL webcal lista para copiar, botón "Abrir en Google Calendar" (enlace directo a `calendar.google.com/calendar/r/settings/addbyurl`), instrucciones paso a paso, rotación de token con confirmación, tabla de compatibilidad (Google, Apple, Outlook, Thunderbird). |
+
+**Flujo:**
+1. Usuario va a Configuración → Calendario → copia su URL `webcal://…`
+2. La añade en Google Calendar una sola vez → "Otros calendarios → Desde URL"
+3. Google la sondea cada 6-24 h — todos los eventos CRM aparecen en Google Calendar
+4. Si crea/edita/borra un evento en el CRM → en el próximo sondeo Google lo actualiza
+5. Cambios en Google **no** afectan al CRM (solo lectura)
+
+---
+
 ### v2.2.0 — 2026-04-13
 
 #### Block B — Google Calendar Export (CRM → Google, one-way)

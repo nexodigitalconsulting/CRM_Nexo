@@ -1,0 +1,1 @@
+ALTER TABLE "profiles" ADD COLUMN "calendar_feed_token" text;

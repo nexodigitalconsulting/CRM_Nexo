@@ -52,6 +52,7 @@ export const profiles = pgTable("profiles", {
   timezone: text("timezone").default("Europe/Madrid"),
   isActive: boolean("is_active").default(true),
   dashboardConfig: jsonb("dashboard_config"),
+  calendarFeedToken: text("calendar_feed_token"),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
 });
