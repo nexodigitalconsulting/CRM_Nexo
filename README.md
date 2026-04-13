@@ -333,6 +333,29 @@ npm run db:studio    # Drizzle Studio — UI visual de la BD
 
 ## Changelog
 
+### v2.2.0 — 2026-04-13
+
+#### Block B — Google Calendar Export (CRM → Google, one-way)
+
+**Arquitectura:** Sin OAuth, sin API de Google. Al crear/editar/borrar un evento en el CRM, el sistema genera un archivo `.ics` (RFC 5545) y lo envía por email al usuario. Gmail/Google Calendar detecta el adjunto y ofrece añadirlo al calendario automáticamente.
+
+| Componente | Descripción |
+|------------|-------------|
+| `src/lib/ics.ts` | Generador RFC 5545 completo: `METHOD:REQUEST` (crear/editar) y `METHOD:CANCEL` (borrar). UID estable `{eventId}@crm-nexo` para que Google reconcilie el mismo evento. Folding de líneas largas, escape de texto según spec. |
+| `src/lib/mailer.ts` | Helper SMTP reutilizando `emailSettings` de BD. `sendMail()` genérico + `sendICSEmail()` que adjunta el `.ics` con `Content-Type: text/calendar; method=REQUEST/CANCEL`. |
+| `app/api/data/calendar/events/route.ts` | POST: tras crear el evento, genera `.ics`, lo envía al email del usuario (fire-and-forget) y marca `is_synced_to_google = true`. |
+| `app/api/data/calendar/events/[id]/route.ts` | PUT: tras editar, envía `.ics` con `SEQUENCE` incrementado. DELETE: antes de borrar, envía `.ics` con `METHOD:CANCEL`. Ambos fire-and-forget para no bloquear la respuesta. |
+| `src/views/Calendar.tsx` | Icono Google (SVG inline) en los pills de eventos con `is_synced_to_google = true`. Tooltip indica "Exportado a Google Calendar". |
+
+**Flujo completo:**
+1. Usuario crea/edita evento → API guarda en BD → genera `.ics` → envía email al usuario
+2. Usuario abre email en Gmail → botón "Añadir a Google Calendar" aparece automáticamente
+3. Al borrar evento → email con `METHOD:CANCEL` → Google Calendar cancela el evento
+
+**No incluye:** OAuth, lectura de eventos de Google hacia el CRM, sincronización bidireccional.
+
+---
+
 ### v2.1.0 — 2026-04-12
 
 #### Infraestructura de BD (Block A)

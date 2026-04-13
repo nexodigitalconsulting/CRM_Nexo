@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { calendarEvents } from "@/lib/schema";
+import { calendarEvents, emailSettings } from "@/lib/schema";
 import { eq, and, gte, lte } from "drizzle-orm";
 import { requireSession, dateToStr, apiError } from "@/lib/api-server";
+import { generateICS } from "@/lib/ics";
+import { sendICSEmail } from "@/lib/mailer";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function mapEvent(e: any) {
@@ -102,7 +104,32 @@ export async function POST(request: NextRequest) {
       where: eq(calendarEvents.id, created.id),
       with: { category: true, client: true, contact: true, contract: true },
     });
-    return NextResponse.json(mapEvent(full), { status: 201 });
+
+    // Send .ics to user email (fire-and-forget — don't block the response)
+    if (user.email) {
+      const [smtpSettings] = await db.select().from(emailSettings).limit(1);
+      if (smtpSettings?.isActive) {
+        const ics = generateICS({
+          id: created.id,
+          title: created.title,
+          description: created.description,
+          location: created.location,
+          startDatetime: created.startDatetime,
+          endDatetime: created.endDatetime,
+          allDay: created.allDay ?? false,
+          organizerEmail: smtpSettings.fromEmail,
+          organizerName: smtpSettings.fromName ?? undefined,
+          attendeeEmail: user.email,
+          sequence: 0,
+        }, "REQUEST");
+        sendICSEmail(user.email, created.title, ics, "REQUEST").catch(() => {/* ignore */});
+
+        // Mark as synced
+        await db.update(calendarEvents).set({ isSyncedToGoogle: true }).where(eq(calendarEvents.id, created.id));
+      }
+    }
+
+    return NextResponse.json(mapEvent({ ...full, isSyncedToGoogle: user.email ? true : false }), { status: 201 });
   } catch (e) {
     return apiError(String(e));
   }

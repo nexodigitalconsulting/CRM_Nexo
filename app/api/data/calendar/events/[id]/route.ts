@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { calendarEvents } from "@/lib/schema";
+import { calendarEvents, emailSettings } from "@/lib/schema";
 import { eq } from "drizzle-orm";
 import { requireSession, dateToStr, apiError } from "@/lib/api-server";
+import { generateICS } from "@/lib/ics";
+import { sendICSEmail } from "@/lib/mailer";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function mapEvent(e: any) {
@@ -59,7 +61,7 @@ export async function PUT(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const { response } = await requireSession(request);
+  const { user, response } = await requireSession(request);
   if (response) return response;
   const { id } = await params;
   try {
@@ -92,6 +94,32 @@ export async function PUT(
       where: eq(calendarEvents.id, id),
       with: { category: true, client: true, contact: true, contract: true },
     });
+
+    // Send updated .ics to user email
+    if (user.email && full) {
+      const [smtpSettings] = await db.select().from(emailSettings).limit(1);
+      if (smtpSettings?.isActive) {
+        // Sequence: use updatedAt as integer to ensure monotonic increment
+        const seq = Math.floor((full.updatedAt?.getTime() ?? Date.now()) / 1000) % 100000;
+        const ics = generateICS({
+          id: full.id,
+          title: full.title,
+          description: full.description,
+          location: full.location,
+          startDatetime: full.startDatetime,
+          endDatetime: full.endDatetime,
+          allDay: full.allDay ?? false,
+          organizerEmail: smtpSettings.fromEmail,
+          organizerName: smtpSettings.fromName ?? undefined,
+          attendeeEmail: user.email,
+          sequence: seq,
+        }, "REQUEST");
+        sendICSEmail(user.email, full.title, ics, "REQUEST").catch(() => {/* ignore */});
+
+        await db.update(calendarEvents).set({ isSyncedToGoogle: true }).where(eq(calendarEvents.id, id));
+      }
+    }
+
     return NextResponse.json(mapEvent(full));
   } catch (e) {
     return apiError(String(e));
@@ -102,11 +130,39 @@ export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const { response } = await requireSession(request);
+  const { user, response } = await requireSession(request);
   if (response) return response;
   const { id } = await params;
   try {
+    // Fetch before deleting so we can send the cancellation ICS
+    const existing = await db.query.calendarEvents.findFirst({
+      where: eq(calendarEvents.id, id),
+    });
+
     await db.delete(calendarEvents).where(eq(calendarEvents.id, id));
+
+    // Send cancellation .ics
+    if (user.email && existing) {
+      const [smtpSettings] = await db.select().from(emailSettings).limit(1);
+      if (smtpSettings?.isActive) {
+        const seq = Math.floor(Date.now() / 1000) % 100000;
+        const ics = generateICS({
+          id: existing.id,
+          title: existing.title,
+          description: existing.description,
+          location: existing.location,
+          startDatetime: existing.startDatetime,
+          endDatetime: existing.endDatetime,
+          allDay: existing.allDay ?? false,
+          organizerEmail: smtpSettings.fromEmail,
+          organizerName: smtpSettings.fromName ?? undefined,
+          attendeeEmail: user.email,
+          sequence: seq,
+        }, "CANCEL");
+        sendICSEmail(user.email, existing.title, ics, "CANCEL").catch(() => {/* ignore */});
+      }
+    }
+
     return new NextResponse(null, { status: 204 });
   } catch (e) {
     return apiError(String(e));

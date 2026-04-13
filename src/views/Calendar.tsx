@@ -5,6 +5,15 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, FileText, AlertTriangle, Plus, Settings, ExternalLink, Loader2, Link2, Copy, Check } from "lucide-react";
+// Google Calendar sync icon (inline SVG — no external dependency)
+const GoogleCalIcon = () => (
+  <svg viewBox="0 0 18 18" className="inline-block w-3 h-3 ml-1 shrink-0" aria-label="Exportado a Google Calendar">
+    <path fill="#4285F4" d="M16.5 9.18c0-.62-.05-1.22-.16-1.79H9v3.39h4.21a3.6 3.6 0 01-1.56 2.36v1.96h2.52c1.48-1.36 2.33-3.36 2.33-5.92z"/>
+    <path fill="#34A853" d="M9 18c2.25 0 4.14-.75 5.52-2.02l-2.52-1.96c-.77.52-1.75.82-3 .82-2.31 0-4.26-1.56-4.96-3.66H1.43v2.03A8.5 8.5 0 009 18z"/>
+    <path fill="#FBBC05" d="M4.04 11.18A5.1 5.1 0 013.77 9.5c0-.58.1-1.15.27-1.68V5.79H1.43A8.5 8.5 0 000 9.5c0 1.37.33 2.67.9 3.82l3.14-2.14z"/>
+    <path fill="#EA4335" d="M9 3.84c1.3 0 2.47.45 3.39 1.33l2.54-2.54A8.5 8.5 0 001.43 5.79L4.57 7.93C5.27 5.83 7.22 3.84 9 3.84z"/>
+  </svg>
+);
 import { useState, useMemo } from "react";
 import { useContracts } from "@/hooks/useContracts";
 import { useInvoices } from "@/hooks/useInvoices";
@@ -328,14 +337,15 @@ export default function Calendar() {
                                   <div
                                     key={event.id}
                                     onClick={(e) => handleEventClick(event, e)}
-                                    className={`text-[10px] px-1 py-0.5 rounded truncate border ${event.color}`}
+                                    className={`text-[10px] px-1 py-0.5 rounded truncate border flex items-center gap-0.5 ${event.color}`}
                                     style={event.hexColor ? {
                                       backgroundColor: event.hexColor + "33",
                                       borderColor: event.hexColor + "4d",
                                     } : undefined}
-                                    title={`${event.title}${event.details ? ` - ${event.details}` : ""}`}
+                                    title={`${event.title}${event.details ? ` - ${event.details}` : ""}${event.dbEvent?.is_synced_to_google ? " · Exportado a Google Calendar" : ""}`}
                                   >
-                                    {event.title}
+                                    <span className="truncate">{event.title}</span>
+                                    {event.dbEvent?.is_synced_to_google && <GoogleCalIcon />}
                                   </div>
                                 ))}
                                 {dayEvents.length > 2 && (
