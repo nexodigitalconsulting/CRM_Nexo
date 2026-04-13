@@ -21,8 +21,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Plus, Filter, Workflow, Play, Pause, Trash2, ExternalLink } from "lucide-react";
-import { useFlows, useCreateFlow, useUpdateFlow, useDeleteFlow } from "@/hooks/useFlows";
+import { Plus, Filter, Workflow, Play, Pause, Trash2, ExternalLink, Zap, Loader2 } from "lucide-react";
+import { useFlows, useCreateFlow, useUpdateFlow, useDeleteFlow, useTriggerFlow } from "@/hooks/useFlows";
 import type { FlowRow, FlowInsertPayload } from "@/lib/api/flows";
 
 const statusMap: Record<FlowRow["status"], "active" | "pending" | "inactive"> = {
@@ -76,8 +76,8 @@ function FlowDialog({
             <Input value={form.description ?? ""} onChange={(e) => setForm((p) => ({ ...p, description: e.target.value }))} placeholder="Descripción breve" />
           </div>
           <div className="space-y-1">
-            <Label>ID Workflow n8n</Label>
-            <Input value={form.n8n_workflow_id ?? ""} onChange={(e) => setForm((p) => ({ ...p, n8n_workflow_id: e.target.value }))} placeholder="workflow_xxx" />
+            <Label>Webhook URL o ID de n8n</Label>
+            <Input value={form.n8n_workflow_id ?? ""} onChange={(e) => setForm((p) => ({ ...p, n8n_workflow_id: e.target.value }))} placeholder="https://n8n.../webhook/xxx  ó  workflow_id" />
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1">
@@ -120,6 +120,8 @@ export default function Flows() {
   const { data: flowList = [], isLoading } = useFlows();
   const updateFlow = useUpdateFlow();
   const deleteFlow = useDeleteFlow();
+  const triggerFlow = useTriggerFlow();
+  const [triggeringId, setTriggeringId] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
 
@@ -133,6 +135,12 @@ export default function Flows() {
   const toggleStatus = (flow: FlowRow) => {
     const next: FlowRow["status"] = flow.status === "active" ? "paused" : "active";
     updateFlow.mutate({ id: flow.id, data: { status: next } });
+  };
+
+  const handleTrigger = async (flow: FlowRow) => {
+    setTriggeringId(flow.id);
+    await triggerFlow.mutateAsync({ id: flow.id });
+    setTriggeringId(null);
   };
 
   const columns = [
@@ -213,7 +221,23 @@ export default function Flows() {
           >
             {flow.status === "active" ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
           </Button>
-          {flow.n8n_workflow_id && (
+          {flow.n8n_workflow_id && flow.status !== "inactive" && (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8 text-primary hover:text-primary"
+              onClick={() => handleTrigger(flow)}
+              disabled={triggeringId === flow.id}
+              title="Disparar flujo ahora"
+            >
+              {triggeringId === flow.id ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Zap className="h-4 w-4" />
+              )}
+            </Button>
+          )}
+          {flow.n8n_workflow_id && !flow.n8n_workflow_id.startsWith("http") && (
             <Button
               variant="ghost"
               size="icon"

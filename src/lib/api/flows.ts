@@ -55,3 +55,18 @@ export async function deleteFlow(id: string): Promise<void> {
   const res = await fetch(`${BASE}/${id}`, { method: "DELETE" });
   if (!res.ok && res.status !== 204) throw new Error(await res.text());
 }
+
+export interface TriggerResult {
+  ok: boolean;
+  executionId?: string;
+  error?: string;
+}
+
+export async function triggerFlow(id: string, payload?: Record<string, unknown>): Promise<TriggerResult> {
+  const res = await fetch(`${BASE}/${id}/trigger`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ payload: payload ?? {} }),
+  });
+  return res.json() as Promise<TriggerResult>;
+}
