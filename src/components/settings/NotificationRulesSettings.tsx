@@ -23,7 +23,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Bell, FileText, Clock, Edit2, History, CheckCircle, XCircle, Mail, ChevronLeft, ChevronRight, User, Plus, Trash2 } from "lucide-react";
+import { Bell, FileText, Clock, Edit2, History, CheckCircle, XCircle, Mail, ChevronLeft, ChevronRight, User, Plus, Trash2, Play, Loader2 } from "lucide-react";
 import { 
   useNotificationRules, 
   useUpdateNotificationRule,
@@ -72,9 +72,18 @@ const STATUS_LABELS: Record<string, { label: string; variant: "default" | "secon
   manual_send: { label: "Manual", variant: "outline" },
 };
 
+interface RunResult {
+  sent: number;
+  skipped: number;
+  errors: number;
+  details: string[];
+}
+
 export function NotificationRulesSettings() {
   const [historyYear, setHistoryYear] = useState<number | undefined>(undefined);
   const [historyPage, setHistoryPage] = useState(1);
+  const [running, setRunning] = useState(false);
+  const [lastRun, setLastRun] = useState<RunResult | null>(null);
   const pageSize = 15;
   
   const { data: rules, isLoading: loadingRules } = useNotificationRules();
@@ -85,6 +94,26 @@ export function NotificationRulesSettings() {
   const createRule = useCreateNotificationRule();
   const deleteRule = useDeleteNotificationRule();
   const updateTemplate = useUpdateEmailTemplate();
+
+  const handleRunNow = async () => {
+    setRunning(true);
+    try {
+      const res = await fetch("/api/cron/notifications", { method: "POST" });
+      const data = await res.json() as RunResult;
+      setLastRun(data);
+      if (data.sent > 0) {
+        toast.success(`${data.sent} email${data.sent !== 1 ? "s" : ""} enviado${data.sent !== 1 ? "s" : ""}`);
+      } else if (data.errors > 0) {
+        toast.error(`${data.errors} error${data.errors !== 1 ? "es" : ""} al enviar`);
+      } else {
+        toast.info("Sin notificaciones pendientes");
+      }
+    } catch {
+      toast.error("Error al ejecutar las notificaciones");
+    } finally {
+      setRunning(false);
+    }
+  };
   
   const [editingTemplate, setEditingTemplate] = useState<EmailTemplate | null>(null);
   const [showRuleDialog, setShowRuleDialog] = useState(false);
@@ -228,16 +257,36 @@ export function NotificationRulesSettings() {
     <div className="space-y-6">
       <Card>
         <CardHeader>
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between flex-wrap gap-2">
             <CardTitle className="flex items-center gap-2">
               <Bell className="h-5 w-5" />
               Reglas de Notificación Automática
             </CardTitle>
-            <Button size="sm" onClick={handleOpenNewRule}>
-              <Plus className="h-4 w-4 mr-1" />
-              Nueva Regla
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={handleRunNow}
+                disabled={running}
+                className="gap-1"
+                title="Evaluar todas las reglas activas y enviar emails ahora"
+              >
+                {running ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
+                {running ? "Ejecutando..." : "Ejecutar ahora"}
+              </Button>
+              <Button size="sm" onClick={handleOpenNewRule}>
+                <Plus className="h-4 w-4 mr-1" />
+                Nueva Regla
+              </Button>
+            </div>
           </div>
+          {lastRun && (
+            <div className="mt-2 text-xs text-muted-foreground flex items-center gap-3 flex-wrap">
+              <span className="text-success font-medium">✓ {lastRun.sent} enviados</span>
+              <span>{lastRun.skipped} omitidos</span>
+              {lastRun.errors > 0 && <span className="text-destructive font-medium">✗ {lastRun.errors} errores</span>}
+            </div>
+          )}
         </CardHeader>
         <CardContent className="space-y-4">
           <p className="text-sm text-muted-foreground mb-4">
