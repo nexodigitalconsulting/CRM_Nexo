@@ -333,6 +333,35 @@ npm run db:studio    # Drizzle Studio — UI visual de la BD
 
 ## Changelog
 
+### v2.8.0 — 2026-04-13
+
+#### Block G — Campaign response tracking
+
+**Schema (`campaigns` table) — nuevas columnas:**
+```sql
+sent_at          timestamp with time zone
+response_at      timestamp with time zone
+response_channel text   -- email | phone | web | whatsapp
+response_notes   text
+last_contact_at  timestamp with time zone
+```
+Migración: `drizzle/0003_campaigns_response_tracking.sql`
+
+**Nuevos componentes:**
+- `CampaignStatsPanel` — panel de analytics con 4 KPI cards + embudo de conversión (Recharts) + desglose por canal. Toggle con botón "Ver estadísticas"
+- `RecordResponseDialog` — modal para registrar canal de respuesta, resultado (respondido / cliente / descartado) y notas
+
+**UI:**
+- Botón 💬 (MessageSquare) por fila → abre RecordResponseDialog para leads activos
+- Botón "Ver estadísticas" en la cabecera del módulo
+
+**Métricas calculadas:**
+- Tasa de envío = enviados / total
+- Tasa de respuesta = respondidos / enviados
+- Tasa de conversión = clientes / respondidos
+
+---
+
 ### v2.7.0 — 2026-04-13
 
 #### Block F — Dashboard con datos reales + MRR de contratos
