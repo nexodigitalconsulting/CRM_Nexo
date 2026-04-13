@@ -3,8 +3,7 @@
 import { Header } from "@/components/layout/Header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, FileText, AlertTriangle, Plus, Settings, ExternalLink, Loader2, Link2, Copy, Check } from "lucide-react";
+import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, FileText, AlertTriangle, Plus, Settings, ExternalLink, Loader2, LayoutList } from "lucide-react";
 // Google Calendar sync icon (inline SVG — no external dependency)
 const GoogleCalIcon = () => (
   <svg viewBox="0 0 18 18" className="inline-block w-3 h-3 ml-1 shrink-0" aria-label="Exportado a Google Calendar">
@@ -17,17 +16,15 @@ const GoogleCalIcon = () => (
 import { useState, useMemo } from "react";
 import { useContracts } from "@/hooks/useContracts";
 import { useInvoices } from "@/hooks/useInvoices";
-import { useCalendarEvents, useCreateCalendarEvent, useDeleteCalendarEvent, CalendarEvent as DBCalendarEvent } from "@/hooks/useCalendarEvents";
+import { useCalendarEvents, CalendarEvent as DBCalendarEvent } from "@/hooks/useCalendarEvents";
 import { useGoogleCalendar, GoogleCalendarEvent } from "@/hooks/useGoogleCalendar";
-import { useAuth } from "@/hooks/useAuth";
-import { format, addDays, isSameMonth, isSameDay, startOfMonth, endOfMonth, eachDayOfInterval, getDay, isWithinInterval, addMonths } from "date-fns";
+import { format, addDays, isSameDay, startOfMonth, endOfMonth, eachDayOfInterval, getDay, isWithinInterval, addMonths, startOfWeek, endOfWeek, addWeeks, subWeeks, eachHourOfInterval, startOfDay, endOfDay, isSameWeek } from "date-fns";
 import { es } from "date-fns/locale";
 import { Skeleton } from "@/components/ui/skeleton";
 import { CalendarEventDialog } from "@/components/calendar/CalendarEventDialog";
 import { AvailabilityManager } from "@/components/calendar/AvailabilityManager";
 import { CategoryManager } from "@/components/calendar/CategoryManager";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { toast } from "sonner";
 
 interface CalendarDisplayEvent {
   id: string;
@@ -78,14 +75,12 @@ export default function Calendar() {
   const [eventDialogOpen, setEventDialogOpen] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState<DBCalendarEvent | null>(null);
   const [activeTab, setActiveTab] = useState<string>("calendar");
-  const [iCalCopied, setICalCopied] = useState(false);
-  
-  const { session } = useAuth();
+  const [viewMode, setViewMode] = useState<"month" | "week" | "agenda">("month");
+
   const { data: contracts = [], isLoading: contractsLoading } = useContracts();
   const { data: invoices = [], isLoading: invoicesLoading } = useInvoices();
   const { data: customEvents = [], isLoading: eventsLoading } = useCalendarEvents();
-  const deleteEvent = useDeleteCalendarEvent();
-  
+
   // Google Calendar integration
   const { 
     events: googleEvents, 
@@ -97,20 +92,6 @@ export default function Calendar() {
   } = useGoogleCalendar();
   
   const isLoading = contractsLoading || invoicesLoading || eventsLoading;
-
-  // iCal subscription URL (usamos la URL de Supabase del entorno)
-  const iCalUrl = session?.user?.id 
-    ? `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/calendar-ical?user_id=${session.user.id}`
-    : null;
-
-  const copyICalUrl = () => {
-    if (iCalUrl) {
-      navigator.clipboard.writeText(iCalUrl);
-      setICalCopied(true);
-      toast.success("URL copiada al portapapeles");
-      setTimeout(() => setICalCopied(false), 2000);
-    }
-  };
 
   // Generate events from contracts, invoices, and custom events
   const events = useMemo(() => {
@@ -220,7 +201,22 @@ export default function Calendar() {
 
   const prevMonth = () => setCurrentDate(addMonths(currentDate, -1));
   const nextMonth = () => setCurrentDate(addMonths(currentDate, 1));
+  const prevWeek = () => setCurrentDate(subWeeks(currentDate, 1));
+  const nextWeek = () => setCurrentDate(addWeeks(currentDate, 1));
   const goToToday = () => setCurrentDate(new Date());
+
+  // Week view helpers
+  const weekStart = startOfWeek(currentDate, { weekStartsOn: 1 });
+  const weekEnd = endOfWeek(currentDate, { weekStartsOn: 1 });
+  const weekDays = eachDayOfInterval({ start: weekStart, end: weekEnd });
+  const workHours = Array.from({ length: 13 }, (_, i) => i + 8); // 8:00–20:00
+
+  // Agenda view helpers — next 30 days grouped by date
+  const agendaStart = startOfDay(new Date());
+  const agendaEnd = addDays(agendaStart, 30);
+  const agendaDays = eachDayOfInterval({ start: agendaStart, end: agendaEnd }).filter(
+    (day) => getEventsForDay(day).length > 0
+  );
 
   const getEventsForDay = (day: Date) => events.filter((e) => isSameDay(e.date, day));
 
@@ -287,21 +283,43 @@ export default function Calendar() {
 
           <TabsContent value="calendar">
             <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-              {/* Calendar Grid */}
+              {/* Calendar Grid / Week / Agenda */}
               <div className="lg:col-span-3">
                 <Card>
-                  <CardHeader className="flex flex-row items-center justify-between pb-2">
+                  <CardHeader className="flex flex-row items-center justify-between pb-2 flex-wrap gap-2">
                     <CardTitle className="text-xl">
-                      {monthNames[currentDate.getMonth()]} {currentDate.getFullYear()}
+                      {viewMode === "month" && `${monthNames[currentDate.getMonth()]} ${currentDate.getFullYear()}`}
+                      {viewMode === "week" && `${format(weekStart, "d MMM", { locale: es })} – ${format(weekEnd, "d MMM yyyy", { locale: es })}`}
+                      {viewMode === "agenda" && "Próximos 30 días"}
                     </CardTitle>
-                    <div className="flex gap-2">
+                    <div className="flex gap-2 flex-wrap">
+                      {/* View switcher */}
+                      <div className="flex rounded-md border overflow-hidden">
+                        {(["month", "week", "agenda"] as const).map((mode) => (
+                          <button
+                            key={mode}
+                            onClick={() => setViewMode(mode)}
+                            className={`px-3 py-1.5 text-xs font-medium transition-colors ${
+                              viewMode === mode
+                                ? "bg-primary text-primary-foreground"
+                                : "bg-card text-muted-foreground hover:bg-muted"
+                            }`}
+                          >
+                            {mode === "month" ? "Mes" : mode === "week" ? "Semana" : "Agenda"}
+                          </button>
+                        ))}
+                      </div>
                       <Button variant="outline" size="sm" onClick={goToToday}>Hoy</Button>
-                      <Button variant="outline" size="icon" onClick={prevMonth}>
-                        <ChevronLeft className="h-4 w-4" />
-                      </Button>
-                      <Button variant="outline" size="icon" onClick={nextMonth}>
-                        <ChevronRight className="h-4 w-4" />
-                      </Button>
+                      {viewMode !== "agenda" && (
+                        <>
+                          <Button variant="outline" size="icon" onClick={viewMode === "month" ? prevMonth : prevWeek}>
+                            <ChevronLeft className="h-4 w-4" />
+                          </Button>
+                          <Button variant="outline" size="icon" onClick={viewMode === "month" ? nextMonth : nextWeek}>
+                            <ChevronRight className="h-4 w-4" />
+                          </Button>
+                        </>
+                      )}
                     </div>
                   </CardHeader>
                   <CardContent>
@@ -309,7 +327,8 @@ export default function Calendar() {
                       <div className="space-y-2">
                         {[...Array(6)].map((_, i) => <Skeleton key={i} className="h-24 w-full" />)}
                       </div>
-                    ) : (
+                    ) : viewMode === "month" ? (
+                      /* ── Month View ── */
                       <div className="grid grid-cols-7 gap-1">
                         {["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"].map((day) => (
                           <div key={day} className="text-center text-sm font-medium text-muted-foreground py-2">{day}</div>
@@ -320,7 +339,6 @@ export default function Calendar() {
                         {daysInMonth.map((day) => {
                           const dayEvents = getEventsForDay(day);
                           const isToday = isSameDay(day, new Date());
-                          
                           return (
                             <div
                               key={day.toISOString()}
@@ -355,6 +373,154 @@ export default function Calendar() {
                             </div>
                           );
                         })}
+                      </div>
+                    ) : viewMode === "week" ? (
+                      /* ── Week View ── */
+                      <div className="overflow-auto">
+                        {/* Day headers */}
+                        <div className="grid gap-px" style={{ gridTemplateColumns: "3rem repeat(7, 1fr)" }}>
+                          <div />
+                          {weekDays.map((day) => {
+                            const isToday = isSameDay(day, new Date());
+                            return (
+                              <div
+                                key={day.toISOString()}
+                                className={`text-center py-2 text-sm font-medium rounded-t-lg ${
+                                  isToday ? "text-primary bg-primary/5" : "text-muted-foreground"
+                                }`}
+                              >
+                                <div className="text-xs uppercase">{format(day, "EEE", { locale: es })}</div>
+                                <div className={`text-lg font-bold mt-0.5 ${isToday ? "text-primary" : ""}`}>
+                                  {format(day, "d")}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                        {/* Hour rows */}
+                        <div className="grid gap-px border rounded-lg overflow-hidden" style={{ gridTemplateColumns: "3rem repeat(7, 1fr)" }}>
+                          {workHours.map((hour) => (
+                            <>
+                              <div key={`h-${hour}`} className="text-[10px] text-muted-foreground text-right pr-1 pt-1 bg-muted/20 border-b border-border/30">
+                                {hour}:00
+                              </div>
+                              {weekDays.map((day) => {
+                                const isToday = isSameDay(day, new Date());
+                                const hourEvents = getEventsForDay(day).filter((e) => {
+                                  if (!e.dbEvent) return false;
+                                  const h = new Date(e.dbEvent.start_datetime).getHours();
+                                  return h === hour;
+                                });
+                                return (
+                                  <div
+                                    key={`${day.toISOString()}-${hour}`}
+                                    onClick={() => {
+                                      const d = new Date(day);
+                                      d.setHours(hour, 0, 0, 0);
+                                      handleDayClick(d);
+                                    }}
+                                    className={`min-h-[3rem] p-0.5 border-b border-l border-border/30 cursor-pointer transition-colors hover:bg-muted/30 ${
+                                      isToday ? "bg-primary/3" : "bg-card"
+                                    }`}
+                                  >
+                                    {hourEvents.map((event) => (
+                                      <div
+                                        key={event.id}
+                                        onClick={(e) => handleEventClick(event, e)}
+                                        className={`text-[10px] px-1 py-0.5 rounded truncate border mb-0.5 ${event.color}`}
+                                        style={event.hexColor ? {
+                                          backgroundColor: event.hexColor + "33",
+                                          borderColor: event.hexColor + "4d",
+                                        } : undefined}
+                                        title={event.title}
+                                      >
+                                        {event.title}
+                                      </div>
+                                    ))}
+                                  </div>
+                                );
+                              })}
+                            </>
+                          ))}
+                        </div>
+                        {/* All-day / non-time events for the week */}
+                        {(() => {
+                          const allDayEvents = events.filter(
+                            (e) => isSameWeek(e.date, currentDate, { weekStartsOn: 1 }) && !e.dbEvent
+                          );
+                          if (allDayEvents.length === 0) return null;
+                          return (
+                            <div className="mt-3">
+                              <p className="text-xs text-muted-foreground font-medium mb-1">Todo el día / Eventos del sistema</p>
+                              <div className="flex flex-wrap gap-1">
+                                {allDayEvents.map((event) => (
+                                  <span
+                                    key={event.id}
+                                    className={`text-[10px] px-2 py-0.5 rounded border ${event.color}`}
+                                  >
+                                    {format(event.date, "EEE d", { locale: es })} · {event.title}
+                                  </span>
+                                ))}
+                              </div>
+                            </div>
+                          );
+                        })()}
+                      </div>
+                    ) : (
+                      /* ── Agenda View ── */
+                      <div className="space-y-4">
+                        {agendaDays.length === 0 ? (
+                          <div className="text-center py-12">
+                            <LayoutList className="h-10 w-10 mx-auto text-muted-foreground mb-3" />
+                            <p className="text-muted-foreground">No hay eventos en los próximos 30 días</p>
+                          </div>
+                        ) : (
+                          agendaDays.map((day) => {
+                            const dayEvts = getEventsForDay(day);
+                            const isToday = isSameDay(day, new Date());
+                            return (
+                              <div key={day.toISOString()}>
+                                <div className={`flex items-center gap-3 mb-2`}>
+                                  <div className={`flex items-center gap-2 px-3 py-1 rounded-full text-sm font-semibold ${
+                                    isToday ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"
+                                  }`}>
+                                    <span>{format(day, "EEE", { locale: es })}</span>
+                                    <span>{format(day, "d MMM", { locale: es })}</span>
+                                  </div>
+                                  <div className="flex-1 h-px bg-border" />
+                                </div>
+                                <div className="space-y-1 pl-2">
+                                  {dayEvts.map((event) => (
+                                    <div
+                                      key={event.id}
+                                      onClick={(e) => handleEventClick(event, e)}
+                                      className={`flex items-start gap-3 p-2.5 rounded-lg border cursor-pointer hover:opacity-90 transition-opacity ${event.color}`}
+                                      style={event.hexColor ? {
+                                        backgroundColor: event.hexColor + "18",
+                                        borderColor: event.hexColor + "4d",
+                                      } : undefined}
+                                    >
+                                      <div className="min-w-[3.5rem] text-xs font-mono pt-0.5 opacity-70">
+                                        {event.dbEvent
+                                          ? format(new Date(event.dbEvent.start_datetime), "HH:mm")
+                                          : "Todo el día"}
+                                      </div>
+                                      <div className="flex-1 min-w-0">
+                                        <p className="text-sm font-medium truncate">{event.title}</p>
+                                        {event.details && (
+                                          <p className="text-xs opacity-70 truncate">{event.details}</p>
+                                        )}
+                                      </div>
+                                      <span className="text-[10px] opacity-60 shrink-0">
+                                        {eventTypeConfig[event.type].label}
+                                      </span>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            );
+                          })
+                        )}
                       </div>
                     )}
                   </CardContent>
@@ -413,50 +579,6 @@ export default function Calendar() {
                     )}
                   </CardContent>
                 </Card>
-
-                {/* iCal Subscription */}
-                {iCalUrl && (
-                  <Card className="border-orange-500/30">
-                    <CardHeader className="pb-3">
-                      <CardTitle className="text-lg flex items-center gap-2">
-                        <Link2 className="h-5 w-5 text-orange-500" />
-                        Suscripción iCal
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-3">
-                      <p className="text-xs text-muted-foreground">
-                        Añade esta URL a Google Calendar, Outlook u otro cliente para ver tus eventos del CRM.
-                      </p>
-                      <div className="flex gap-2">
-                        <Input 
-                          value={iCalUrl} 
-                          readOnly 
-                          className="text-xs font-mono"
-                        />
-                        <Button 
-                          variant="outline" 
-                          size="icon"
-                          onClick={copyICalUrl}
-                        >
-                          {iCalCopied ? (
-                            <Check className="h-4 w-4 text-green-500" />
-                          ) : (
-                            <Copy className="h-4 w-4" />
-                          )}
-                        </Button>
-                      </div>
-                      <div className="text-xs text-muted-foreground space-y-1">
-                        <p className="font-medium">Cómo añadir a Google Calendar:</p>
-                        <ol className="list-decimal list-inside space-y-0.5">
-                          <li>Abre Google Calendar</li>
-                          <li>Clic en + junto a "Otros calendarios"</li>
-                          <li>Selecciona "Desde URL"</li>
-                          <li>Pega la URL copiada</li>
-                        </ol>
-                      </div>
-                    </CardContent>
-                  </Card>
-                )}
 
                 <Card>
                   <CardHeader className="pb-3">
