@@ -333,6 +333,23 @@ npm run db:studio    # Drizzle Studio — UI visual de la BD
 
 ## Changelog
 
+### v2.5.0 — 2026-04-13
+
+#### Block D — Vistas de calendario: Semana y Agenda
+
+| Vista | Descripción |
+|-------|-------------|
+| **Mes** | Vista mensual existente (sin cambios) |
+| **Semana** | Columnas de 7 días con franjas horarias 8:00–20:00. Click en celda abre dialog de nuevo evento. Eventos del sistema (contratos, facturas) aparecen como banda "Todo el día" debajo. |
+| **Agenda** | Lista agrupada por fecha para los próximos 30 días. Muestra hora exacta para eventos personalizados o "Todo el día" para eventos del sistema. |
+
+**Mejoras adicionales:**
+- Selector de vista integrado en la cabecera del calendario (Mes / Semana / Agenda)
+- Navegación por semanas con botones anterior/siguiente
+- Eliminada la tarjeta de suscripción iCal obsoleta (Supabase) — reemplazada por el feed webcal en Ajustes → Calendario
+
+---
+
 ### v2.4.0 — 2026-04-12
 
 #### Block C — Motor de reglas de notificación automática
