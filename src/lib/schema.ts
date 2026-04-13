@@ -358,7 +358,12 @@ export const campaigns = pgTable("campaigns", {
   website: text("website"),
   placeId: text("place_id"),
   captureDate: date("capture_date"),
-  status: text("status").default("active"),
+  sentAt: timestamp("sent_at", { withTimezone: true }),
+  responseAt: timestamp("response_at", { withTimezone: true }),
+  responseChannel: text("response_channel"),   // email | phone | web | whatsapp
+  responseNotes: text("response_notes"),
+  lastContactAt: timestamp("last_contact_at", { withTimezone: true }),
+  status: text("status").default("pendiente"),
   createdBy: uuid("created_by"),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),

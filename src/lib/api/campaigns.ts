@@ -19,6 +19,7 @@ export interface CampaignRow {
   sent_at: string | null;
   response_at: string | null;
   response_channel: string | null;
+  response_notes: string | null;
   last_contact_at: string | null;
   status: string;
   created_by: string | null;
@@ -56,6 +57,18 @@ export async function updateCampaign(id: string, campaign: CampaignUpdate): Prom
 
 export async function deleteCampaign(id: string): Promise<void> {
   await fetch(`${BASE}/${id}`, { method: "DELETE" });
+}
+
+export interface CampaignStats {
+  total: number;
+  sent: number;
+  responded: number;
+  clients: number;
+  discarded: number;
+  sendRate: number;
+  responseRate: number;
+  conversionRate: number;
+  byChannel: Record<string, number>;
 }
 
 export async function convertCampaignToContact(

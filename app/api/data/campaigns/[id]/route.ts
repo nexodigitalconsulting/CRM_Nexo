@@ -20,6 +20,11 @@ function mapCampaign(c: typeof campaigns.$inferSelect) {
     website: c.website,
     place_id: c.placeId,
     capture_date: c.captureDate,
+    sent_at: dateToStr(c.sentAt),
+    response_at: dateToStr(c.responseAt),
+    response_channel: c.responseChannel,
+    response_notes: c.responseNotes,
+    last_contact_at: dateToStr(c.lastContactAt),
     status: c.status,
     created_by: c.createdBy,
     created_at: dateToStr(c.createdAt) ?? "",
@@ -65,6 +70,11 @@ export async function PUT(
     if (body.website !== undefined) update.website = body.website as string | null;
     if (body.place_id !== undefined) update.placeId = body.place_id as string | null;
     if (body.capture_date !== undefined) update.captureDate = body.capture_date as string | null;
+    if (body.sent_at !== undefined) update.sentAt = body.sent_at ? new Date(body.sent_at as string) : null;
+    if (body.response_at !== undefined) update.responseAt = body.response_at ? new Date(body.response_at as string) : null;
+    if (body.response_channel !== undefined) update.responseChannel = body.response_channel as string | null;
+    if (body.response_notes !== undefined) update.responseNotes = body.response_notes as string | null;
+    if (body.last_contact_at !== undefined) update.lastContactAt = body.last_contact_at ? new Date(body.last_contact_at as string) : null;
     if (body.status !== undefined) update.status = body.status as string;
     update.updatedAt = new Date();
     const [updated] = await db.update(campaigns).set(update).where(eq(campaigns.id, id)).returning();

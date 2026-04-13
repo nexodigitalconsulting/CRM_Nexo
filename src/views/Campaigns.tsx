@@ -13,9 +13,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Plus, Megaphone, Calendar, MapPin, Globe, Trash2, Edit2, Mail, Phone, Building2, Clock, MessageSquare, UserPlus } from "lucide-react";
+import { Plus, Megaphone, Calendar, MapPin, Globe, Trash2, Edit2, Mail, Phone, Building2, Clock, MessageSquare, UserPlus, BarChart2 } from "lucide-react";
 import { useCampaigns, useDeleteCampaign, useConvertCampaignToContact, type Campaign } from "@/hooks/useCampaigns";
 import { CampaignFormDialog } from "@/components/campaigns/CampaignFormDialog";
+import { CampaignStatsPanel } from "@/components/campaigns/CampaignStatsPanel";
+import { RecordResponseDialog } from "@/components/campaigns/RecordResponseDialog";
 import { ExportDropdown } from "@/components/common/ExportDropdown";
 import { TableViewManager, ColumnConfig } from "@/components/common/TableViewManager";
 import { useDefaultTableView } from "@/hooks/useTableViews";
@@ -96,6 +98,8 @@ export default function Campaigns() {
   const [selectedCampaign, setSelectedCampaign] = useState<Campaign | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [campaignToDelete, setCampaignToDelete] = useState<Campaign | null>(null);
+  const [responseDialogCampaign, setResponseDialogCampaign] = useState<Campaign | null>(null);
+  const [showStats, setShowStats] = useState(false);
   const [visibleColumns, setVisibleColumns] = useState<string[]>(
     columnConfigs.filter((c) => c.defaultVisible).map((c) => c.key)
   );
@@ -348,13 +352,28 @@ export default function Campaigns() {
       render: (campaign: Campaign) => (
         <TooltipProvider>
           <div className="flex items-center gap-1">
+            {!["cliente", "descartado"].includes(campaign.status) && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="text-primary"
+                    onClick={() => setResponseDialogCampaign(campaign)}
+                  >
+                    <MessageSquare className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Registrar respuesta</TooltipContent>
+              </Tooltip>
+            )}
             {campaign.status !== "cliente" && (
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <Button 
-                    variant="ghost" 
-                    size="icon" 
-                    className="text-success" 
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="text-success"
                     onClick={() => handleConvertToContact(campaign)}
                     disabled={convertToContact.isPending}
                   >
@@ -400,13 +419,23 @@ export default function Campaigns() {
         title="Campañas"
         subtitle="Leads y negocios capturados desde n8n"
         actions={
-          <Button className="gap-2" onClick={() => { setSelectedCampaign(null); setDialogOpen(true); }}>
-            <Plus className="h-4 w-4" />
-            Nueva Campaña
-          </Button>
+          <div className="flex gap-2">
+            <Button variant="outline" className="gap-2" onClick={() => setShowStats((v) => !v)}>
+              <BarChart2 className="h-4 w-4" />
+              {showStats ? "Ocultar stats" : "Ver estadísticas"}
+            </Button>
+            <Button className="gap-2" onClick={() => { setSelectedCampaign(null); setDialogOpen(true); }}>
+              <Plus className="h-4 w-4" />
+              Nueva Campaña
+            </Button>
+          </div>
         }
       />
       <div className="p-6 space-y-6">
+        {/* Funnel stats panel */}
+        {showStats && campaigns.length > 0 && (
+          <CampaignStatsPanel campaigns={campaigns} />
+        )}
         {/* Stats */}
         <div className="grid grid-cols-1 sm:grid-cols-5 gap-4">
           <div className="bg-card rounded-lg border border-border p-4">
@@ -511,6 +540,15 @@ export default function Campaigns() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Record Response Dialog */}
+      {responseDialogCampaign && (
+        <RecordResponseDialog
+          campaign={responseDialogCampaign}
+          open={!!responseDialogCampaign}
+          onClose={() => setResponseDialogCampaign(null)}
+        />
+      )}
     </div>
   );
 }
