@@ -333,6 +333,39 @@ npm run db:studio    # Drizzle Studio — UI visual de la BD
 
 ## Changelog
 
+### v2.4.0 — 2026-04-12
+
+#### Block C — Motor de reglas de notificación automática
+
+**Arquitectura:** Cron job evaluable desde scheduler externo (EasyPanel, GitHub Actions) o manualmente desde Ajustes. Deduplica por entidad+regla dentro del umbral de días para evitar spam.
+
+| Componente | Descripción |
+|------------|-------------|
+| `POST /api/cron/notifications` | Evalúa todas las reglas activas y envía emails |
+| `GET /api/cron/notifications?secret=` | Trigger externo con CRON_SECRET |
+| `notification_queue` | Registro de envíos (sent/failed/pending) + dedup |
+| `NotificationRulesSettings` | Botón "Ejecutar ahora" con resumen de resultados |
+
+**Tipos de regla soportados:**
+- `invoice_due_*` — facturas próximas a vencer (N días)
+- `invoice_overdue` — facturas vencidas
+- `contract_expiring` — contratos que vencen en N días
+- `contract_pending` — contratos pendientes de activación
+- `quote_no_response` — presupuestos enviados sin respuesta próximos a caducar
+
+**Variables de plantilla:** `{{client_name}}`, `{{company_name}}`, `{{invoice_number}}`, `{{contract_number}}`, `{{quote_number}}`, `{{total}}`, `{{due_date}}`, `{{end_date}}`, `{{days}}`
+
+**Seguridad:** Auth dual — sesión de usuario (botón manual) o header `x-cron-secret` (scheduler externo). Variable `CRON_SECRET` en `.env`.
+
+**Configuración cron externa (EasyPanel):**
+```
+POST https://tudominio.com/api/cron/notifications
+Header: x-cron-secret: <CRON_SECRET>
+Schedule: 0 8 * * *   # cada día a las 8:00
+```
+
+---
+
 ### v2.3.0 — 2026-04-13
 
 #### Block B (mejorado) — Webcal Feed: sincronización real CRM → Google Calendar
