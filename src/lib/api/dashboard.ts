@@ -15,6 +15,7 @@ export interface DashboardStats {
 }
 
 export interface DashboardWidgetStats {
+  contracts: { count: number; active: number; mrr: number };
   contacts: { count: number; newThisMonth: number };
   clients: { count: number; active: number };
   quotes: { count: number; pending: number; pendingAmount: number };

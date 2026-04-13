@@ -11,6 +11,7 @@ import { RecentActivityWidget } from "@/components/dashboard/RecentActivityWidge
 import { UpcomingTasksWidget } from "@/components/dashboard/UpcomingTasksWidget";
 import { RevenueExpensesChart } from "@/components/dashboard/RevenueExpensesChart";
 import { SalesPipelineChart } from "@/components/dashboard/SalesPipelineChart";
+import { ContractsMrrChart } from "@/components/dashboard/ContractsMrrChart";
 import { DynamicTableWidget } from "@/components/dashboard/DynamicTableWidget";
 import { useDashboardStats } from "@/hooks/useDashboardWidgets";
 import type { DashboardWidget, WidgetHeight } from "@/hooks/useDashboardWidgets";
@@ -30,7 +31,7 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
 const defaultWidgets: DashboardWidget[] = [
-  { id: "stat-contacts", type: "stat", title: "Contactos", entity: "contacts", config: { field: "count" }, size: "small", height: "auto", order: 0 },
+  { id: "stat-contracts", type: "stat", title: "Contratos Activos", entity: "contracts", config: { field: "count" }, size: "small", height: "auto", order: 0 },
   { id: "stat-clients", type: "stat", title: "Clientes Activos", entity: "clients", config: { field: "count" }, size: "small", height: "auto", order: 1 },
   { id: "stat-quotes", type: "stat", title: "Presupuestos Pendientes", entity: "quotes", config: { field: "count" }, size: "small", height: "auto", order: 2 },
   { id: "stat-invoices", type: "stat", title: "Facturación Mensual", entity: "invoices", config: { field: "sum" }, size: "small", height: "auto", order: 3 },
@@ -38,6 +39,7 @@ const defaultWidgets: DashboardWidget[] = [
   { id: "widget-activity", type: "activity", title: "Actividad Reciente", config: {}, size: "large", height: "auto", order: 5 },
   { id: "widget-pipeline", type: "chart", title: "Pipeline de Ventas", entity: "quotes", config: { chartType: "bar" }, size: "large", height: "auto", order: 6 },
   { id: "widget-revenue", type: "chart", title: "Ingresos vs Gastos", entity: "invoices", config: { chartType: "area" }, size: "large", height: "auto", order: 7 },
+  { id: "widget-mrr", type: "chart", title: "MRR Contratos", entity: "contracts", config: { chartType: "line" }, size: "large", height: "auto", order: 8 },
 ];
 
 export default function Dashboard() {
@@ -107,6 +109,7 @@ export default function Dashboard() {
 
   const getWidgetIcon = (entity?: string) => {
     switch (entity) {
+      case "contracts": return FileText;
       case "contacts": return Users;
       case "clients": return Building2;
       case "quotes": return FileText;
@@ -119,6 +122,7 @@ export default function Dashboard() {
   const getWidgetValue = (widget: DashboardWidget) => {
     if (!stats) return "—";
     switch (widget.entity) {
+      case "contracts": return stats.contracts.active;
       case "contacts": return stats.contacts.count;
       case "clients": return stats.clients.active;
       case "quotes": return stats.quotes.pending;
@@ -131,6 +135,7 @@ export default function Dashboard() {
   const getWidgetChange = (widget: DashboardWidget) => {
     if (!stats) return undefined;
     switch (widget.entity) {
+      case "contracts": return { value: stats.contracts.active, label: `MRR ${formatCurrency(stats.contracts.mrr)}` };
       case "contacts": return { value: stats.contacts.newThisMonth, label: "este mes" };
       case "clients": return { value: stats.clients.active, label: "activos" };
       case "quotes": return { value: stats.quotes.pending, label: "pendientes" };
@@ -166,6 +171,9 @@ export default function Dashboard() {
         }
         if (widget.config.chartType === "bar" || widget.title.includes("Pipeline")) {
           return <SalesPipelineChart key={widget.id} />;
+        }
+        if (widget.config.chartType === "line" || widget.title.includes("MRR")) {
+          return <ContractsMrrChart key={widget.id} />;
         }
         return null;
       default:
@@ -279,7 +287,12 @@ export default function Dashboard() {
               <Wallet className="h-5 w-5 text-primary" />
               <h3 className="font-semibold">Resumen Financiero del Mes</h3>
             </div>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+              <div>
+                <p className="text-sm text-muted-foreground">MRR</p>
+                <p className="text-xl font-semibold text-primary">{formatCurrency(stats.contracts.mrr)}</p>
+                <p className="text-xs text-muted-foreground">{stats.contracts.active} contratos activos</p>
+              </div>
               <div>
                 <p className="text-sm text-muted-foreground">Ingresos</p>
                 <p className="text-xl font-semibold text-success">{formatCurrency(stats.invoices.monthlyTotal)}</p>

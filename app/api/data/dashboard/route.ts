@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { contacts, clients, quotes, invoices, expenses } from "@/lib/schema";
+import { contacts, clients, quotes, invoices, expenses, contracts } from "@/lib/schema";
 import { eq, and, gte, inArray, sql } from "drizzle-orm";
 import { requireSession, toNum, apiError } from "@/lib/api-server";
 
@@ -15,12 +15,13 @@ export async function GET(request: NextRequest) {
     const firstDayStr = firstDayOfMonth.toISOString().split("T")[0];
 
     if (type === "widget") {
-      const [contactRows, clientRows, quoteRows, invoiceRows, expenseRows] = await Promise.all([
+      const [contactRows, clientRows, quoteRows, invoiceRows, expenseRows, contractRows] = await Promise.all([
         db.select({ id: contacts.id, status: contacts.status, createdAt: contacts.createdAt }).from(contacts),
         db.select({ id: clients.id, status: clients.status }).from(clients),
         db.select({ id: quotes.id, status: quotes.status, total: quotes.total }).from(quotes),
         db.select({ id: invoices.id, status: invoices.status, total: invoices.total, issueDate: invoices.issueDate }).from(invoices),
         db.select({ id: expenses.id, status: expenses.status, total: expenses.total, issueDate: expenses.issueDate }).from(expenses),
+        db.select({ id: contracts.id, status: contracts.status, total: contracts.total, billingPeriod: contracts.billingPeriod }).from(contracts),
       ]);
 
       const currentMonth = now.getMonth();
@@ -35,7 +36,24 @@ export async function GET(request: NextRequest) {
         return d.getMonth() === currentMonth && d.getFullYear() === currentYear;
       });
 
+      // MRR: normalize each active contract's total to monthly equivalent
+      const activeContracts = contractRows.filter((c) => c.status === "vigente");
+      const mrr = activeContracts.reduce((sum, c) => {
+        const t = toNum(c.total);
+        switch (c.billingPeriod) {
+          case "mensual":    return sum + t;
+          case "trimestral": return sum + t / 3;
+          case "anual":      return sum + t / 12;
+          default:           return sum + t;
+        }
+      }, 0);
+
       return NextResponse.json({
+        contracts: {
+          count: contractRows.length,
+          active: activeContracts.length,
+          mrr: Math.round(mrr * 100) / 100,
+        },
         contacts: {
           count: contactRows.length,
           newThisMonth: contactRows.filter((c) => {
