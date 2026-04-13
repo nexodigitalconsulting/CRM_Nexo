@@ -31,6 +31,8 @@ import { PdfSettingsManager } from "@/components/settings/PdfSettingsManager";
 import { EntityConfigManager } from "@/components/settings/EntityConfigManager";
 import { DatabaseStatus } from "@/components/settings/DatabaseStatus";
 import { EmailLogsPanel } from "@/components/settings/EmailLogsPanel";
+import { UserManagementSettings } from "@/components/settings/UserManagementSettings";
+import { SecuritySettings } from "@/components/settings/SecuritySettings";
 import { toast } from "sonner";
 
 // ── Calendar Feed Settings ────────────────────────────────────────────────────
@@ -269,55 +271,11 @@ export default function Settings() {
           </TabsContent>
 
           <TabsContent value="users">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Users className="h-5 w-5" />
-                  Gestión de Usuarios
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <Alert>
-                  <AlertDescription>
-                    La gestión de usuarios se realiza desde el panel de autenticación
-                    de Supabase. Puedes invitar usuarios, gestionar roles y configurar
-                    políticas de acceso.
-                  </AlertDescription>
-                </Alert>
-                <div className="text-sm text-muted-foreground mt-4">
-                  Self-hosted: gestiona usuarios desde tu Supabase Studio local (Auth → Users).
-                </div>
-              </CardContent>
-            </Card>
+            <UserManagementSettings />
           </TabsContent>
 
           <TabsContent value="security">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Shield className="h-5 w-5" />
-                  Configuración de Seguridad
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <Alert>
-                  <AlertDescription>
-                    Las políticas de seguridad RLS (Row Level Security) están
-                    configuradas en la base de datos. Cada tabla tiene políticas
-                    que controlan el acceso según el rol del usuario.
-                  </AlertDescription>
-                </Alert>
-                <div className="space-y-2">
-                  <h4 className="font-medium">Roles disponibles:</h4>
-                  <ul className="list-disc list-inside text-sm text-muted-foreground space-y-1">
-                    <li><strong>admin</strong> - Acceso total al sistema</li>
-                    <li><strong>manager</strong> - Gestión de datos y reportes</li>
-                    <li><strong>user</strong> - Operaciones básicas</li>
-                    <li><strong>readonly</strong> - Solo lectura</li>
-                  </ul>
-                </div>
-              </CardContent>
-            </Card>
+            <SecuritySettings />
           </TabsContent>
 
           <TabsContent value="pdfs">
